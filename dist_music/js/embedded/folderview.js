@@ -1,0 +1,410 @@
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2017 - 2026
+ */
+
+import playIconPath from '../../img/music-dark.svg';
+import playIconSvgData from '../../img/music-dark.svg?raw';
+
+OCA.Music = OCA.Music || {};
+
+/**
+ * "Folder player" is used in the Files app and in the link-shared folders
+ */
+OCA.Music.FolderView = class {
+
+	#currentFile = null; // may be an audio file or a playlist file
+	#currentNode = null; // current file when using ncFiles4, also legacy #currentFile is still defined
+	#playingListFile = false;
+	#fileList = null; // FileList from the Sharing app prior to NC 31
+	#ncFiles4Sidebar = null; // Sidebar on NC 33+
+	#shareToken = null;
+	#audioMimes = null;
+	#playlistMimes = null;
+
+	#player = null;
+	#playlist = null;
+
+	constructor(embeddedPlayer, audioMimes, playlistMimes) {
+		this.#audioMimes = audioMimes;
+		this.#playlistMimes = playlistMimes;
+		this.#player = embeddedPlayer;
+		this.#player.setCallbacks(
+			this.#onClose.bind(this),
+			this.#onNext.bind(this),
+			this.#onPrev.bind(this),
+			this.#onMenuOpen.bind(this),
+			this.#onShowList.bind(this),
+			this.#onImportList.bind(this),
+			this.#onImportRadio.bind(this)
+		);
+	}
+
+	registerToNcFiles4(ncFiles, sharingToken) {
+		this.#shareToken = sharingToken;
+		this.#registerToNcFiles4(ncFiles, this.#audioMimes, this.#toggleOrOpenAudioFile, 'music_play_audio_file');
+		this.#registerToNcFiles4(ncFiles, this.#playlistMimes, this.#toggleOrOpenPlaylistFile, 'music_play_playlist_file');
+		this.#ncFiles4Sidebar = ncFiles.getSidebar();
+	}
+
+	registerToNcFiles3(ncFiles, sharingToken) {
+		this.#shareToken = sharingToken;
+		this.#registerToNcFiles3(ncFiles, this.#audioMimes, this.#toggleOrOpenAudioFile, 'music_play_audio_file');
+		this.#registerToNcFiles3(ncFiles, this.#playlistMimes, this.#toggleOrOpenPlaylistFile, 'music_play_playlist_file');
+	}
+
+	registerToFileActions(fileActions, sharingToken) {
+		this.#shareToken = sharingToken;
+		this.#registerToFileActions(fileActions, this.#audioMimes, this.#toggleOrOpenAudioFile, 'music_play_audio_file');
+		this.#registerToFileActions(fileActions, this.#playlistMimes, this.#toggleOrOpenPlaylistFile, 'music_play_playlist_file');
+	}
+
+	onPlaylistItemClick(playlistFile, itemIdx) {
+		if (this.#currentFile !== null && playlistFile.id == this.#currentFile.id) {
+			if (itemIdx == this.#playlist.currentIndex()) {
+				this.#player.togglePlayback();
+			} else {
+				this.#jumpToPlaylistFile(this.#playlist.jumpToIndex(itemIdx));
+			}
+		}
+		else {
+			if (OCA.Files.App) {
+				// Share app on NC30 or earlier
+				this.#fileList = OCA.Files.App.fileList;
+				this.#currentFile = this.#fileList.findFile(playlistFile.name);
+			} else {
+				// Share app on NC 31+ or Files app
+				this.#currentFile = playlistFile;
+			}
+			this.#openPlaylistFile(() => this.#jumpToPlaylistFile(this.#playlist.jumpToIndex(itemIdx)));
+		}
+	}
+
+	playlistFileState() {
+		if (this.#playingListFile) {
+			return {
+				fileId: this.#currentFile.id,
+				index: this.#playlist.currentIndex()
+			};
+		} else {
+			return null;
+		}
+	}
+
+	#urlForFile(file) {
+		// Use download endpoints provided by the Music back-end instead of relying on mFileList.getDownloadUrl or the 
+		// file.source from ncFiles.FileAction (on NC28+). This has the benefit of working the same way on all platform
+		// versions and when playing individual audio files or a playlist.
+
+		// When not playing a public share, we add the request token. This is actually unnecessary for most files
+		// but needed when the file in question is played using our Aurora.js fallback player.
+		return this.#shareToken
+			? OC.generateUrl(`apps/music/api/share/${this.#shareToken}/${file.id}/download`)
+			: OC.generateUrl(`apps/music/api/files/${file.id}/download`) + '?requesttoken=' + encodeURIComponent(OC.requestToken);
+	}
+
+	#onClose() {
+		this.#currentFile = null;
+		this.#currentNode = null;
+		this.#playingListFile = false;
+		this.#playlist?.reset();
+		OCA.Music.playlistTabView?.setCurrentTrack(null, null);
+	}
+
+	#onNext() {
+		if (this.#playlist) {
+			this.#jumpToPlaylistFile(this.#playlist.next());
+		}
+	}
+
+	#onPrev() {
+		if (this.#playlist) {
+			this.#jumpToPlaylistFile(this.#playlist.prev());
+		}
+	}
+
+	#onMenuOpen($menu) {
+		// disable/enable the "Import list to Music" item
+		let inLibraryFilesCount = _(this.#playlist.files()).filter('in_library').size();
+		let extStreamsCount = _(this.#playlist.files()).filter('external').size();
+		let outLibraryFilesCount = this.#playlist.length() - inLibraryFilesCount;
+
+		let $importListItem = $menu.find('#playlist-menu-import');
+		let $importRadioItem = $menu.find('#playlist-menu-import-radio');
+
+		if (inLibraryFilesCount === 0) {
+			$importListItem.addClass('disabled');
+			$importListItem.attr('title', t('music', 'None of the playlist files are within your music library'));
+		} else {
+			$importListItem.removeClass('disabled');
+			if (outLibraryFilesCount > 0) {
+				$importListItem.attr('title',
+						t('music', '{inCount} out of {totalCount} files are within your music library and can be imported',
+						{inCount: inLibraryFilesCount, totalCount: this.#playlist.length()}));
+			} else {
+				$importListItem.removeAttr('title');
+			}
+		}
+
+		// hide the "Import radio to Music" if there are no external streams on the list
+		if (extStreamsCount === 0) {
+			$importRadioItem.addClass('hidden');
+		} else {
+			$importRadioItem.removeClass('hidden');
+		}
+
+		// hide the "Import list to Music" if there are only external streams on the list
+		if (extStreamsCount === this.#playlist.length()) {
+			$importListItem.addClass('hidden');
+		} else {
+			$importListItem.removeClass('hidden');
+		}
+	}
+
+	#onShowList() {
+		if (OCA.Files.Sidebar) {
+			OCA.Files.Sidebar.open(this.#currentFile.path + '/' + this.#currentFile.name);
+			OCA.Files.Sidebar.setActiveTab(OCA.Music.playlistTabView.id);
+		} else if (this.#ncFiles4Sidebar?.available) {
+			this.#ncFiles4Sidebar.open(this.#currentNode, 'music_playlist');
+		}
+	}
+
+	#onImportList() {
+		this.#doImportFromFile(OCA.Music.PlaylistFileService.importPlaylist);
+	}
+
+	#onImportRadio() {
+		this.#doImportFromFile(OCA.Music.PlaylistFileService.importRadio);
+	}
+
+	#doImportFromFile(serviceImportFunc) {
+		this.#player.showBusy(true);
+
+		serviceImportFunc(this.#currentFile, (_result) => {
+			this.#player.showBusy(false);
+		});
+	}
+
+	#jumpToPlaylistFile(file) {
+		if (!file) {
+			this.#player.close();
+		} else {
+			if (!this.#playingListFile) {
+				this.#currentFile = file;
+			}
+			if (file.external) {
+				this.#player.playExtUrl(file.url, file.token, file.caption);
+			} else {
+				this.#player.playFile(
+					this.#urlForFile(file),
+					file.mimetype,
+					file.id,
+					file.name,
+					this.#shareToken
+				);
+			}
+			this.#player.setPlaylistIndex(this.#playlist.currentIndex(), this.#playlist.length());
+			if (OCA.Music.playlistTabView) {
+				// this will also take care of clearing any existing focus if the this.#currentFile is not a playlist
+				OCA.Music.playlistTabView.setCurrentTrack(this.#currentFile.id, this.#playlist.currentIndex());
+			}
+		}
+	}
+
+	#createFileClickCallback(fileOpenCallback) {
+		return (file) => {
+			// Check if playing file changes
+			if (this.#currentFile?.id != file.id) {
+				this.#currentFile = file;
+				fileOpenCallback();
+			}
+			else {
+				this.#player.togglePlayback();
+			}
+		};
+	}
+
+	#toggleOrOpenAudioFile = this.#createFileClickCallback(() => this.#openAudioFile());
+	#toggleOrOpenPlaylistFile = this.#createFileClickCallback(() => this.#openPlaylistFile());
+
+	#registerToNcFiles4(ncFiles, mimes, onActionCallback, actionId) {
+		ncFiles.registerFileAction({
+			id: actionId,
+			displayName: () => t('music', 'Play'),
+			iconSvgInline: () => playIconSvgData,
+			default: ncFiles.DefaultType.DEFAULT,
+			order: -1, // prioritize over the built-in Viewer app
+			inline: () => false,
+
+			enabled: ({nodes}) => (nodes.length == 1 && mimes.includes(nodes[0].mime)),
+
+			/**
+			 * Function executed on single file action
+			 * @return true if the action was executed successfully,
+			 * false otherwise and null if the action is silent/undefined.
+			 * @throws Error if the action failed
+			 */
+			exec: ({nodes, contents}) => {
+				this.#currentNode = nodes[0];
+
+				const adaptFile = (f) => {
+					return {id: f.fileid, name: f.basename, mimetype: f.mime, path: f.dirname};
+				};
+				onActionCallback(adaptFile(nodes[0]));
+
+				if (!this.#playingListFile) {
+					const dirFiles = _.map(contents, adaptFile);
+					this.#playlist = new OCA.Music.Playlist(dirFiles, this.#audioMimes, this.#currentFile.id);
+					this.#player.setNextAndPrevEnabled(this.#playlist.length() > 1);
+				}
+
+				return true;
+			},
+		});
+	}
+
+	#registerToNcFiles3(ncFiles, mimes, onActionCallback, actionId) {
+		ncFiles.registerFileAction(new ncFiles.FileAction({
+			id: actionId,
+			displayName: () => t('music', 'Play'),
+			iconSvgInline: () => playIconSvgData,
+			default: ncFiles.DefaultType.DEFAULT,
+			order: -1, // prioritize over the built-in Viewer app
+
+			enabled: (nodes, _view) => (nodes.length == 1 && mimes.includes(nodes[0].mime)),
+
+			/**
+			 * Function executed on single file action
+			 * @return true if the action was executed successfully,
+			 * false otherwise and null if the action is silent/undefined.
+			 * @throws Error if the action failed
+			 */
+			exec: (file, view, dir) => {
+				const adaptFile = (f) => {
+					return {id: f.fileid, name: f.basename, mimetype: f.mime, path: dir};
+				};
+				onActionCallback(adaptFile(file));
+
+				if (!this.#playingListFile) {
+					// get the directory contents and use them as the play queue
+					view.getContents(dir).then(contents => {
+						const dirFiles = _.map(contents.contents, adaptFile);
+						// By default, the files are sorted simply by the character codes, putting upper case names before lower case
+						// and not respecting any locale settings. This doesn't match the order on the UI, regardless of the column
+						// used for sorting. Sort on our own treating numbers "naturally" and using the locale of the browser since
+						// this is how NC28 seems to do this (older NC versions, on the other hand, used the user-selected UI-language
+						// as the locale for sorting although user-selected locale would have made even more sense).
+						// This still leaves such a mismatch that the special characters may be sorted differently by localeCompare than
+						// what NC28 Files does (it uses the 3rd party library natural-orderby for this).
+						dirFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+
+						this.#playlist = new OCA.Music.Playlist(dirFiles, this.#audioMimes, this.#currentFile.id);
+						this.#player.setNextAndPrevEnabled(this.#playlist.length() > 1);
+					});
+				}
+
+				return true;
+			},
+		}));
+	}
+
+	#registerToFileActions(fileActions, mimes, onActionCallback, actionId) {
+		// Handle 'play' action on file row
+		const onPlay = (fileName, context) => {
+			this.#fileList = context.fileList;
+			let file = this.#fileList.findFile(fileName);
+
+			// Recent versions of Nextcloud (at least 23-27, possibly some others too) fire this handler when
+			// the user navigates to an audio file with a direct link. In that case, the callback happens before
+			// the context.filList is populated and we can't operate normally. Just ignore these cases.
+			if (file !== null) {
+				onActionCallback(file);
+			}
+		};
+
+		const registerPlayerForMime = (mime) => {
+			fileActions.register(
+					mime,
+					actionId,
+					OC.PERMISSION_READ,
+					playIconPath,
+					onPlay,
+					t('music', 'Play')
+			);
+			fileActions.setDefault(mime, actionId);
+		};
+		_.forEach(mimes, registerPlayerForMime);
+	}
+
+	#openAudioFile() {
+		this.#playingListFile = false;
+
+		this.#player.show();
+		this.#player.showBusy(false);
+		this.#playlist = new OCA.Music.Playlist(this.#fileList?.files ?? [this.#currentFile], this.#audioMimes, this.#currentFile.id);
+		this.#player.setNextAndPrevEnabled(this.#playlist.length() > 1);
+		this.#jumpToPlaylistFile(this.#playlist.currentFile());
+	}
+
+	#openPlaylistFile(onReadyCallback = null) {
+		this.#playingListFile = true;
+
+		// clear the previous playback
+		this.#player.stop();
+		this.#playlist = null;
+
+		this.#player.show(this.#currentFile.name, !!(this.#ncFiles4Sidebar?.available || OCA.Files.Sidebar));
+		this.#player.showBusy(true);
+
+		const listFileId = this.#currentFile.id;
+		const onPlaylistLoaded = (data) => {
+			// ignore the callback if the player is already closed or file changed by the time we get it
+			if (this.#currentFile?.id == listFileId) {
+				this.#player.showBusy(false);
+				if (data.files.length > 0) {
+					this.#playlist = new OCA.Music.Playlist(data.files, this.#audioMimes, data.files[0].id);
+					this.#player.setNextAndPrevEnabled(this.#playlist.length() > 1);
+					this.#jumpToPlaylistFile(this.#playlist.currentFile());
+				}
+				else {
+					this.#currentFile = null;
+					this.#currentNode = null;
+					this.#player.close();
+					OCA.Music.Dialogs.showNotification(t('music', 'No files from the playlist could be found'));
+				}
+				if (data.invalid_paths.length > 0) {
+					let note = t('music', 'The playlist contained {count} invalid path(s).',
+							{count: data.invalid_paths.length});
+					if (!this.#shareToken) {
+						// Guide the user to look for details, unless this is a public share where the
+						// details pane is not available.
+						note += ' ' +  t('music', 'See the playlist file details.');
+					}
+					OCA.Music.Dialogs.showNotification(note);
+				}
+
+				if (onReadyCallback) {
+					onReadyCallback();
+				}
+			}
+		};
+		const onError = () => {
+			// ignore the callback if the player is already closed or file changed by the time we get it
+			if (this.#currentFile?.id == listFileId) {
+				this.#player.close();
+				this.#player.showBusy(false);
+				this.#currentFile = null;
+				this.#currentNode = null;
+				OCA.Music.Dialogs.showNotification(t('music', 'Error reading playlist file'));
+			}
+		};
+		OCA.Music.PlaylistFileService.readFile(listFileId, onPlaylistLoaded, onError, this.#shareToken);
+	}
+
+};

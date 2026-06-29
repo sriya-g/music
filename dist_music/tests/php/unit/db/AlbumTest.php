@@ -1,0 +1,82 @@
+<?php
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Morris Jobke 2013, 2014
+ * @copyright Pauli Järvinen 2017 - 2025
+ */
+
+namespace OCA\Music\Db;
+
+class AlbumTest extends \PHPUnit\Framework\TestCase {
+	private $urlGenerator;
+
+	protected function setUp() : void {
+		$this->urlGenerator = $this->getMockBuilder('\OCP\IURLGenerator')
+			->disableOriginalConstructor()
+			->getMock();
+		$this->urlGenerator
+			->method('linkToRoute')
+			->will($this->returnCallback([$this, 'linkToRouteMock']));
+	}
+
+	public static function linkToRouteMock(string $route, array $args) : string {
+		switch ($route) {
+			case 'music.shivaApi.artist':		return "/link/to/artist/{$args['id']}";
+			case 'music.shivaApi.album':		return "/link/to/album/{$args['id']}";
+			case 'music.coverApi.albumCover':	return "/link/to/album/{$args['albumId']}/cover";
+			default:							return "(mock missing for route $route)";
+		}
+	}
+
+	public function testToShivaApi() {
+		$album = new Album();
+		$album->setId(3);
+		$album->setName('The name');
+		$album->setYears([1999, 2000, 2013]);
+		$album->setCoverFileId(5);
+		$album->setAlbumArtistId(3);
+
+		$artist1 = new Artist();
+		$artist2 = new Artist();
+		$artist1->setId(1);
+		$artist2->setId(2);
+		$album->setArtists([$artist1, $artist2]);
+
+		$l10n = $this->getMockBuilder('\OCP\IL10N')->getMock();
+
+		$this->assertEquals([
+			'id' => 3,
+			'name' => 'The name',
+			'year' => 2013,
+			'cover' => '/link/to/album/3/cover',
+			'slug' => 'the-name',
+			'artists' => [
+				['id' => 1, 'uri' => '/link/to/artist/1'],
+				['id' => 2, 'uri' => '/link/to/artist/2']
+			],
+			'uri' => '/link/to/album/3',
+			'albumArtistId' => 3,
+			], $album->toShivaApi($this->urlGenerator, $l10n));
+	}
+
+	public function testNameLocalization() {
+		$album = new Album();
+		$album->setName(null);
+
+		$l10n = $this->getMockBuilder('\OCP\IL10N')->getMock();
+		$l10n->expects($this->any())
+			->method('t')
+			->will($this->returnValue('Unknown album'));
+
+		$this->assertEquals('Unknown album', $album->getNameString($l10n));
+		$album->setName('Album name');
+		$this->assertEquals('Album name', $album->getNameString($l10n));
+	}
+}

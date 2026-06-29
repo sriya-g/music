@@ -1,0 +1,28 @@
+imports:
+    - javascript
+    - php
+
+filter:
+    excluded_paths: [js/vendor/*, tests/]
+    dependency_paths:
+        - "vendor/nextcloud/ocp"
+        - "vendor/doctrine/dbal/"
+        - "3rdparty/getID3/getid3/"
+        - "stubs/"
+
+# No-one currently submits the coverage data so there's no use to wait for it.
+#tools:
+#    external_code_coverage:
+#        timeout: 300    # Timeout in seconds, 5 minutes
+#        runs: 2         # Scrutinizer waits for the first 2 coverage submissions (unit & integration)
+
+build:
+    image: default-bionic
+    environment:
+        php: 8.0.2
+        node: 16
+    nodes:
+        analysis:
+            tests:
+                override:
+                    - php-scrutinizer-run

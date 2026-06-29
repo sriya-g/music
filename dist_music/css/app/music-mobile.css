@@ -1,0 +1,164 @@
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Jan-Christoph Borchardt, http://jancborchardt.net
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Morris Jobke 2013, 2014
+ * @copyright Jan-Christoph Borchardt 2014
+ * @copyright Pauli Järvinen 2017 - 2026
+ */
+
+.mobile #app-view {
+	padding-inline-start: 4px;
+}
+
+.mobile .artist-area {
+	padding-top: 15px;
+}
+
+.mobile .artist-area > h1 {
+	margin-inline-start: 4px;
+}
+
+/* adjust album area to screen width */
+.mobile .album-area {
+	padding: 10px 30px 0 6px;
+}
+
+/* smaller album art */
+.mobile .view-container:not(.compact) .album-area > .albumart,
+.mobile .view-container:not(.compact) .album-area > .overlay {
+	line-height: 50px;
+	font-size: 30px;
+	width: 50px;
+	height: 50px;
+	float: inline-start;
+	border-radius: var(--music-albumart-small-border-radius);
+}
+/* also adjust the overlay position */
+.mobile .view-container:not(.compact) .album-area > .overlay {
+	margin-inline-start: -50px;
+}
+
+/* nicely display album name next to cover */
+.mobile .view-container:not(.compact) .album-area h2 {
+	padding: 0px 15px;
+	position: absolute;
+	inset-inline-start: 56px;
+	height: 50px;
+	line-height: 50px;
+}
+.mobile .view-container.single-col:not(.compact) .album-area h2 {
+	white-space: nowrap; /* override multi-line normally allowed in .single-col */
+}
+.mobile .album-area > h2 > div {
+	line-height: 1.2;
+}
+.mobile #app-view .heading-actions {
+	top: 50px;
+	inset-inline-end: 5px;
+}
+
+/* move track list to the left so it’s visible on small screens */
+.mobile .view-container:not(.compact) .album-area .track-list {
+	margin-inline-start: 0;
+	padding-top: 15px;
+	clear: both;
+}
+/* align track title to the left with album title */
+.mobile .view-container:not(.compact) .album-area .track-list > li:not(.more-less) {
+	padding-inline-start: 40px;
+}
+.mobile .view-container:not(.compact) .album-area .track-list > li.more-less {
+	padding-inline-start: 57px;
+}
+
+/* layout the play bar elements for less space */
+#app-navigation + #app-content.mobile #controls {
+	padding: 0 40px;
+}
+.mobile #controls.two-line .control,
+.mobile #controls.two-line .song-info,
+.mobile #controls .albumart {
+	margin-left: 0;
+	margin-right: 0;
+}
+.mobile #controls.two-line #play-pause-container .control {
+	margin-left: -6px;
+	margin-right: -6px;
+}
+.mobile #controls.two-line .song-info {
+	inset-inline-start: 220px;
+}
+.mobile #controls.two-line .title {
+	font-size: 14px;
+}
+.mobile #controls.two-line #shuffle {
+	inset-inline-start: 55px;
+}
+.mobile #controls.two-line #repeat {
+	inset-inline-start: 104px;
+}
+.mobile #controls.two-line .music-progress-info {
+	inset-inline-start: 172px;
+}
+.mobile #controls #play-pause-menu {
+	inset-inline-end: 0;
+}
+
+/* in portrait, there's even less space */
+.mobile.portrait #controls #skip-prev-button {
+	display: none;
+}
+.mobile.portrait #controls #context-menu-skip-prev {
+	display: block;
+}
+.mobile.portrait #controls.two-line #shuffle {
+	inset-inline-start: 35px;
+}
+.mobile.portrait #controls.two-line #repeat {
+	inset-inline-start: 77px;
+}
+.mobile.portrait #controls.two-line .song-info {
+	inset-inline-start: 172px;
+}
+.mobile.portrait #controls.two-line .music-progress-info {
+	inset-inline-start: 124px;
+}
+.mobile.portrait #controls #play-pause-menu {
+	inset-inline-end: -54px;
+}
+.mobile.portrait #controls #play-pause-menu::after /* the caret */ {
+	inset-inline-start: 36px;
+}
+
+/* extra narrow screen matches small smart phones; drop non-essential elements and margins */
+.mobile.portrait.extra-narrow #controls .albumart,
+.mobile.portrait.extra-narrow #controls .volume-icon-and-percent {
+	display: none;
+}
+.mobile.portrait.extra-narrow #controls.two-line .song-info {
+	inset-inline-start: 120px;
+	inset-inline-end: 25px;
+}
+.mobile.portrait.extra-narrow .view-container.compact .album-area .track-list {
+	margin-inline-start: 0;
+}
+.mobile.portrait.extra-narrow .view-container:not(.compact) .album-area .track-list > li:not(.more-less) {
+	padding-inline-start: 0;
+}
+.mobile.portrait.extra-narrow .view-container:not(.compact) .album-area .track-list > li.more-less {
+	padding-inline-start: 18px;
+}
+
+/* min-width screen may result on desktop browser when manually resizing the window; here we need to drop also essential elements */
+.mobile.portrait.min-width #controls .music-volume-control {
+	display: none;
+}
+.mobile.portrait.min-width #controls.two-line .song-info {
+	inset-inline-end: 10px;
+}

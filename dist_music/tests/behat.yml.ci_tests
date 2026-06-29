@@ -1,0 +1,19 @@
+
+default:
+    suites:
+        Ampache:
+            paths:
+                - features/Ampache
+            contexts:
+                - AmpacheContext:
+                    baseUrl: http://localhost:8888/index.php
+                    username: ampache
+                    password: ampache
+        Subsonic:
+            paths:
+                - features/Subsonic
+            contexts:
+                - SubsonicContext:
+                    baseUrl: http://localhost:8888/index.php
+                    username: ampache
+                    password: ampache

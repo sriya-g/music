@@ -1,0 +1,53 @@
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Jan-Christoph Borchardt, http://jancborchardt.net
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Morris Jobke 2013, 2014
+ * @copyright Jan-Christoph Borchardt 2014
+ * @copyright Pauli Järvinen 2016 - 2026
+ */
+
+/* Adjust layout so that there is room for the toggle button of the collapsible navigation pane.
+   The rule has to match the one used by the core to make the pane collapsible.
+ */
+@media only screen and (width < 1024px) {
+	#app-view {
+		padding-top: 66px;
+	}
+
+	#content.app-music #app-navigation:not(.hidden) + #app-content {
+		inset-inline-start: 0;
+	}
+}
+
+#app-navigation + #app-content.tablet #controls {
+	padding: 0 40px;
+}
+
+.tablet #controls .albumart {
+	margin-inline-start: 8px;
+	margin-inline-end: 0;
+}
+
+.tablet #controls .song-info {
+	inset-inline-start: 260px;
+}
+
+.tablet #controls:not(.two-line) .song-info {
+	width: 200px;
+}
+
+.tablet #controls:not(.two-line) .music-progress-info {
+	inset-inline-start: 460px;
+	max-width: 350px;
+}
+
+.tablet #controls .title {
+	font-size: 14px;
+	line-height: 26px;
+}

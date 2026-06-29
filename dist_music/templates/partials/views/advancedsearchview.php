@@ -1,0 +1,157 @@
+<div class="view-container" id="adv-search-area">
+	<h1 translate>Advanced search</h1>
+
+	<div id="adv-search-controls">
+		<div id="adv-search-common-parameters">
+			<div>
+				<label for="adv-search-type" translate>Search for</label>
+				<select id="adv-search-type" ng-model="entityType" ng-change="onEntityTypeChanged()">
+					<option value="track" translate>tracks</option>
+					<option value="album" translate>albums</option>
+					<option value="artist" translate>artists</option>
+					<option value="playlist" translate>playlists</option>
+					<option value="genre" translate>genres</option>
+					<option value="podcast_episode" translate>podcast episodes</option>
+					<option value="podcast_channel" translate>podcast channels</option>
+					<option value="radio_station" translate>radio stations</option>
+				</select>
+			</div>
+			<div>
+				<select id="adv-search-conjunction" ng-model="conjunction">
+					<option value="and" translate>matching all rules</option>
+					<option value="or" translate>matching any rule</option>
+				</select>
+			</div>
+			<div>
+				<label for="adv-search-order" translate>ordering results</label>
+				<select id="adv-search-order" ng-model="order">
+					<option ng-repeat="order in availableOrders[entityType]" ng-value="order.value">{{ order.text }}</option>
+				</select>
+			</div>
+			<div>
+				<label for="adv-search-limit" translate>limiting to</label>
+				<select id="adv-search-limit" ng-model="maxResults">
+					<option value="" translate>unlimited</option>
+					<option value="10" translate>10 matches</option>
+					<option value="30" translate>30 matches</option>
+					<option value="100" translate>100 matches</option>
+					<option value="500" translate>500 matches</option>
+				</select>
+			</div>
+		</div>
+		<h2 translate>Rules</h2>
+		<div id="adv-search-rules">
+			<div class="adv-search-rule-row" ng-repeat="rule in searchRules" on-enter="search()">
+				<select ng-model="rule.rule" ng-change="onRuleChanged(rule)">
+					<option ng-if="!searchRuleTypes[entityType][0].label" ng-repeat="ruleType in searchRuleTypes[entityType][0].options" ng-value="ruleType.key">{{ ruleType.name }}</option>
+					<optgroup ng-repeat="category in searchRuleTypes[entityType]" label="{{ category.label }}" ng-if="category.label">
+						<option ng-repeat="ruleType in category.options" ng-value="ruleType.key">{{ ruleType.name }}</option>
+					</optgroup>
+				</select>
+
+				<select ng-model="rule.operator">
+					<option ng-repeat="ruleOp in operatorsForRule(rule.rule)" ng-value="ruleOp.key">{{ ruleOp.name }}</option>
+				</select>
+
+				<input ng-if="ruleType(rule.rule) == 'text'" type="text" ng-model="rule.input" enterkeyhint="search"/>
+				<input ng-if="['numeric', 'numeric_limit', 'days'].includes(ruleType(rule.rule))" type="number" ng-model="rule.input" enterkeyhint="search"/>
+				<input ng-if="ruleType(rule.rule) == 'date'" type="date" ng-model="rule.input"/>
+				<select ng-if="ruleType(rule.rule) == 'numeric_rating'" ng-model="rule.input">
+					<option ng-repeat="val in [0,1,2,3,4,5]" ng-value="val">{{ ratingLabel(val) }}</option>
+				</select>
+				<select ng-if="ruleType(rule.rule) == 'playlist'" ng-model="rule.input">
+					<option ng-repeat="pl in playlists" ng-value="pl.id">{{ pl.name }}</option>
+				</select>
+
+				<a class="icon icon-close" ng-click="removeSearchRule($index)"></a>
+			</div>
+			<div class="add-row clickable" ng-click="addSearchRule()">
+				<a class="icon icon-add"></a>
+			</div>
+		</div>
+		<button ng-click="search()" translate>Search</button><span style="color:red" ng-show="errorDescription">{{ errorDescription }}</span>
+	</div>
+
+	<div ng-if="results" class="flat-list-view playlist-area">
+		<h2 class="results-title">
+			<span ng-class="{ clickable: resultCount() }" ng-click="onHeaderClick()">
+				<span ui-draggable="true" drag="getHeaderDraggable()"
+					translate translate-n="resultCount()" translate-plural="{{ resultCount() }} results">{{ resultCount() }} result</span>
+				<img ng-if="resultCount()" class="play svg" alt="{{ 'Play' | translate }}"
+					src="<?php \OCA\Music\Utility\HtmlUtil::printSvgPath('play-small') ?>"/>
+			</span>
+			<button class="icon-more" ng-show="saveableResultCount()" ng-click="onResultsContextMenuButton($event)"></button>
+			<div class="popovermenu bubble heading-actions" ng-show="showResultsMenu">
+				<ul>
+					<li><a ng-click="saveResults()"><span class="icon icon-playlist svg"></span><span translate>Save playlist</span></a></li>
+				</ul>
+			</div>
+		</h2>
+		<track-list
+			tracks="results.tracks"
+			get-track-data="getTrackData"
+			play-track="onTrackClick"
+			show-track-details="showTrackDetails"
+			get-draggable="getTrackDraggable"
+		></track-list>
+		<track-list
+			tracks="results.albums"
+			get-track-data="getAlbumData"
+			play-track="onAlbumClick"
+			show-track-details="showAlbumDetails"
+			get-draggable="getAlbumDraggable"
+			track-id-prefix="'album'"
+			content-type="'album'"
+		></track-list>
+		<track-list
+			tracks="results.artists"
+			get-track-data="getArtistData"
+			play-track="onArtistClick"
+			show-track-details="showArtistDetails"
+			get-draggable="getArtistDraggable"
+			track-id-prefix="'artist'"
+			content-type="'artist'"
+		></track-list>
+		<track-list
+			tracks="results.playlists"
+			get-track-data="getPlaylistData"
+			play-track="onPlaylistClick"
+			show-track-details="showPlaylistDetails"
+			get-draggable="getPlaylistDraggable"
+			track-id-prefix="'playlist'"
+			content-type="'playlist'"
+		></track-list>
+		<track-list
+			tracks="results.genres"
+			get-track-data="getGenreData"
+			play-track="onGenreClick"
+			get-draggable="getGenreDraggable"
+			track-id-prefix="'genre'"
+			content-type="'genre'"
+		></track-list>
+		<track-list
+			tracks="results.podcastEpisodes"
+			get-track-data="getPodcastEpisodeData"
+			play-track="onPodcastEpisodeClick"
+			show-track-details="showPodcastEpisodeDetails"
+			track-id-prefix="'podcast-episode'"
+			content-type="'podcast'"
+		></track-list>
+		<track-list
+			tracks="results.podcastChannels"
+			get-track-data="getPodcastChannelData"
+			play-track="onPodcastChannelClick"
+			show-track-details="showPodcastChannelDetails"
+			track-id-prefix="'podcast-channel'"
+			content-type="'podcast-channel'"
+		></track-list>
+		<track-list
+			tracks="results.radioStations"
+			get-track-data="getRadioStationData"
+			play-track="onRadioStationClick"
+			show-track-details="showRadioStationDetails"
+			track-id-prefix="'radio-station'"
+			content-type="'radio'"
+		></track-list>
+	</div>
+</div>

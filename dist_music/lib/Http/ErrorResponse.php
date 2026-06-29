@@ -1,0 +1,33 @@
+<?php declare(strict_types=1);
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2017 - 2026
+ */
+
+namespace OCA\Music\Http;
+
+use OCP\AppFramework\Http\JSONResponse;
+
+/**
+ * @extends JSONResponse<int, array, array<string, mixed>>
+ */
+class ErrorResponse extends JSONResponse {
+
+	/**
+	 * @param int $statusCode the Http status code
+	 * @param string $message Error message, defaults to empty
+	 */
+	public function __construct(int $statusCode, ?string $message=null, array $additionalFields=[]) {
+		$content = $additionalFields;
+		if (!empty($message)) {
+			$content['message'] = $message;
+		}
+		parent::__construct($content, $statusCode);
+	}
+}

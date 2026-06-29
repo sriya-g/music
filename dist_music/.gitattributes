@@ -1,0 +1,6 @@
+.gitattributes export-ignore
+.gitignore export-ignore
+.github export-ignore
+.php-cs-fixer.dist.php export-ignore
+.scrutinizer.yml export-ignore
+behat.yml.ci_tests export-ignore

@@ -1,0 +1,46 @@
+{
+    "env": {
+        "browser": true,
+        "commonjs": true,
+        "es2021": true
+    },
+    "extends": "eslint:recommended",
+	"parser": "../node_modules/@babel/eslint-parser",
+    "parserOptions": {
+		"requireConfigFile": false,
+        "sourceType": "module"
+    },
+    "ignorePatterns": ["/vendor/**", "app/l10n/*"],
+    "globals": {
+        "_": "readonly",
+        "$": "readonly",
+        "OC": "readonly",
+        "OCA": "writable",
+        "OCP": "readonly",
+        "angular": "readonly",
+        "t": "readonly",
+        "AV": "readonly",
+        "MediaMetadata": "readonly"
+    },
+    "rules": {
+        "indent": [
+            "off"
+        ],
+        "linebreak-style": [
+            "error",
+            "unix"
+        ],
+        "quotes": [
+            "error",
+            "single"
+        ],
+        "semi": [
+            "error",
+            "always"
+        ],
+        "no-unused-vars": [
+            2,
+            {"args": "after-used", "argsIgnorePattern": "^_"}
+        ]
+    }
+}

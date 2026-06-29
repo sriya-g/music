@@ -1,0 +1,17 @@
+parameters:
+    level: 6
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - lib
+    scanDirectories:
+        - vendor/nextcloud/ocp
+        - stubs
+        - 3rdparty
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    ignoreErrors:
+        - '#Property [a-zA-Z0-9\\_]+::\$logger is never read, only written.#'
+        - '#return type with generic class OCP\\AppFramework\\Http\\\w*Response does not specify its types:#'
+        - '#generic class OCP\\AppFramework\\Http\\Response but does not specify its types: S, H#'
+        - '#Dead catch - Doctrine\\DBAL\\Exception\\UniqueConstraintViolationException is never thrown in the try block.#'
+        - identifier: missingType.iterableValue
