@@ -55,6 +55,7 @@
 	</repair-steps>
 	<commands>
 		<command>OCA\Music\Command\Cleanup</command>
+		<command>OCA\Music\Command\ListenBrainzPlaylistSync</command>
 		<command>OCA\Music\Command\PlaylistExport</command>
 		<command>OCA\Music\Command\PlaylistImport</command>
 		<command>OCA\Music\Command\PodcastAdd</command>
