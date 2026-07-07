@@ -401,6 +401,69 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			$playlistBusinessLayer->setTracks($ncTrackIds, $ncPlaylist->getId(), $userId);
 		}
 
+		// Clean up old daily/weekly playlists
+		$keys = $this->config->getUserKeys($userId, 'music');
+		foreach ($keys as $key) {
+			if (\strpos($key, 'listenbrainz.playlist.') === 0) {
+				$playlistId = (int)$this->config->getUserValue($userId, 'music', $key, '0');
+				if ($playlistId <= 0) {
+					$this->config->deleteUserValue($userId, 'music', $key);
+					continue;
+				}
+
+				try {
+					$ncPlaylist = $playlistBusinessLayer->find($playlistId, $userId);
+				} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+					$this->config->deleteUserValue($userId, 'music', $key);
+					continue;
+				}
+
+				$playlistName = $ncPlaylist->getName() ?? '';
+				
+				// Check if it is a daily/weekly playlist
+				$isDailyOrWeekly = false;
+				if (\strpos($playlistName, '(ListenBrainz)') !== false) {
+					if (\strpos($playlistName, 'Daily Jams') !== false ||
+						\strpos($playlistName, 'Weekly Jams') !== false ||
+						\strpos($playlistName, 'Weekly Exploration') !== false) {
+						$isDailyOrWeekly = true;
+					}
+				}
+
+				if ($isDailyOrWeekly) {
+					$playlistDate = null;
+					// Try to parse the date from the title (e.g. 2026-07-06)
+					if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $playlistName, $matches)) {
+						$playlistDate = \strtotime($matches[1]);
+					} else {
+						// Fallback to creation date
+						$createdStr = $ncPlaylist->getCreated();
+						if ($createdStr) {
+							if ($createdStr instanceof \DateTimeInterface) {
+								$playlistDate = $createdStr->getTimestamp();
+							} else {
+								$playlistDate = \strtotime((string)$createdStr);
+							}
+						}
+					}
+
+					if ($playlistDate !== null && $playlistDate > 0) {
+						$ageSeconds = \time() - $playlistDate;
+						if ($ageSeconds > 7 * 86400) {
+							// More than 7 days old, delete it!
+							try {
+								$playlistBusinessLayer->delete($playlistId, $userId);
+								$this->logger->warning("ListenBrainz playlist sync: deleted old daily/weekly playlist '{$playlistName}' (ID {$playlistId})");
+							} catch (\Throwable $e) {
+								$this->logger->warning("ListenBrainz playlist sync: failed to delete old playlist '{$playlistName}': " . $e->getMessage());
+							}
+							$this->config->deleteUserValue($userId, 'music', $key);
+						}
+					}
+				}
+			}
+		}
+
 		$this->logger->warning("ListenBrainz playlist sync completed for user {$userId}");
 	}
 }
