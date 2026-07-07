@@ -89,16 +89,17 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		$userId = $track->getUserId();
 		$sessionKey = $this->getApiSession($userId);
 		if (!$sessionKey) {
+			$this->logger->warning("ListenBrainz scrobble skipped: No session key found for user {$userId}");
 			return;
 		}
 
 		if (empty($track->getArtistName())) {
-			$this->logger->info("Skip scrobbling track {$track->getId()} '{$track->getTitle()}' with unknown artist to ListenBrainz");
+			$this->logger->warning("Skip scrobbling track {$track->getId()} '{$track->getTitle()}' with unknown artist to ListenBrainz");
 			return;
 		}
 
 		if ($track->getLength() <= 30) {
-			$this->logger->info("Track '{$track->getTitle()}' by '{$track->getArtistName()}' is too short to scrobble to ListenBrainz");
+			$this->logger->warning("Track '{$track->getTitle()}' by '{$track->getArtistName()}' is too short ({$track->getLength()}s) to scrobble to ListenBrainz");
 			return;
 		}
 
@@ -215,10 +216,13 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		\curl_setopt($ch, \CURLOPT_POSTFIELDS, \json_encode($payloadData));
 		$responseString = \curl_exec($ch);
 		$httpCode = \curl_getinfo($ch, \CURLINFO_HTTP_CODE);
+		$curlError = \curl_error($ch);
 		\curl_close($ch);
 
 		if ($responseString === false || $httpCode !== 200) {
-			$this->logger->warning("Failed to submit listen to ListenBrainz. HTTP Code: {$httpCode}, Response: " . (string)$responseString);
+			$this->logger->warning("Failed to submit listen to ListenBrainz. HTTP Code: {$httpCode}, cURL Error: {$curlError}, Response: " . (string)$responseString);
+		} else {
+			$this->logger->warning("Successfully submitted listen to ListenBrainz. Response: " . (string)$responseString);
 		}
 	}
 }

@@ -193,7 +193,7 @@ class Application extends App implements IBootstrap {
 		$context->registerService(IScrobbler::class, function () {
 			$scrobblers = $this->get('externalScrobblers');
 			$scrobblers[] = $this->get(TrackBusinessLayer::class);
-			return new AggregateScrobbler($scrobblers);
+			return new AggregateScrobbler($scrobblers, $this->get(Logger::class));
 		});
 	}
 }

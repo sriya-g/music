@@ -15,24 +15,36 @@
 namespace OCA\Music\Service\Scrobbling;
 
 use OCA\Music\Db\Track;
+use OCA\Music\AppFramework\Core\Logger;
 
 class AggregateScrobbler implements IScrobbler {
 
 	/**
 	 * @param array<IScrobbler> $scrobblers
 	 */
-	public function __construct(private array $scrobblers) {
+	public function __construct(
+		private array $scrobblers,
+		private Logger $logger
+	) {
 	}
 
 	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null): void {
 		foreach ($this->scrobblers as $scrobbler) {
-			$scrobbler->recordTrackPlayed($track, $timeOfPlay);
+			try {
+				$scrobbler->recordTrackPlayed($track, $timeOfPlay);
+			} catch (\Throwable $e) {
+				$this->logger->error('Error recording play on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
+			}
 		}
 	}
 
 	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null): void {
 		foreach ($this->scrobblers as $scrobbler) {
-			$scrobbler->setNowPlaying($track, $timeOfPlay);
+			try {
+				$scrobbler->setNowPlaying($track, $timeOfPlay);
+			} catch (\Throwable $e) {
+				$this->logger->error('Error setting now playing on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
+			}
 		}
 	}
 }
