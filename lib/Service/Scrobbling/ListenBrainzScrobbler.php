@@ -323,6 +323,9 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		$trackBusinessLayer = \OC::$server->query(\OCA\Music\BusinessLayer\TrackBusinessLayer::class);
 
 		foreach ($allPlaylists as $mbid => $lbPlaylist) {
+			// Sleep 500ms to respect rate limits
+			\usleep(500000);
+
 			$title = $lbPlaylist['playlist']['title'];
 			$this->logger->warning("ListenBrainz playlist sync: fetching details for playlist '{$title}' ({$mbid})");
 
@@ -337,10 +340,11 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			]);
 			$responseString = \curl_exec($ch);
 			$httpCode = \curl_getinfo($ch, \CURLINFO_HTTP_CODE);
+			$curlError = \curl_error($ch);
 			\curl_close($ch);
 
 			if ($responseString === false || $httpCode !== 200) {
-				$this->logger->warning("ListenBrainz playlist sync: failed to fetch details for playlist {$mbid}");
+				$this->logger->warning("ListenBrainz playlist sync: failed to fetch details for playlist {$mbid} (HTTP {$httpCode}, cURL Error: {$curlError}, Response: " . (string)$responseString);
 				continue;
 			}
 
@@ -349,6 +353,9 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 				$this->logger->warning("ListenBrainz playlist sync: details for playlist {$mbid} contains no tracks list");
 				continue;
 			}
+
+			$isExploration = (\strpos(\strtolower($title), 'exploration') !== false);
+			$missingTracks = [];
 
 			// Map ListenBrainz track list to Nextcloud track IDs
 			$ncTrackIds = [];
@@ -362,6 +369,48 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 				$foundTracks = $trackBusinessLayer->findAllByNameArtistOrAlbum($trackTitle, $artistName, null, $userId);
 				if (!empty($foundTracks)) {
 					$ncTrackIds[] = $foundTracks[0]->getId();
+				} else {
+					if ($isExploration) {
+						$missingTracks[] = [
+							'title' => $trackTitle,
+							'artist' => $artistName,
+							'album' => $lbTrack['album'] ?? '',
+							'identifier' => $lbTrack['identifier'] ?? ''
+						];
+					}
+				}
+			}
+
+			if ($isExploration && !empty($missingTracks)) {
+				try {
+					$userFolder = \OC::$server->getUserFolder($userId);
+					if (!$userFolder->nodeExists('ListenBrainz')) {
+						$userFolder->newFolder('ListenBrainz');
+					}
+					$lbFolder = $userFolder->get('ListenBrainz');
+					if ($lbFolder instanceof \OCP\Files\Folder) {
+						$file = $lbFolder->nodeExists('missing_exploration_tracks.json') 
+							? $lbFolder->get('missing_exploration_tracks.json') 
+							: $lbFolder->newFile('missing_exploration_tracks.json');
+						
+						if ($file instanceof \OCP\Files\File) {
+							$content = $file->getContent();
+							$existingData = [];
+							if ($content !== false && !empty($content)) {
+								$existingData = \json_decode($content, true) ?: [];
+							}
+							$entryKey = \date('Y-m-d');
+							$existingData[$entryKey] = [
+								'playlist_title' => $title,
+								'sync_date' => \date('Y-m-d H:i:s'),
+								'missing_tracks' => $missingTracks
+							];
+							$file->putContent(\json_encode($existingData, \JSON_PRETTY_PRINT));
+							$this->logger->warning("ListenBrainz playlist sync: saved " . \count($missingTracks) . " missing exploration tracks to ListenBrainz/missing_exploration_tracks.json");
+						}
+					}
+				} catch (\Throwable $e) {
+					$this->logger->warning("ListenBrainz playlist sync: failed to save missing tracks file: " . $e->getMessage());
 				}
 			}
 
