@@ -355,7 +355,6 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			}
 
 			$isExploration = (\strpos(\strtolower($title), 'exploration') !== false);
-			$missingTracks = [];
 
 			// Map ListenBrainz track list to Nextcloud track IDs
 			$ncTrackIds = [];
@@ -369,19 +368,10 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 				$foundTracks = $trackBusinessLayer->findAllByNameArtistOrAlbum($trackTitle, $artistName, null, $userId);
 				if (!empty($foundTracks)) {
 					$ncTrackIds[] = $foundTracks[0]->getId();
-				} else {
-					if ($isExploration) {
-						$missingTracks[] = [
-							'title' => $trackTitle,
-							'artist' => $artistName,
-							'album' => $lbTrack['album'] ?? '',
-							'identifier' => $lbTrack['identifier'] ?? ''
-						];
-					}
 				}
 			}
 
-			if ($isExploration && !empty($missingTracks)) {
+			if ($isExploration) {
 				try {
 					$userFolder = \OC::$server->getUserFolder($userId);
 					if (!$userFolder->nodeExists('ListenBrainz')) {
@@ -389,28 +379,51 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 					}
 					$lbFolder = $userFolder->get('ListenBrainz');
 					if ($lbFolder instanceof \OCP\Files\Folder) {
-						$file = $lbFolder->nodeExists('missing_exploration_tracks.json') 
-							? $lbFolder->get('missing_exploration_tracks.json') 
-							: $lbFolder->newFile('missing_exploration_tracks.json');
+						$sanitizedTitle = \preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $title);
+						$m3uFilename = $sanitizedTitle . ".m3u";
+						
+						$file = $lbFolder->nodeExists($m3uFilename) 
+							? $lbFolder->get($m3uFilename) 
+							: $lbFolder->newFile($m3uFilename);
 						
 						if ($file instanceof \OCP\Files\File) {
-							$content = $file->getContent();
-							$existingData = [];
-							if ($content !== false && !empty($content)) {
-								$existingData = \json_decode($content, true) ?: [];
+							$m3uContent = "#EXTM3U\n#EXTENC: UTF-8\n";
+							
+							foreach ($playlistDetails['playlist']['track'] as $lbTrack) {
+								$trackTitle = $lbTrack['title'] ?? '';
+								$artistName = $lbTrack['creator'] ?? '';
+								if (empty($trackTitle) || empty($artistName)) {
+									continue;
+								}
+								
+								$durationMs = $lbTrack['duration'] ?? -1000;
+								$durationSec = ($durationMs > 0) ? \round($durationMs / 1000) : -1;
+								
+								// Find matching local track
+								$foundTracks = $trackBusinessLayer->findAllByNameArtistOrAlbum($trackTitle, $artistName, null, $userId);
+								if (!empty($foundTracks)) {
+									$track = $foundTracks[0];
+									$nodes = $userFolder->getById($track->getFileId());
+									if (\count($nodes) > 0) {
+										$trackRelPath = \OCA\Music\Utility\FilesUtil::relativePath($lbFolder->getPath(), $nodes[0]->getPath());
+										$m3uContent .= "#EXTINF:{$durationSec},{$artistName} - {$trackTitle}\n";
+										$m3uContent .= $trackRelPath . "\n";
+									} else {
+										$m3uContent .= "#EXTINF:{$durationSec},{$artistName} - {$trackTitle}\n";
+										$m3uContent .= "missing/" . \sprintf("%s - %s.mp3", $artistName, $trackTitle) . "\n";
+									}
+								} else {
+									$m3uContent .= "#EXTINF:{$durationSec},{$artistName} - {$trackTitle}\n";
+									$m3uContent .= "missing/" . \sprintf("%s - %s.mp3", $artistName, $trackTitle) . "\n";
+								}
 							}
-							$entryKey = \date('Y-m-d');
-							$existingData[$entryKey] = [
-								'playlist_title' => $title,
-								'sync_date' => \date('Y-m-d H:i:s'),
-								'missing_tracks' => $missingTracks
-							];
-							$file->putContent(\json_encode($existingData, \JSON_PRETTY_PRINT));
-							$this->logger->warning("ListenBrainz playlist sync: saved " . \count($missingTracks) . " missing exploration tracks to ListenBrainz/missing_exploration_tracks.json");
+							
+							$file->putContent($m3uContent);
+							$this->logger->warning("ListenBrainz playlist sync: saved M3U exploration playlist to ListenBrainz/{$m3uFilename}");
 						}
 					}
 				} catch (\Throwable $e) {
-					$this->logger->warning("ListenBrainz playlist sync: failed to save missing tracks file: " . $e->getMessage());
+					$this->logger->warning("ListenBrainz playlist sync: failed to save M3U playlist: " . $e->getMessage());
 				}
 			}
 
