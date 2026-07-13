@@ -16,11 +16,16 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\AppInfo\Application;
 use OCA\Music\Service\Scrobbling\ListenBrainzScrobbler;
 use OCP\BackgroundJob\TimedJob;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
 
 class ListenBrainzPlaylistSync extends TimedJob {
 
-	public function __construct() {
+	public function __construct(ITimeFactory $time = null) {
+		if ($time === null) {
+			$time = \OC::$server->query(ITimeFactory::class);
+		}
+		parent::__construct($time);
 		// Run every 24 hours (86400 seconds)
 		$this->setInterval(86400);
 	}
