@@ -1,12 +1,17 @@
 ## [Unreleased]
 
 ### Added
+- Support for Nextcloud 35 (tested on rc2)
+  [#144](https://github.com/nc-music/music/issues/144)
+  * The action `browse` now identifies the catalogs by these IDs instead of by their names, and accepts the argument `catalog` to narrow the listed children. The names are still accepted wherever an ID is
+  * The action `browse` renders its IDs as strings on the JSON API, matching the original Ampache server, and accepts the type `album_artist` as an alias of `artist`
 - Admin settings UI to setup Last.fm API key and secret without editing `config.php` manually
   [#131](https://github.com/nc-music/music/pull/131) @mattwellss
 - Possibility to configure the default volume with the config.php key `music.default_volume`
   [#109](https://github.com/nc-music/music/issues/109)
 - Possibility to disable extracting of various metadata tag types with the config.php keys `music.tag_enabled_id3v1`, `music.tag_enabled_id3v2`, `music.tag_enabled_lyrics3`, and `music.tag_enabled_ape`
-  * The ID3v1 tags are now disabled by default while the others are enabled
+  * The ID3v1 and Lyrics3 tags are now disabled by default while the others are enabled
+    [#143](https://github.com/nc-music/music/issues/143)
 - Composer and BPM support [#123](https://github.com/nc-music/music/pull/123):
   * Scan `composer` and `BPM` from the track metadata and store them in the database (rescan needed) @ineednousername
   * Subsonic API: Include OpenSubsonic properties `bpm`, `displayComposer`, and `contributors[role='composer']` in all song responses @ineednousername
@@ -19,24 +24,88 @@
   * Track comment is stored to DB while scanning the library
   * The `comment` property is included in all song responses in the Subsonic and Ampache APIs
   * Advanced search can find tracks by comment
+- MBID support [#94](https://github.com/nc-music/music/issues/94), [#148](https://github.com/nc-music/music/issues/148)
+  * MusicBrainz IDs (Recording Id, Release Track Id, Release Id, Release Group Id, Artist Id, Release Artist Id) from file metadata are stored to DB when scanning the library
+  * Song/album/artist responses in the Subsonic API contain the `musicBrainzId` property and the responses in Ampache API contain the `mbid` property
+  * Advanced search can find tracks/albums/artists by the MBID values
+  * Distinct artists with identical names can be separated by MBID. Distinct album versions with the same name from the same artist can be separated by MBID.
+- Compilation field support [#127](https://github.com/nc-music/music/issues/127)
+  * The `compilation` metadata tag is stored to the DB when scanning the library
+  * Subsonic API: Include OpenSubsonic property `isCompilation` in the AlbumID3 responses
+- Partial support for replaygain [#63](https://github.com/nc-music/music/issues/63)
+  * The replaygain fields are saved to the DB while scanning and included in the song responses of the Ampache and Subsonic APIs
+  * The web UI player does *not* use the replaygain data
+- Record label support
+  * The record labels are scanned from the song metadata tag `publisher` and store in the DB
+  * Ampache API: Add actions `labels`, `label`, and `label_artists`. Include property `publisher` to the song responses.
+  * Subsonic API: Include property `recordLabels` on the album responses (OpenSubsonic addition)
+  * Advanced search can find tracks/albums/artists by the record label
+- Sample rate is scanned and included in the song responses of Ampache and Subsonic APIs. Advanced search can find songs by sample rate.
 - Context menu with the "Import from file" action on the "New Playlist" navigation item
   [#80 (comment)](https://github.com/nc-music/music/issues/80#issuecomment-3725231400)
+- Scan improvements:
+  * Provide controls for scanning and rescanning in the Settings view
+  * Enable aborting the ongoing scan operation on the UI
+  * Show in the Settings view if some tracks have been scanned on a less capable version of Music and offer to rescan them
+    + The same is shown by `occ music:scan`; these files can be scanned with the option `--rescan-old`
+- Ampache API: Actions `player` and `now_playing`, letting a client report its playback state and read it back. Unlike on the original Ampache server, the state is visible only to the user it belongs to
+  [#155](https://github.com/nc-music/music/pull/155) @lachlan-00
+- Ampache API: Actions `catalogs` and `catalog`, presenting the library as the two synthetic catalogs `music` and `podcasts` which the action `browse` has always used
+  [#144](https://github.com/nc-music/music/issues/144) @lachlan-00
 
 ### Changed
+- Ampache API: Reject the deprecated actions `tag`, `tags`, `tag_albums`, `tag_artists`, and `tag_songs` on API versions 5 and 6 like the original Ampache server does, answering with the error 4706 and, on version 6, the HTTP status 410. The actions still work on API version 4, and the renamed `genre` variants are unaffected
+  [#154](https://github.com/nc-music/music/pull/154) @lachlan-00
 - Show some error details in the browser console when subscribing a podcast channel fails
   [#132](https://github.com/nc-music/music/issues/132)
 - Avoid PostgreSQL logging tons of unique constraint violations on typical library scan
-  [owncloud/music#1135](https://github.com/owncloud/music/issues/1135)
+  [oc-music#1135](https://github.com/nc-music/oc-music/issues/1135)
+- Show a confirmation dialog before removing the unavailable files from the library
+  [#140](https://github.com/nc-music/music/pull/140) @sturlan
+- Do not automatically remove the unavailable files during the "rescan all"
 - Track details pane:
   * Collapse the more exotic tags by default and show them by clicking "Show more…"
   * Make all MusicBrainz Ids from the tags into links to the MusicBrainz site (like previously done with MbIds from Last.fm)
-  * On tag names, abbreviate "musicbrainz" as "mb" to not truncate the more important parts of the name
-  * Show also MusicBrainz Recording Id stored in id3v2.4 tag `UFID` (MusicBrainz Picard uses this on mp3 files)
+  * On tag names, abbreviate "musicbrainz" as "mb" and "replaygain" as "rg" to not truncate the more important parts of the name
+  * Show also the MusicBrainz Recording Id stored in id3v2.4 tag `UFID` (MusicBrainz Picard uses this on mp3 files)
   * Show all values of multi-valued metadata tags
+- Attempt to restart the playing radio stream if it abruptly ends
+  [#89](https://github.com/nc-music/music/issues/89)
+- Improved web UI view switching performance for huge libraries
+- Playlist view remains lightning fast even on insanely large playlists
+- Extensive internal refactoring on the web UI
+- In absence of the `album artist` tag, if there are tracks with the same `album` name but differing `artist` name, treat those tracks as one album from "Various Artists"
+  [#45](https://github.com/nc-music/music/issues/45), [#55](https://github.com/nc-music/music/issues/55), [#98](https://github.com/nc-music/music/issues/98)
+  * Library has to be rescanned for this change to take effect
+  * To avoid merging albums with the same name, make sure the tracks have either `album artist` or `Music Brainz Release Id` metadata tag set
+- Drop obsolete column `disk` from the DB table `oc_music_albums` (the disk info was moved to `oc_music_tracks` in Music v0.13.1)
 
 ### Fixed
+- HTTP status 500 on all the Ampache, Subsonic, and web UI endpoints accessing the file system in case the configured music folder no longer exists; the APIs now return a proper protocol error instead
+  [#149](https://github.com/nc-music/music/pull/149) @lachlan-00
+- HTTP redirection not working (e.g. on radio streams) when the `Location` header contains a relative URL
 - Deprecation warnings printed on PHP 8.3+ while executing the Music background tasks
 - Web UI trying to load an invalid image URL upon page load
+- Negative offset being ignored when showing time-synced lyrics
+- Empty lines being hidden when viewing time-synced lyrics
+- Collapsible navigation pane (used on narrow screens) misbehaving when song/album/etc. dragged sideways and dropped anywhere else than the navigation pane
+- Dashboard widget not stopping the playback when "Next" button pressed on the last track of the queue
+- Web UI failing to load on NC33 if `OCA.Theming` not ready in time (systematically on some systems, sporadically on others)
+  [#146](https://github.com/nc-music/music/issues/146)
+- Alphabet navigation working wrong in the Internet radio view when some station is unnamed (such stations are now listed as last)
+- The embedded music player within Files being slightly misplaced on NC 34+
+- Performance problem on background cleanup task with huge libraries
+  [#157](https://github.com/nc-music/music/issues/157)
+- Album covers from Last.fm not showing up in the details pane since Last.fm changed the sub domain hosting the images
+- Subsonic API:
+  * Attribute `parent` misplaced in the response of `getMusicDirectory` when browsing by file system folders
+  * Endpoints `savePlayQueue` and `savePlayQueueByIndex` not allowing an empty list to clear the queue
+  * JSON response of `getNowPlaying` containing a stray empty array within the `entry` array when nothing is playing
+
+## 3.1.1 - 2026-07-16
+
+### Fixed
+- Vulnerability [GHSA-frmc-frvc-h5p6](https://github.com/nc-music/oc-music/security/advisories/GHSA-frmc-frvc-h5p6)
 
 ## 3.1.0 - 2026-06-02
 
@@ -111,28 +180,28 @@
 
 ### Changed
 - Updated the Belarusian translation
-  [#1275](https://github.com/owncloud/music/pull/1275) @pavel-miniutka
+  [#1275](https://github.com/nc-music/oc-music/pull/1275) @pavel-miniutka
 
 ### Fixed
 - MusicBrainz links from Last.fm in track details not always working
 - Advanced Search common rules elements being weirdly ordered on RTL layout
 - Subsonic API:
   * Scrobbles counted twice with some clients (at least Supersonic)
-    [#1274](https://github.com/owncloud/music/pull/1274) @mattwellss
+    [#1274](https://github.com/nc-music/oc-music/pull/1274) @mattwellss
   * Artist IDs formatted incorrectly in the property `artists` of album results (added in v2.5.0, this broke many artist links e.g. on Feishin, Supersonic, and Airdrome)
 
 ## 2.5.0 - 2025-12-25
 
 ### Added
 - Scrobbling to Last.fm (with opt-in from the admin and the user)
-  [#1266](https://github.com/owncloud/music/pull/1266) @mattwellss
+  [#1266](https://github.com/nc-music/oc-music/pull/1266) @mattwellss
 - Radio station details pane shows information from Last.fm for the current track when the service is configured and the station broadcasts current track using the format "artist - track"
-  [#1249](https://github.com/owncloud/music/issues/1249)
+  [#1249](https://github.com/nc-music/oc-music/issues/1249)
 - Context menu with "Save playlist" function for advanced search results
-  [#1256](https://github.com/owncloud/music/issues/1256)
+  [#1256](https://github.com/nc-music/oc-music/issues/1256)
 - Searching for radio stations with the advanced search
 - Full support for the right-to-left UI layout used on languages like Hebrew and Arabic on NC 31 and later
-  [#1269](https://github.com/owncloud/music/issues/1269)
+  [#1269](https://github.com/nc-music/oc-music/issues/1269)
   * Previously, the layout was totally broken on these languages
 
 ### Changed
@@ -166,19 +235,19 @@
 - Entire page moving when progress bar dragged on pinch-zoomed touch screen
 - Some minor UI glitches
 - Some radio stations not playing in the (default) relayed mode because Music tried to forward also the "hop-by-hop" HTTP headers
-  [#1268](https://github.com/owncloud/music/issues/1268)
+  [#1268](https://github.com/nc-music/oc-music/issues/1268)
 
 ## 2.4.1 - 2025-10-12
 
 ### Changed
 - In artist image names, spaces may be optionally replaced with underscores (_)
-  [#1246](https://github.com/owncloud/music/issues/1246)
+  [#1246](https://github.com/nc-music/oc-music/issues/1246)
 
 ### Fixed
 - The dismiss button added in v2.4.0 not working on the "dirty files to rescan" banner
-  [#1251](https://github.com/owncloud/music/issues/1251)
+  [#1251](https://github.com/nc-music/oc-music/issues/1251)
 - After moving a folder within the music library, files remaining as "dirty" even after rescan (since v2.3.0)
-  [#1251](https://github.com/owncloud/music/issues/1251)
+  [#1251](https://github.com/nc-music/oc-music/issues/1251)
 
 ## 2.4.0 - 2025-10-05
 
@@ -186,34 +255,34 @@
 - Mouse wheel can be used to adjust volume while hovering over the volume control (slow by default, faster with SHIFT)
 - Volume percent is displayed in place of the volume icon while adjusting
 - Button to dismiss the "files to scan" banner without taking any action (it will be shown again on page reload)
-  [#1251](https://github.com/owncloud/music/issues/1251)
+  [#1251](https://github.com/nc-music/oc-music/issues/1251)
 - Belarusian translation
-  [#1254](https://github.com/owncloud/music/pull/1254) @pavel-miniutka
+  [#1254](https://github.com/nc-music/oc-music/pull/1254) @pavel-miniutka
 
 ### Changed
 - Playlist tooltip on the navigation pane now shows also the playlist name
-  [#1236](https://github.com/owncloud/music/issues/1236)
+  [#1236](https://github.com/nc-music/oc-music/issues/1236)
 - Prevent HTML injection from track metadata to the web UI
 
 ### Fixed
 - Favorite toggle in the details pane not working (since v2.3.0)
-  [#1250](https://github.com/owncloud/music/issues/1250)
+  [#1250](https://github.com/nc-music/oc-music/issues/1250)
 - Overly long playlist names shown only as ellipses (…) in the navigation pane
-  [#1236](https://github.com/owncloud/music/issues/1236)
+  [#1236](https://github.com/nc-music/oc-music/issues/1236)
 - "Unshare from self" not removing songs from the user's library (since v2.3.0)
 - Sharing files on NC32 broken while Music enabled (due to unannounced API change)
-  [#1253](https://github.com/owncloud/music/issues/1253)
+  [#1253](https://github.com/nc-music/oc-music/issues/1253)
 
 ## 2.3.0 - 2025-08-31
 
 ### Added
 - Support for Nextcloud 32
 - Russian translation
-  [#1219](https://github.com/owncloud/music/pull/1219) @mexvod
+  [#1219](https://github.com/nc-music/oc-music/pull/1219) @mexvod
 - Hungarian translation
-  [#1245](https://github.com/owncloud/music/pull/1245) @rkrisztian
+  [#1245](https://github.com/nc-music/oc-music/pull/1245) @rkrisztian
 - Subsonic: Support for methods `savePlayQueue` and `getPlayQueue`
-  [#1241](https://github.com/owncloud/music/pull/1241) @mattwellss
+  [#1241](https://github.com/nc-music/oc-music/pull/1241) @mattwellss
 
 ### Changed
 - Human-friendly formatting for bitrate and sample rate in the track details pane
@@ -221,11 +290,11 @@
 
 ### Fixed
 - Subsonic API: In methods `getAlbumInfo` and `getAlbumInfo2` with no info found, an empty array was returned instead of an empty object
-  [#1233](https://github.com/owncloud/music/issues/1233)
+  [#1233](https://github.com/nc-music/oc-music/issues/1233)
 - File hooks potentially breaking the cloud update process when Music app is updated at the same time and the cloud runs partially updated app instance
-  [#1231](https://github.com/owncloud/music/issues/1231)
+  [#1231](https://github.com/nc-music/oc-music/issues/1231)
 - Album cover from Last.fm failing to be loaded in the album details pane (since v2.1.0)
-  [#1238](https://github.com/owncloud/music/issues/1238)
+  [#1238](https://github.com/nc-music/oc-music/issues/1238)
 - Music controls pane overlapping the scrollbar with Firefox on Windows 11
 - Not being able to drag the scrollbar on ownCloud with Firefox on Windows 11
 
@@ -233,13 +302,13 @@
 
 ### Added
 - Support for importing WPL playlist files and play them within Files
-  [#1153](https://github.com/owncloud/music/issues/1153)
+  [#1153](https://github.com/nc-music/oc-music/issues/1153)
   * MIME mapping for the file is needed which can be added with `occ music:register-mime-types`
 - Support parsing lyrics from .lrc files in addition to the audio file metadata tags
-  [#1221](https://github.com/owncloud/music/issues/1221)
+  [#1221](https://github.com/nc-music/oc-music/issues/1221)
   * The lyrics file must be found in the same folder with the audio file and have the same file name but with the extension `.lrc`.
 - Importing and exporting podcasts channels from/to an OPML file
-  [#904](https://github.com/owncloud/music/issues/904)
+  [#904](https://github.com/nc-music/oc-music/issues/904)
   * Using the web UI or with the `occ` commands `music:podcast-import` and `music:podcast-export`
 
 ### Changed
@@ -256,13 +325,13 @@
 - "New files to scan" and "Scanning" bottom panes being slightly misplaced on NC 25+
 - Alphabet navigation not scrolling to quite correct location on first click in long list views like "All tracks" (since v2.0.0)
 - Command `occ music:scan --rescan` failing if the DB contains any track with an invalid `artist_id` or `album_id`
-  [#1228](https://github.com/owncloud/music/issues/1228)
+  [#1228](https://github.com/nc-music/oc-music/issues/1228)
 
 ## 2.1.4 - 2025-04-10
 
 ### Fixed
 - Subsonic API not working on PHP versions 7.4 and 8.0 (since v2.1.3)
-  [#1218](https://github.com/owncloud/music/issues/1218)
+  [#1218](https://github.com/nc-music/oc-music/issues/1218)
 - Album title misplaced on NC30+ when using "normal layout" on narrow screen (like mobile phone)
 - Podcast episode titles overlapping alphabet navigation on narrow screen
 
@@ -276,13 +345,13 @@
   * Advanced search supports new rule `disk_count` for type `album`
 - Subsonic API:
   * Add cache headers to the cover art responses
-    [#1205](https://github.com/owncloud/music/issues/1205)
+    [#1205](https://github.com/nc-music/oc-music/issues/1205)
   * Add OpenSubsonic extension method [`getPodcastEpisode`](https://opensubsonic.netlify.app/docs/extensions/getpodcastepisode/)
 - Shiva API:
   * Added endpoints `/api/random/artist`, `/api/random/album`, `/api/random/track`
-    [#51](https://github.com/owncloud/music/issues/51)
+    [#51](https://github.com/nc-music/oc-music/issues/51)
   * Added endpoint `/api/tracks/{id}/lyrics`
-    [#48](https://github.com/owncloud/music/issues/48)
+    [#48](https://github.com/nc-music/oc-music/issues/48)
   * Added endpoint `/api/whatsnew`
   * The playlists API is now mostly compatible with the Shiva specification
   * Systematically use plurals in endpoint names to match the specification: `api/artists/{id}` instead of `api/artist/{id}` etc.
@@ -291,23 +360,23 @@
 
 ### Fixed
 - Unhandled error logged on corrupted/incompatible album cover images (now a warning is logged instead)
-  [#1204](https://github.com/owncloud/music/issues/1204)
+  [#1204](https://github.com/nc-music/oc-music/issues/1204)
 - Unable to play some podcasts in the default relayed mode
-  [#1209](https://github.com/owncloud/music/issues/1209)
+  [#1209](https://github.com/nc-music/oc-music/issues/1209)
 - Dashboard widget: Internet radio station without given name failing to load album art and showing the load indicator indefinitely
 - Errors like 'Undefined array key "status_code"' logged when playing certain internet radio stations
 - Ampache API: Endpoint `song` failing with code 500 when the song has no lyrics set (since v2.1.2)
-  [#1208](https://github.com/owncloud/music/issues/1208)
+  [#1208](https://github.com/nc-music/oc-music/issues/1208)
 - Subsonic API: 
   * Property `artistImageUrl` being invalid on artist when authenticated using `apiKey`
   * Method `getPlaylist` failing with code 500 if the playlist has any invalid song references
-    [#1128](https://github.com/owncloud/music/issues/1128)
+    [#1128](https://github.com/nc-music/oc-music/issues/1128)
 
 ## 2.1.2 - 2025-02-16
 
 ### Added
 - Support for Nextcloud 31
-  [#1198](https://github.com/owncloud/music/issues/1198)
+  [#1198](https://github.com/nc-music/oc-music/issues/1198)
 - Support for PHP 8.4
 
 ### Changed
@@ -320,7 +389,7 @@
   * Clicking the previously played song didn't play it again after stopping the playback with the keyboard 'stop' media key
 - Internet radio:
   * Stream relaying not working on some redirecting stream URLs, depending on the headers
-    [#1194](https://github.com/owncloud/music/issues/1194)
+    [#1194](https://github.com/nc-music/oc-music/issues/1194)
   * Stream playback failing when the stream URL has only the domain part without any path and no trailing '/' (like http://abc.somedomain.xyz)
   * Stream playback failing when the given URL redirects to a playlist file containing the actual audio URL
   * HTTP redirections not followed when parsing Icy-MetaData of the channel
@@ -328,21 +397,21 @@
   * Navigation items "Search" and "Settings" positioned and highlighted incorrectly on NC30+ with Chromium based browsers
   * Collapsed navigation pane and corner roundings shown wrong on narrow screens on NC 30.0.5
 - Ampache API: CORS problem on the endpoint `/ampache/image.php`
-  [#1199](https://github.com/owncloud/music/pull/1199) @rstefko
+  [#1199](https://github.com/nc-music/oc-music/pull/1199) @rstefko
 - Subsonic API: In JSON responses, playlist `id` was returned as integer instead of string type
-  [#1202](https://github.com/owncloud/music/issues/1202)
+  [#1202](https://github.com/nc-music/oc-music/issues/1202)
 
 ## 2.1.1 - 2025-01-03
 
 ### Fixed
 - Background cleanup job not working with PostgreSQL (since v2.1.0)
-  [#1191](https://github.com/owncloud/music/issues/1191)
+  [#1191](https://github.com/nc-music/oc-music/issues/1191)
 
 ## 2.1.0 - 2025-01-02
 
 ### Added
 - Dashboard widget for Nextcloud
-  [#1172](https://github.com/owncloud/music/pull/1172)
+  [#1172](https://github.com/nc-music/oc-music/pull/1172)
 - Ampache API:
   * Support for [API key authentication](https://ampache.org/api/#api-key)
   * Support for action `playlist_hash`
@@ -352,13 +421,13 @@
 ### Changed
 - Renamed config.php key `music.allowed_radio_src` as `music.allowed_stream_src`. Its default value is now an empty array `[]`.
 - Internet radio and podcast streams are now relayed via the user's cloud instance by default. To opt out, set the config.php keys `music.relay_radio_stream` and `music.relay_podcast_stream` as `false` and add required sources to `music.allowed_stream_src`.
-  [#1035](https://github.com/owncloud/music/issues/1035)
-- Documentation of the admin configuration options moved from the Settings view to the [Wiki page](https://github.com/owncloud/music/wiki/Admin-settings)
-- Troubleshooting for Internet radio moved to the [Wiki page](https://github.com/owncloud/music/wiki/Internet-radio-trouble-shooting)
+  [#1035](https://github.com/nc-music/oc-music/issues/1035)
+- Documentation of the admin configuration options moved from the Settings view to the [Wiki page](https://github.com/nc-music/oc-music/wiki/Admin-settings)
+- Troubleshooting for Internet radio moved to the [Wiki page](https://github.com/nc-music/oc-music/wiki/Internet-radio-trouble-shooting)
 - Allow translating all the strings in the embedded Files player and the new Dashboard widget. Provide Finnish translations for these.
 - Optimized loading of folder tree also for cases where the library root is the home folder and there is a huge externally mounted audio folder
 - Prompt user to rescan modified tracks on app load if that has not happened automatically (e.g. for shared files modified by another user)
-  [#706](https://github.com/owncloud/music/issues/706)
+  [#706](https://github.com/nc-music/oc-music/issues/706)
 - Ampache API:
   * Action `get_indexes` supports also `type=song_artist`
   * Actions `playlists` and `playlist` support argument `include`
@@ -367,21 +436,21 @@
   * Added fields `md5`, `has_access`, `has_collaborate`, and `last_update` to the `playlist` results
   * For radio stations without user-supplied name, use the stream URL as a name
   * Set CORS headers and enable pre-flight to allow Ample or other web app clients to connect from any domain
-    [#1181](https://github.com/owncloud/music/issues/1181)
+    [#1181](https://github.com/nc-music/oc-music/issues/1181)
   * Action `get_bookmark` returns an empty response instead of error if the object ID is valid but there are no bookmarks on the object
   * Action `get_bookmark` supports argument `all` (affects response format only, we still don't support more than one bookmark per song/episode)
 - Subsonic API:
   * Allow method `getOpenSubsonicExtensions` without any user authentication
   * When browsing by folder, `getMusicDirectory` sorts songs by file name instead of song title
-    [#1182](https://github.com/owncloud/music/issues/1182)
+    [#1182](https://github.com/nc-music/oc-music/issues/1182)
   * Added field `path` to all song responses
 
 ### Fixed
 - Song progress shown incorrectly in the media session integration of Chrome when playing (exotic file types) with the fallback Aurora.js player
 - Track disappearing from playlists when moved to another folder within the library folder
-  [#1173](https://github.com/owncloud/music/issues/1173)
+  [#1173](https://github.com/nc-music/oc-music/issues/1173)
 - Scan sometimes breaking on MariaDB with "Serialization failure: 1213 Deadlock" when the cleanup task gets run on the background
-  [#918](https://github.com/owncloud/music/issues/918)
+  [#918](https://github.com/nc-music/oc-music/issues/918)
 - In Files app, sidebar not showing playlist file contents if the list has any external URLs with no caption
 - Uploaded image not used immediately as album cover when using SQLite (background job fixed this, though)
 - Ampache API:
@@ -394,7 +463,7 @@
 
 ### Added
 - French translation
-  [#1157](https://github.com/owncloud/music/pull/1157) @flozz
+  [#1157](https://github.com/nc-music/oc-music/pull/1157) @flozz
 - Support for Nextcloud 30
 
 ### Changed
@@ -403,7 +472,7 @@
 ### Fixed
 - Favorite toggle button not working on artists with no image available
 - Cover art image not used automatically upon the image file upload in some cases when PostgreSQL used
-  [#1164](https://github.com/owncloud/music/issues/1164)
+  [#1164](https://github.com/nc-music/oc-music/issues/1164)
 
 ## 2.0.0 - 2024-06-23
 
@@ -423,7 +492,7 @@
 - Drop support for Nextcloud versions older than 20 (i.e. NC 13 - 19)
 - New design including cover art on all list-like views
 - Ampache and Subsonic APIs: Check the username in case-insensitive manner
-  [#1147](https://github.com/owncloud/music/issues/1147)
+  [#1147](https://github.com/nc-music/oc-music/issues/1147)
 - Ampache API:
   * The action `download` doesn't implicitly record the track as played (unlike `stream`) (Update: This change didn't actually work, fixed in v2.1.0)
   * The song property `url` refers to the `stream` URL instead of `download` URL
@@ -431,18 +500,18 @@
 ### Fixed
 - Playlist sorting not working if the list contains any broken track references
 - Nextcloud.log being flooded with the debug-level message "/appinfo/app.php is deprecated" on NC20+
-  [#1043](https://github.com/owncloud/music/issues/1043)
+  [#1043](https://github.com/nc-music/oc-music/issues/1043)
 
 ## 1.11.0 - 2024-04-21
 
 ### Added
 - Advanced search view
-  [#1141](https://github.com/owncloud/music/pull/1141)
+  [#1141](https://github.com/nc-music/oc-music/pull/1141)
 - Support for Nextcloud 29
-  [#1132](https://github.com/owncloud/music/issues/1132)
+  [#1132](https://github.com/nc-music/oc-music/issues/1132)
 - Ampache API:
   * Option to change the session timeout with the `config.php` key `music.ampache_session_expiry_time`
-    [#1134](https://github.com/owncloud/music/issues/1134)
+    [#1134](https://github.com/nc-music/oc-music/issues/1134)
   * Support for the actions `search`, `user`, `user_playlists`, `user_smartlists`, `playlist_add`, `index`, `scrobble`
   * Support for the advanced search rule `bitrate` on songs
 - Subsonic API:
@@ -454,7 +523,7 @@
   * Advanced search operators `sounds like` and `does not sound like` supported also on SQLite, and on PgSQL if module `fuzzystrmatch` is installed
   * Advanced search rules `album_genre` and `artist_genre` supported also on PgSQL
   * Authentication tag can be delivered also using the bearer token header (required to support Ample v3)
-    [#1140](https://github.com/owncloud/music/issues/1140)
+    [#1140](https://github.com/nc-music/oc-music/issues/1140)
   * All results with property `art` have also the property `has_art`
   * Implicitly record the track as played with the actions `download` and `stream`
 
@@ -462,15 +531,15 @@
 - Playlist file not playing within Files in case the first track of the list is in unsupported format
 - Some Finnish translations being replaced with English (since v1.9.0)
 - Error "Cannot set response code - headers already sent" logged on each played song on PHP 8.3
-  [#1133](https://github.com/owncloud/music/issues/1133)
+  [#1133](https://github.com/nc-music/oc-music/issues/1133)
 - Files player: Menu icon for "Import list to Music" not adjusted correctly for the dark theme
 - Standard NC viewer opened instead of embedded Music player when opening file from Dashboard on NC28+
-  [#1126](https://github.com/owncloud/music/issues/1126)
+  [#1126](https://github.com/nc-music/oc-music/issues/1126)
 - Music app page loading randomly failing on Chrome
-  [#1137](https://github.com/owncloud/music/issues/1137)
+  [#1137](https://github.com/nc-music/oc-music/issues/1137)
 - Ampache API:
   * API not working on ownCloud 10.14.0 (HTTP error 500 on all Ampache API calls)
-    [#1138](https://github.com/owncloud/music/issues/1138)
+    [#1138](https://github.com/nc-music/oc-music/issues/1138)
   * Advanced search rule `playlist_name` not being case insensitive like the other string rules
   * Advanced search rules `playlist` and `playlist_name` not working with SQLite
   * Advanced search operator `does not sound like` not working
@@ -479,15 +548,15 @@
   * Incorrect root node name on the actions `user_preference` and `user_preferences`
 - Subsonic API:
   * Method `getAlbumInfo2` response having incorrect root element name
-    [#1125](https://github.com/owncloud/music/pull/1125) @perillamint
+    [#1125](https://github.com/nc-music/oc-music/pull/1125) @perillamint
   * On NC28+, every XML API call logged an error 'Undefined array key "" at /var/www/html/lib/private/AppFramework/Http.php#128'.
-    [#1142](https://github.com/owncloud/music/issues/1142)
+    [#1142](https://github.com/nc-music/oc-music/issues/1142)
 
 ## 1.10.0 - 2024-01-27
 
 ### Added
 - Support for Nextcloud 28
-  [#1116](https://github.com/owncloud/music/pull/1116)
+  [#1116](https://github.com/nc-music/oc-music/pull/1116)
 - Support for PHP 8.3
 - Ampache API: 
   * Support for argument `random` in the method `playlist_songs`
@@ -500,11 +569,11 @@
     + Allow getting the whole library with an empty `query` argument in `search3` method
 - MusicBrainz link from Last.fm to the artist/album/track details pane, when available
 - Filters "Recently added" and "Not recently added" for the smart playlist
-  [#1098](https://github.com/owncloud/music/issues/1098)
+  [#1098](https://github.com/nc-music/oc-music/issues/1098)
 - Optional "strict" mode for the history filters of the smart playlist
-  [#1099](https://github.com/owncloud/music/issues/1099)
+  [#1099](https://github.com/nc-music/oc-music/issues/1099)
 - Hint about the keyboard shortcuts in the Settings view and in tooltips
-  [#1086](https://github.com/owncloud/music/issues/1086)
+  [#1086](https://github.com/nc-music/oc-music/issues/1086)
 
 ### Changed
 - Ampache API:
@@ -512,18 +581,18 @@
   * On method `bookmark_create`, the argument `client` defaults to null instead of "AmpacheAPI"
 - Subsonic API: Methods `search2` and `search3` support '*' as a wildcard
 - Consider also the tag names `unsynced_lyrics` and `unsyncedlyrics` when parsing lyrics
-  [#1111](https://github.com/owncloud/music/pull/1111) @RobertZenz
+  [#1111](https://github.com/nc-music/oc-music/pull/1111) @RobertZenz
 - Updated the getID3 library to the development version 1.9.23-202312292105
   * Fixes the issue of garbage bytes being extracted from some RIFF tags
-    [#1115](https://github.com/owncloud/music/issues/1115)
+    [#1115](https://github.com/nc-music/oc-music/issues/1115)
 - Search within the Music app now works with an own input field in the navigation pane instead of the unified search input
 
 ### Fixed
 - Songs with scanned integer property value (like track number) larger than 2147483647 causing error on PostgreSQL
-  [#1106](https://github.com/owncloud/music/issues/1106)
+  [#1106](https://github.com/nc-music/oc-music/issues/1106)
 - Lite player in Files attempting to play also audio files with MIME types unsupported on the current browser
 - Subsonic API: Use integer-type IDs in `getMusicFolders` to comply with the API specification
-  [#1108](https://github.com/owncloud/music/issues/1108)
+  [#1108](https://github.com/nc-music/oc-music/issues/1108)
 - Playlist details showing length as "NaN:NaN" in case the playlist contains any invalid track references
 
 ## 1.9.1 - 2023-10-08
@@ -539,16 +608,16 @@
 
 ### Added
 - Smart playlist feature, allowing list creation by user-supplied criteria
-  [#619](https://github.com/owncloud/music/issues/619)
-  [#1061](https://github.com/owncloud/music/pull/1061) @rstefko
+  [#619](https://github.com/nc-music/oc-music/issues/619)
+  [#1061](https://github.com/nc-music/oc-music/pull/1061) @rstefko
 - Dragging tracks/albums/etc on the "+ New Playlist" item creates a new playlist containing those items
 - Files playlist tab: Tooltip showing the file path or stream URL
 - Subsonic API:
   * Rating support: method `setRating`, rating properties in all applicable result entities, type `highest` to the method `getAlbumList`
   * Empty implementation for the method `getNowPlaying`
-    [#1079](https://github.com/owncloud/music/pull/1079) @NattyNarwhal
+    [#1079](https://github.com/nc-music/oc-music/pull/1079) @NattyNarwhal
 - Ampache API:
-  [#1078](https://github.com/owncloud/music/pull/1078)
+  [#1078](https://github.com/nc-music/oc-music/pull/1078)
   * New methods:
     + `rate`
     + `get_similar`
@@ -579,8 +648,8 @@
 
 ### Changed
 - Ampache API:
-  [#1078](https://github.com/owncloud/music/pull/1078)
-  [#909](https://github.com/owncloud/music/issues/909)
+  [#1078](https://github.com/nc-music/oc-music/pull/1078)
+  [#909](https://github.com/nc-music/oc-music/issues/909)
   * Follow the APIv5 conventions if version 5.x.x requested by the client on `handshake`
   * Follow the APIv6 conventions if version 6.0.0 or higher requested by the client on `handshake`
   * Follow the APIv6 conventions if the client doesn't specify any version
@@ -593,20 +662,20 @@
   * Also, volume settings in the Share and Files embedded players are now distinct from the volume in the main app
 - Small optimization on the size of the `collection.json` loaded by the web front-end
 - Order the playlists by name in the navigation pane, navigate automatically to the created or renamed playlist
-  [#1083](https://github.com/owncloud/music/issues/1083)
+  [#1083](https://github.com/nc-music/oc-music/issues/1083)
 - Any invalid playlist entries are now visible on the web UI to enable easy removal
-  [#1087](https://github.com/owncloud/music/issues/1087)
+  [#1087](https://github.com/nc-music/oc-music/issues/1087)
 
 ### Fixed
 - Subsonic API:
   * Unhandled exception when attempting to delete a non-existent bookmark
-    [#1071](https://github.com/owncloud/music/issues/1071)
+    [#1071](https://github.com/nc-music/oc-music/issues/1071)
   * Method `getPlaylist` failing if the playlist contains any invalid track references (since v1.8.0)
-    [#1087](https://github.com/owncloud/music/issues/1087)
+    [#1087](https://github.com/nc-music/oc-music/issues/1087)
 - Scanning breaking if any out-of-bounds numeric value gets scanned from any audio file
-  [#1073](https://github.com/owncloud/music/issues/1073)
+  [#1073](https://github.com/nc-music/oc-music/issues/1073)
 - File and folder selection dialogs not working on NC 27.1.0 and 27.1.1 (workaround for a NC bug which should get fixed in NC 27.1.2)
-  [#1091](https://github.com/owncloud/music/issues/1091)
+  [#1091](https://github.com/nc-music/oc-music/issues/1091)
 
 ## 1.8.4 - 2023-06-06
 ### Added
@@ -615,58 +684,58 @@
 ### Changed
 - Allow UTF-8 encoding also on playlists with the extension .m3u (in addition to .m3u8)
   * The file is interpreted as ISO-8859-1 only if not valid UTF-8 or if so specified by the #EXTENC tag
-  [#1047](https://github.com/owncloud/music/issues/1047)
+  [#1047](https://github.com/nc-music/oc-music/issues/1047)
 
 ### Fixed
 - Folder icons not being theme-colored on Nextcloud 25+
 - Navigation pane divider lines being invisible with some themes on Nextcloud 25+
 - Subsonic: Incorrect interpretation of the optional `time` argument on the `scrobble` method
-  [#1066](https://github.com/owncloud/music/issues/1066)
+  [#1066](https://github.com/nc-music/oc-music/issues/1066)
 - "Show in Files" link in the track details popping up an empty player bar on Nextcloud (at least on NC23-27)
 
 ## 1.8.3 - 2023-04-08
 ### Fixed
 - On ownCloud, flooding the log with errors "Cannot declare class because the name is already in use" (since v1.8.2)
-  [#1060](https://github.com/owncloud/music/pull/1060) @prsnbrg
+  [#1060](https://github.com/nc-music/oc-music/pull/1060) @prsnbrg
 - Nextcloud 25 and later not running the Music background tasks: podcast channel updates, database cleanup
-  [#1044](https://github.com/owncloud/music/issues/1044)
+  [#1044](https://github.com/nc-music/oc-music/issues/1044)
 - M4A-ALAC files sometimes starting to play simultaneously while the previous file is still playing
 
 ## 1.8.2 - 2023-04-01
 ### Added
 - Support for Nextcloud 26
-  [#1055](https://github.com/owncloud/music/pull/1055) @blizzz
+  [#1055](https://github.com/nc-music/oc-music/pull/1055) @blizzz
 - Support for PHP 8.2
-  [#1056](https://github.com/owncloud/music/issues/1056)
+  [#1056](https://github.com/nc-music/oc-music/issues/1056)
 
 ### Changed
 - Respect the "Ignored articles" setting also when sorting a playlist by artist
-  [#1048](https://github.com/owncloud/music/issues/1048)
+  [#1048](https://github.com/nc-music/oc-music/issues/1048)
 - In addition to 'http' and 'https', allow podcast streams from the URL schemes 'feed', 'podcast', 'pcast', 'podcasts', 'itms-pcast', 'itms-pcasts', 'itms-podcast', and 'itms-podcasts'
   [153901](https://help.nextcloud.com/t/private-rss-link-support-for-podcast/153901)
 
 ### Fixed
 - Subsonic: `getAlbumList` with `type=alphabeticalByArtist` not working on PostgreSQL
-  [#1046](https://github.com/owncloud/music/issues/1046)
+  [#1046](https://github.com/nc-music/oc-music/issues/1046)
 
 ## 1.8.1 - 2023-01-08
 ### Changed
 - Keyboard shortcuts for seeking and volume adjustment step in smaller increments when ALT key is held down
-  [#1039](https://github.com/owncloud/music/issues/1039)
+  [#1039](https://github.com/nc-music/oc-music/issues/1039)
 - The REST API for Ampache/Subsonic key management made more consistent with the other REST APIs
 
 ### Fixed
 - Ampache/Subsonic key creation not working from the web UI on Nextcloud versions < 25 and on ownCloud 10.0 (regression in v1.8.0)
-  [#1038](https://github.com/owncloud/music/issues/1038)
+  [#1038](https://github.com/nc-music/oc-music/issues/1038)
 
 ## 1.8.0 - 2023-01-01
 ### Added
 - Basic support to play M4A files with ALAC encoding also on non-Apple browsers
-  [#1030](https://github.com/owncloud/music/issues/1030)
+  [#1030](https://github.com/nc-music/oc-music/issues/1030)
   * Based on the [Aurora.js](https://github.com/audiocogs/aurora.js/) plugin [ALAC.js](https://github.com/audiocogs/alac.js) v0.1.0
   * Limitations: no seeking, no adjusting of playback speed, possible glitches, may not work with all files
 - Basic support to play AIFF, AU, and CAF files
-  [#767](https://github.com/owncloud/music/issues/767)
+  [#767](https://github.com/nc-music/oc-music/issues/767)
   * Based on the [Aurora.js](https://github.com/audiocogs/aurora.js/) (no plugins required)
   * Limitations: no seeking, no adjusting of playback speed, possible glitches, may not work with all files
   * Corresponding file extensions must be mapped to MIME types `audio/*`, see below
@@ -675,7 +744,7 @@
 
 ### Changed
 - Show the collapsed navigation pane when a track is dragged over the navigation pane toggle
-  [#999](https://github.com/owncloud/music/issues/999)
+  [#999](https://github.com/nc-music/oc-music/issues/999)
 - Updated the getID3 library to the release version 1.9.22-202207161647
 - More secure generation of the Ampache/Subsonic API keys
   * Removed the REST API endpoint `/api/settings/userkey/add`, leaving only `/api/settings/userkey/generate`
@@ -690,22 +759,22 @@
 - Not adjusting to dark theme when the theme comes from the browser preference (in NC25)
 - User's podcasts, radio stations, and Ampache/Subsonic API keys not erased when an user account deleted
 - Music controls not visible on publicly shared folders on NC25
-  [#1028](https://github.com/owncloud/music/issues/1028)
+  [#1028](https://github.com/nc-music/oc-music/issues/1028)
 - Wrong icon in the "New files to scan" and "No scanned files" pop-ups on NC25
 - Firefox on Ubuntu selecting the single-column layout after page load regardless of the window width
-  [#1029](https://github.com/owncloud/music/issues/1029)
+  [#1029](https://github.com/nc-music/oc-music/issues/1029)
 - Tablet and mobile layout not working correctly on NC 25.0.2
-  [#1036](https://github.com/owncloud/music/issues/1036)
+  [#1036](https://github.com/nc-music/oc-music/issues/1036)
 - Playback jumping to the next radio station when seeking beyond the end of the already buffered content
 
 ## 1.7.0 - 2022-10-31
 ### Added
 - Two-line layout for the controls pane on narrow windows
-  [#1004](https://github.com/owncloud/music/issues/1004) [#204](https://github.com/owncloud/music/issues/204)
+  [#1004](https://github.com/nc-music/oc-music/issues/1004) [#204](https://github.com/nc-music/oc-music/issues/204)
 - Muting/unmuting by clicking the speaker icon
-  [#1013](https://github.com/owncloud/music/pull/1013) @Root-Core
+  [#1013](https://github.com/nc-music/oc-music/pull/1013) @Root-Core
 - Many new keyboard shortcuts
-  [#1013](https://github.com/owncloud/music/pull/1013) @Root-Core
+  [#1013](https://github.com/nc-music/oc-music/pull/1013) @Root-Core
   * Numpad +/-: Increase/decrease volume
   * M: Mute toggle
   * J/L: Seek backwards/forward
@@ -716,22 +785,22 @@
   * Step size of seeking and volume control is increased when shift held down
 - 'Skip previous' shown in the play/pause context menu on narrow screens where it doesn't fit in the controls pane
 - Preview of the seek position shown while hovering over the seek bar
-  [#1007](https://github.com/owncloud/music/pull/1007) @Root-Core
+  [#1007](https://github.com/nc-music/oc-music/pull/1007) @Root-Core
 
 ### Changed
 - Use background color definitions from the cloud core when available. Fixes a problem with the Nextcloud Breeze Dark theme introduced in v1.6.0.
-  [#1002](https://github.com/owncloud/music/pull/1002)
+  [#1002](https://github.com/nc-music/oc-music/pull/1002)
 - Subsonic: Search functions now find also songs by artist or album name and albums by artist name
   * This prevents the Substreamer client from going haywire when shuffle play for an artist requested (!)
-  [#1000](https://github.com/owncloud/music/issues/1000)
+  [#1000](https://github.com/nc-music/oc-music/issues/1000)
 - Subsonic: Method `getCoverArt` returns a placeholder image (instead of an error) if the album/artist in question has no cover art set
-  [#1000](https://github.com/owncloud/music/issues/1000)
+  [#1000](https://github.com/nc-music/oc-music/issues/1000)
 - Context menu on the play/pause button can be opened with right click in addition to the long press
-  [#1006](https://github.com/owncloud/music/pull/1006) @Root-Core
+  [#1006](https://github.com/nc-music/oc-music/pull/1006) @Root-Core
 - Playback speed change by clicking the menu option now has step size 0.25 instead of 0.5. Right-click or long-press decreases the speed.
-  [#1013](https://github.com/owncloud/music/pull/1013) @Root-Core
+  [#1013](https://github.com/nc-music/oc-music/pull/1013) @Root-Core
 - Wider progress bar on wide high-resolution screens
-  [#1004](https://github.com/owncloud/music/issues/1004)
+  [#1004](https://github.com/nc-music/oc-music/issues/1004)
 - Removed the undocumented keyboard shortcuts for toggling the layout on Albums and Folders views
 - Respect the global keyboard shortcut disable switch introduced by Nextcloud 25
 
@@ -739,33 +808,33 @@
 - Small issues in the mobile and tablet layouts
 - Subsonic: API method `getTopSongs` ignoring the argument `count`
 - Subsonic: Some clients (at least Substreamer, Jamstash, Sonixd) experiencing perpetual 302 redirect loops
-  [#1000](https://github.com/owncloud/music/issues/1000)
+  [#1000](https://github.com/nc-music/oc-music/issues/1000)
 - Subsonic: `getScanState` in json mode returning "false" as string instead of bool caused Substreamer to poll it indefinitely
-  [#1000](https://github.com/owncloud/music/issues/1000)
+  [#1000](https://github.com/nc-music/oc-music/issues/1000)
 - Podcast title not showing on the German translation of 'Podcast channel "{{ title }}" added'
-  [#1005](https://github.com/owncloud/music/pull/1005) @Root-Core
+  [#1005](https://github.com/nc-music/oc-music/pull/1005) @Root-Core
 - Alphabet navigation breaking down when the artist name starts with a Unicode character greater than U+FFFF
-  [#1021](https://github.com/owncloud/music/issues/1021)
+  [#1021](https://github.com/nc-music/oc-music/issues/1021)
 - Nextcloud 25: Web UI not working except for in a narrow window; alphabet navigation not working; layout issues
-  [#1017](https://github.com/owncloud/music/issues/1017)
+  [#1017](https://github.com/nc-music/oc-music/issues/1017)
 
 ## 1.6.0 - 2022-08-13
 ### Added
 - Option to set the playback rate. This can be found by long-pressing the play/pause button on the controls pane.
-  [#972](https://github.com/owncloud/music/issues/972)
+  [#972](https://github.com/nc-music/oc-music/issues/972)
 - Show the broadcasted song title on Icecast/Shoutcast -type radio streams
-  [#992](https://github.com/owncloud/music/pull/992) @medismail
+  [#992](https://github.com/nc-music/oc-music/pull/992) @medismail
 - Show other metadata broadcasted by the radio station in the details pane
 - Gapless play with preloading of the next track in the queue
-  [#685](https://github.com/owncloud/music/issues/685)
-  [#776](https://github.com/owncloud/music/issues/776)
+  [#685](https://github.com/nc-music/oc-music/issues/685)
+  [#776](https://github.com/nc-music/oc-music/issues/776)
 - Artist and album names from Last.fm to the Last.fm tab of the track details
-  [#995](https://github.com/owncloud/music/issues/995)
+  [#995](https://github.com/nc-music/oc-music/issues/995)
 - Album art from Last.fm on the album details pane when no local art available
 - Support for radio stream URLs which point to a playlist file containing the actual audio stream URL
-  [#966](https://github.com/owncloud/music/issues/966)
+  [#966](https://github.com/nc-music/oc-music/issues/966)
 - Configurable option to ignore articles in the alphabetical ordering of the artists (by default, ignore: The, El, La, Los, Las, Le, Les)
-  [#984](https://github.com/owncloud/music/issues/984)
+  [#984](https://github.com/nc-music/oc-music/issues/984)
 - Support for Nextcloud 25 (tested on beta 1)
 
 ### Changed
@@ -773,7 +842,7 @@
 - If updating a podcast channel fails, don't retry it each time the background task runs but only upon the normal podcast update schedule
 - HLS-type radio streams are now relayed via the cloud server, removing the need to whitelist each allowed source server
 - Subsonic: Use album-based track numbering also on playlists, to help DSub in cache management
-  [#994](https://github.com/owncloud/music/issues/994)
+  [#994](https://github.com/nc-music/oc-music/issues/994)
 - Allow playing external audio streams from playlist file also on link-shared folders
   * HLS-type streams are not allowed, though
 - Albums with the same name but different artist now each have their own color on placeholder album art
@@ -782,75 +851,75 @@
 - Previous radio station being played without any error messages when failed to start playing an HLS stream
 - Playback of a local track starting from a non-zero offset after playing an HLS stream
 - Errors being logged because of incomplete exception case handling
-  [#989](https://github.com/owncloud/music/issues/989)
-  [#988](https://github.com/owncloud/music/issues/988)
+  [#989](https://github.com/nc-music/oc-music/issues/989)
+  [#988](https://github.com/nc-music/oc-music/issues/988)
 - Podcast episodes shown in wrong order after channel updated via the web UI
 - Fallback Aurora.js player not working in the main app (i.e. worked only within Files; broken since Music v1.2.1)
 - Fallback Aurora.js not working on most versions of Nextcloud (starting from NC15 or NC16)
 - The manifest file of the HLS stream was being polled indefinitely after listening to the stream was stopped
 - Severe performance problem in the background cleanup task when PostgreSQL used
-  [#997](https://github.com/owncloud/music/issues/997)
+  [#997](https://github.com/nc-music/oc-music/issues/997)
 - Not able to start playing a podcast episode which happens to have the same ID as currently playing song or radio station
 
 ## 1.5.2 - 2022-05-08
 ### Added
 - Allow dragging current song from the player bar to a playlist on the navigation pane
-  [#946](https://github.com/owncloud/music/issues/946)
+  [#946](https://github.com/nc-music/oc-music/issues/946)
 - Support for Nextcloud 24
-  [#957](https://github.com/owncloud/music/pull/957) @PVince81
+  [#957](https://github.com/nc-music/oc-music/pull/957) @PVince81
 - Support for PHP 8.1
-  [#939](https://github.com/owncloud/music/issues/939)
+  [#939](https://github.com/nc-music/oc-music/issues/939)
 
 ### Changed
 - Support more formats when parsing the length of a podcast episode
-  [#971](https://github.com/owncloud/music/pull/971) @ksmolder
+  [#971](https://github.com/nc-music/oc-music/pull/971) @ksmolder
 
 ### Fixed
 - Lyrics not detected from the metadata of a FLAC file
-  [#940](https://github.com/owncloud/music/issues/940)
+  [#940](https://github.com/nc-music/oc-music/issues/940)
 - Folders view not opening if the music folder tree has any invalid parent references in the file index
-  [#955](https://github.com/owncloud/music/issues/955)
+  [#955](https://github.com/nc-music/oc-music/issues/955)
 - Attribute `xmlns` missing from the Subsonic XML responses
-  [#970](https://github.com/owncloud/music/pull/970) @rstefko
+  [#970](https://github.com/nc-music/oc-music/pull/970) @rstefko
 - Radio view behaving badly if there were any stations with no name (i.e. URL only)
 
 ## 1.5.1 - 2022-02-01
 ### Added
 - Subsonic: Stub implementation for the method `getScanStatus`
-  [#926](https://github.com/owncloud/music/issues/926)
+  [#926](https://github.com/nc-music/oc-music/issues/926)
 
 ### Fixed
 - Ampache: Action `album_songs` always returning an empty result
-  [#934](https://github.com/owncloud/music/issues/934)
+  [#934](https://github.com/nc-music/oc-music/issues/934)
 - Podcasts not shown correctly when multiple channels had an episode with identical GUID
-  [#937](https://github.com/owncloud/music/issues/937)
+  [#937](https://github.com/nc-music/oc-music/issues/937)
 
 ## 1.5.0 - 2021-11-28
 ### Added
 - Support for Nextcloud 23
-  [#912](https://github.com/owncloud/music/pull/912) @PVince81
+  [#912](https://github.com/nc-music/oc-music/pull/912) @PVince81
 - Option `rescan-modified` to the `occ` command `music:scan`
-  [#843](https://github.com/owncloud/music/issues/843)
+  [#843](https://github.com/nc-music/oc-music/issues/843)
 - Menu with stop button shown with long press on the play/pause button
-  [#911](https://github.com/owncloud/music/issues/911)
+  [#911](https://github.com/nc-music/oc-music/issues/911)
 - Stop button shown in place of the play/pause button while shift held down
 - User setting to disable metadata extraction and scan only the file and folder names
-  [#914](https://github.com/owncloud/music/issues/914)
+  [#914](https://github.com/nc-music/oc-music/issues/914)
 - Possibility to start playback and/or set shuffle/repeat with the URL arguments
-  [#922](https://github.com/owncloud/music/issues/922)
+  [#922](https://github.com/nc-music/oc-music/issues/922)
 - Option to remove duplicates from a playlist
-  [#690](https://github.com/owncloud/music/issues/690)
+  [#690](https://github.com/nc-music/oc-music/issues/690)
 
 ### Changed
 - Allow replacing '/' and characters forbidden on Windows file names with '_' when matching image files to artist names
-  [#913](https://github.com/owncloud/music/issues/913)
+  [#913](https://github.com/nc-music/oc-music/issues/913)
 - Improved robustness for scanning
-  [#600](https://github.com/owncloud/music/issues/600)
+  [#600](https://github.com/nc-music/oc-music/issues/600)
 - Updated the getID3 library to development version 1.9.21-202111211051
-  [#600](https://github.com/owncloud/music/issues/600)
-  [#921](https://github.com/owncloud/music/issues/921)
+  [#600](https://github.com/nc-music/oc-music/issues/600)
+  [#921](https://github.com/nc-music/oc-music/issues/921)
 - Enable using wildcards in file names on `occ music:playlist-import`
-  [#832](https://github.com/owncloud/music/issues/832)
+  [#832](https://github.com/nc-music/oc-music/issues/832)
 - Never use the library root folder name as an album or an artist name (in case no metadata is available)
 
 ### Fixed
@@ -861,7 +930,7 @@
 - Nextcloud dark theme not always properly applied, especially after page reload
 - Scanning via the web UI often not finding the artist images
 - Layout problems, most notable on the Albums view, on Nextcloud 22.2.1 and later
-  [#923](https://github.com/owncloud/music/issues/923)
+  [#923](https://github.com/nc-music/oc-music/issues/923)
 - Last.fm error notes not centered as intended (since v1.4.0)
 - Clicking a track in the Folders view not working if there wasn't already something playing (since v1.4.0)
 - Long album names overlapping the alphabet navigation on the mobile layout
@@ -872,23 +941,23 @@
 ## 1.4.1 - 2021-10-31
 ### Added
 - `occ` commands `playlist-export` and `playlist-import`
-  [#832](https://github.com/owncloud/music/issues/832)
+  [#832](https://github.com/nc-music/oc-music/issues/832)
 
 ### Changed
 - Ampache: A few more actions now support pagination with offset and limit: `artist_albums`, `artist_songs`, `album_songs`, `search_songs`
 - Subsonic: Added support to `getArtistInfo` to identify the artist using a track ID, an album ID, or a folder ID
-  [#906](https://github.com/owncloud/music/issues/906)
+  [#906](https://github.com/nc-music/oc-music/issues/906)
 - Subsonic: Added support to `getAlbumInfo` to identify the album using a track or folder ID
 
 ### Fixed
 - A performance problem affecting Subsonic method `getArtist`, Ampache action `artist_albums`, and a few other functions
 - Duplicate folders showing up in the tree layout of the Folders view with some tree structures
-  [#905](https://github.com/owncloud/music/issues/905)
+  [#905](https://github.com/nc-music/oc-music/issues/905)
 
 ## 1.4.0 - 2021-10-10
 ### Added
 - Hierarchical tree layout for the Folders view
-  [#742](https://github.com/owncloud/music/issues/742)
+  [#742](https://github.com/nc-music/oc-music/issues/742)
 - Cover art to the playlist details pane
 - Subsonic features: 
   * Support playlist cover art
@@ -899,7 +968,7 @@
   * Added action `record_play`
   * Support filters `frequent`, `recent`, and `forgotten` in the action `stats` for tracks, albums, and artists
 - Comprehensive translations for the main app for Chinese (China)
-  [#899](https://github.com/owncloud/music/pull/899) @RuofengX
+  [#899](https://github.com/nc-music/oc-music/pull/899) @RuofengX
 
 ### Changed
 - Use smaller heading size in the Folders and Genres views
@@ -919,9 +988,9 @@
 
 ### Fixed
 - Show the German translations added in v1.3.2 also when the selected language variant is "informal: du" or "Austria"
-  [#890](https://github.com/owncloud/music/pull/890)
+  [#890](https://github.com/nc-music/oc-music/pull/890)
 - Deprecated use of ReflectionType on Subsonic and Ampache APIs which broke some API features on PHP8
-  [#896](https://github.com/owncloud/music/issues/896)
+  [#896](https://github.com/nc-music/oc-music/issues/896)
 - Navigation pane auto-collapse on mobile layout not working on recent versions of Nextcloud
 - Tracks and podcasts with missing metadata causing page load failure on [Ultrasonic](https://f-droid.org/en/packages/org.moire.ultrasonic/)
 - Small layout issues in the details pane
@@ -933,28 +1002,28 @@
 ## 1.3.3 - 2021-09-06
 ### Fixed
 - Update from v1.3.1 not working properly on Nextcloud
-  [#892](https://github.com/owncloud/music/issues/892)
+  [#892](https://github.com/nc-music/oc-music/issues/892)
 
 ## 1.3.2 - 2021-09-05
 ### Added
 - Comprehensive German translation for the main app
-  [#890](https://github.com/owncloud/music/pull/890) @simonspa
+  [#890](https://github.com/nc-music/oc-music/pull/890) @simonspa
 
 ### Changed
 - The second level parent folder name of a track is used as fallback for the artist name, in case the name cannot be extracted from the file tags
 
 ### Fixed
 - Not being able to subscribe podcasts from some providers
-  [#888](https://github.com/owncloud/music/pull/888) @icewind1991
+  [#888](https://github.com/nc-music/oc-music/pull/888) @icewind1991
 - Subsonic: Argument `musicFolderId` on `getIndexes` not being optional, breaking compatibility with Soundwaves Player
-  [#885](https://github.com/owncloud/music/issues/885)
+  [#885](https://github.com/nc-music/oc-music/issues/885)
 - Non-latin characters showing as question marks (?) on track/album/artist names of WAV files having both RIFF and ID3v2 tags (fixed by updating getID3 to v1.9.20-202109010614)
-  [#882](https://github.com/owncloud/music/issues/882)
+  [#882](https://github.com/nc-music/oc-music/issues/882)
 - Application update on Nextcloud not working over Music app versions older than v1.0.0 (introduced in v1.2.1)
-  [#889](https://github.com/owncloud/music/issues/889)
-  [#883](https://github.com/owncloud/music/issues/883)
+  [#889](https://github.com/nc-music/oc-music/issues/889)
+  [#883](https://github.com/nc-music/oc-music/issues/883)
 - Ampache: Action `stream` not supporting the type `podcast` or `podcast_episode`
-  [#891](https://github.com/owncloud/music/issues/891)
+  [#891](https://github.com/nc-music/oc-music/issues/891)
 
 ## 1.3.1 - 2021-08-28
 A mistake made when creating the release package 1.3.0 broke the application pretty badly. This version is a new attempt with the same content.
@@ -963,7 +1032,7 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 - Scrolling to the album by clicking the album name or image on the album details pane
 - Scrolling to the artist by clicking the artist name or image on the artist details pane
 - Support for podcasts
-  [#875](https://github.com/owncloud/music/pull/875)
+  [#875](https://github.com/nc-music/oc-music/pull/875)
   * Dedicated view on the web UI
   * Check for new episodes manually or automatically on the background by schedule
   * Details pane for podcast channels and episodes
@@ -977,7 +1046,7 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 - Show the play icon overlay on album cover also in the Albums compact layout while in search mode
 - Show icon also for the playlists in the navigation pane
 - Excluded folder picker UI is launched with the music library path set as the base path (requires NC16+)
-  [#876](https://github.com/owncloud/music/issues/876)
+  [#876](https://github.com/nc-music/oc-music/issues/876)
 - Limit all Ampache results to maximum of 5000 entries to follow the API specification
 - Subsonic/Ampache: On fuzzy search, match each whitespace-separated substring separately unless quotation marks used
   * Among other things, this fixes the search on [Substreamer](https://play.google.com/store/apps/details?id=com.ghenry22.substream2) which implicitly adds the quotation
@@ -987,7 +1056,7 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 
 ### Fixed
 - Performance problem on Subsonic actions `getAlbumList` and `getAlbumList2` with huge libraries
-  [#873](https://github.com/owncloud/music/issues/873)
+  [#873](https://github.com/nc-music/oc-music/issues/873)
 - Last.fm details view not showing the tag correctly if the track/album/artist has only one tag
 - Ampache client [AmpacheAlbumPlayer](https://play.google.com/store/apps/details?id=com.stemaker.ampachealbumplayer) being incompatible
 - Continuing playback from the same offset when moving from Files to Music (broken since 1.0.0)
@@ -1002,12 +1071,12 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 
 ### Changed
 - Stream audio files without first allocating the whole file to RAM, to avoid extensive RAM use with large files
-  [#864](https://github.com/owncloud/music/issues/864)
+  [#864](https://github.com/nc-music/oc-music/issues/864)
 - Updated the getID3 library to version 1.9.20-202106221748 to fix scan errors with PHP8
-  [#856](https://github.com/owncloud/music/issues/856)
-  [#867](https://github.com/owncloud/music/issues/867)
+  [#856](https://github.com/nc-music/oc-music/issues/856)
+  [#867](https://github.com/nc-music/oc-music/issues/867)
 - Deliveries for ownCloud and Nextcloud are now technically incompatible and not just signed differently
-  [#865](https://github.com/owncloud/music/issues/865)
+  [#865](https://github.com/nc-music/oc-music/issues/865)
 
 ### Fixed
 - Albums compact layout not collapsing albums if view switched while the search box had some text
@@ -1015,11 +1084,11 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 ## 1.2.0 - 2021-05-13
 ### Added
 - Desktop notification shown when the playing song changes (with a setting to opt out)
-  [#828](https://github.com/owncloud/music/issues/828)
+  [#828](https://github.com/nc-music/oc-music/issues/828)
 - Alternative compact layout for the Albums view
-  [#840](https://github.com/owncloud/music/issues/840)
+  [#840](https://github.com/nc-music/oc-music/issues/840)
 - Support for Windows-style relative paths when parsing playlist files
-  [#845](https://github.com/owncloud/music/issues/845)
+  [#845](https://github.com/nc-music/oc-music/issues/845)
 
 ### Changed
 - Clicking the song info area on player bar now activates the playing view and scrolls to the current track (instead of just scrolling to the current track if available in the current view)
@@ -1029,21 +1098,21 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 ### Fixed
 - Details icon not being shown after a truncated album title in the Albums view
 - Errors being spammed to the log on NC18+ with PHP older than 7.4 when config.php has `'debug' => true`
-  [#849](https://github.com/owncloud/music/issues/849)
+  [#849](https://github.com/nc-music/oc-music/issues/849)
 - Subsonic method `getPlaylist` breaking if the list has any invalid tracks
-  [#853](https://github.com/owncloud/music/issues/853)
+  [#853](https://github.com/nc-music/oc-music/issues/853)
 - Ampache methods returning empty result sets to Amarok which passes (invalid) argument `limit=0`
-  [#854](https://github.com/owncloud/music/issues/854)
+  [#854](https://github.com/nc-music/oc-music/issues/854)
 - Non-ASCII characters breaking scanning if PHP has been configured to use internal encoding other than UTF-8
-  [#846](https://github.com/owncloud/music/issues/846)
+  [#846](https://github.com/nc-music/oc-music/issues/846)
 - Scanning with `occ` breaking if option `--debug` given
 - Scanning not working if the `allow_url_fopen` is disabled in php.ini
-  [#763](https://github.com/owncloud/music/issues/763)
+  [#763](https://github.com/nc-music/oc-music/issues/763)
 
 ## 1.1.0 - 2021-03-24
 ### Added
 - Action to sort a playlist by title, album, or artist
-  [#689](https://github.com/owncloud/music/issues/689)
+  [#689](https://github.com/nc-music/oc-music/issues/689)
 - Keyboard shortcut shift+space to stop the playback
 - Details pane for radio stations
 - Support for editing the name and the stream URL of the radio stations
@@ -1054,7 +1123,7 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 - jQuery library updated from 3.5.1 to 3.6.0
 - lodash library updated from 4.17.20 to 4.17.21
 - getID3 library updated from 1.9.20-202102260858 to 1.9.20-202103112222 (commit a309234) to fix error on parsing WAV files
-  [#837](https://github.com/owncloud/music/issues/837)
+  [#837](https://github.com/nc-music/oc-music/issues/837)
 
 ### Fixed
 - Potential database corruption if updating from Music version < 0.13.0 (introduced in v1.0.3)
@@ -1064,12 +1133,12 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 - Playlist comment modification not synced to server if the text box was clicked again after the modification but before defocusing the field
 - Details pane "Follow playback" not working correctly when playing Internet radio
 - Some external deployment scripts ignoring the empty but vital Music app directories
-  [#838](https://github.com/owncloud/music/issues/838)
+  [#838](https://github.com/nc-music/oc-music/issues/838)
 
 ## 1.0.3 - 2021-03-01
 ### Added
 - Support for Nextcloud 21
-  [#830](https://github.com/owncloud/music/issues/830)
+  [#830](https://github.com/nc-music/oc-music/issues/830)
 - Support for PHP 8.0
 - Comprehensive Finnish translation for the main application
 
@@ -1080,12 +1149,12 @@ A mistake made when creating the release package 1.3.0 broke the application pre
 ### Fixed
 - Scan stopping if a track with unknown album encountered within the root folder (bug introduced in v1.0.0)
 - Subsonic: [Jamstash](https://github.com/tsquillario/Jamstash) not working with its default configuration
-  [#787](https://github.com/owncloud/music/issues/787)
+  [#787](https://github.com/nc-music/oc-music/issues/787)
 - Subsonic: Method `createPlaylist` not supporting the editing of existing playlists, breaking the playlist reordering on [Jamstash](https://github.com/tsquillario/Jamstash)
 
 ### Changed
 - Use the [Keep a CHANGELOG format](https://keepachangelog.com) for the changelog to show the latest changes in the Apps management of Nextcloud.
-  [#824](https://github.com/owncloud/music/issues/824) @siccovansas
+  [#824](https://github.com/nc-music/oc-music/issues/824) @siccovansas
 
 ## 1.0.1 - 2021-02-13
 - fix playlist and radio exporting not working on Nextcloud versions after 13 (bug introduced in v1.0.0) (#822)

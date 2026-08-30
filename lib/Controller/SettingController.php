@@ -20,10 +20,9 @@ use OCA\Music\Db\AmpacheUserMapper;
 use OCA\Music\Http\ErrorResponse;
 use OCA\Music\Service\LibrarySettings;
 use OCA\Music\Service\Scanner;
+use OCA\Music\Service\Scrobbling\ExternalScrobbler;
 use OCA\Music\Utility\AppInfo;
 use OCA\Music\Utility\StringUtil;
-use OCA\Music\Service\Scrobbling\ExternalScrobbler;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\CORS;
@@ -109,16 +108,16 @@ class SettingController extends Controller {
 	#[NoCSRFRequired]
 	public function getAll() : JSONResponse {
 		return new JSONResponse([
-			'path' => $this->librarySettings->getPath($this->user()),
-			'excludedPaths' => $this->librarySettings->getExcludedPaths($this->user()),
-			'scanMetadata' => $this->librarySettings->getScanMetadataEnabled($this->user()),
+			'path'            => $this->librarySettings->getPath($this->user()),
+			'excludedPaths'   => $this->librarySettings->getExcludedPaths($this->user()),
+			'scanMetadata'    => $this->librarySettings->getScanMetadataEnabled($this->user()),
 			'ignoredArticles' => $this->librarySettings->getIgnoredArticles($this->user()),
-			'ampacheUrl' => $this->getAmpacheUrl(),
-			'subsonicUrl' => $this->getSubsonicUrl(),
-			'ampacheKeys' => $this->ampacheUserMapper->getAll($this->user()),
-			'appVersion' => AppInfo::getVersion(),
-			'user' => $this->user(),
-			'scrobblers' => $this->getScrobbleAuth()
+			'ampacheUrl'      => $this->getAmpacheUrl(),
+			'subsonicUrl'     => $this->getSubsonicUrl(),
+			'ampacheKeys'     => $this->ampacheUserMapper->getAll($this->user()),
+			'appVersion'      => AppInfo::getVersion(),
+			'user'            => $this->user(),
+			'scrobblers'      => $this->getScrobbleAuth()
 		]);
 	}
 
@@ -152,11 +151,11 @@ class SettingController extends Controller {
 		foreach ($this->externalScrobblers as $scrobbler) {
 			$tokenRequestUrl = $scrobbler->getTokenRequestUrl();
 			$services[] = [
-				'service' => $scrobbler->getName(),
-				'identifier' => $scrobbler->getIdentifier(),
-				'configured' => $scrobbler->getIdentifier() === 'listenbrainz' ? true : ($tokenRequestUrl && $scrobbler->getApiSecret()),
+				'service'         => $scrobbler->getName(),
+				'identifier'      => $scrobbler->getIdentifier(),
+				'configured'      => $scrobbler->getIdentifier() === 'listenbrainz' ? true : ($tokenRequestUrl && $scrobbler->getApiSecret()),
 				'tokenRequestUrl' => $tokenRequestUrl,
-				'hasSession' => $scrobbler->getApiSession($this->user()) !== null
+				'hasSession'      => $scrobbler->getApiSession($this->user()) !== null
 			];
 		}
 

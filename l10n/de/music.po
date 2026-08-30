@@ -1147,7 +1147,7 @@ msgstr ""
 "der Musiksammlung, um es hier zu sehen."
 
 #: ../templates/main.php:44
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "Laden Sie Musik in der Dateien-App hoch, um sie hier anzuhören"
 
 #: ../templates/partials/radiohint.php:11

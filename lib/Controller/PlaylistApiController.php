@@ -27,7 +27,6 @@ use OCA\Music\Http\ErrorResponse;
 use OCA\Music\Http\FileResponse;
 use OCA\Music\Service\CoverService;
 use OCA\Music\Service\PlaylistFileService;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -58,7 +57,7 @@ class PlaylistApiController extends Controller {
 		private PlaylistFileService $playlistFileService,
 		private string $userId,
 		private IConfig $configManager,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 		$this->userFolder = $rootFolder->getUserFolder($userId);
@@ -72,8 +71,8 @@ class PlaylistApiController extends Controller {
 	public function getAll(string $type = 'shiva') : JSONResponse {
 		$playlists = $this->playlistBusinessLayer->findAll($this->userId);
 		$result = ($type === 'shiva')
-			? \array_map(fn($p) => $p->toShivaApi($this->urlGenerator), $playlists)
-			: \array_map(fn($p) => $p->toApi($this->urlGenerator), $playlists);
+			? \array_map(fn ($p) => $p->toShivaApi($this->urlGenerator), $playlists)
+			: \array_map(fn ($p) => $p->toApi($this->urlGenerator), $playlists);
 		return new JSONResponse($result);
 	}
 
@@ -82,7 +81,7 @@ class PlaylistApiController extends Controller {
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function create(?string $name, string|int|null $trackIds, ?string $comment=null) : JSONResponse {
+	public function create(?string $name, string|int|null $trackIds, ?string $comment = null) : JSONResponse {
 		$playlist = $this->playlistBusinessLayer->create($name ?? '', $this->userId);
 
 		// add trackIds and comment to the newly created playlist if provided
@@ -99,7 +98,7 @@ class PlaylistApiController extends Controller {
 
 	/**
 	 * deletes a playlist
-	 * @param  int $id playlist ID
+	 * @param int $id playlist ID
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
@@ -142,7 +141,7 @@ class PlaylistApiController extends Controller {
 		$this->albumBusinessLayer->injectAlbumsToTracks($tracks, $this->userId);
 
 		return \array_map(
-			fn($track, $index) => \array_merge($track->toShivaApi($this->urlGenerator), ['index' => $index]),
+			fn ($track, $index) => \array_merge($track->toShivaApi($this->urlGenerator, null), ['index' => $index]),
 			$tracks, \array_keys($tracks)
 		);
 	}
@@ -154,7 +153,7 @@ class PlaylistApiController extends Controller {
 	#[NoCSRFRequired]
 	public function generate(
 			?bool $useLatestParams, ?string $history, ?string $genres, ?string $artists, ?string $composers,
-			?int $fromYear, ?int $toYear, ?string $favorite=null, int $size=100, string|int|bool|null $historyStrict='false') : JSONResponse {
+			?int $fromYear, ?int $toYear, ?string $favorite = null, int $size = 100, string|int|bool|null $historyStrict = 'false') : JSONResponse {
 
 		if ($useLatestParams) {
 			$history = $this->configManager->getUserValue($this->userId, $this->appName, 'smartlist_history') ?: null;
@@ -189,15 +188,15 @@ class PlaylistApiController extends Controller {
 		$result = $playlist->toApi($this->urlGenerator);
 
 		$result['params'] = [
-			'history' => $history ?: null,
+			'history'       => $history ?: null,
 			'historyStrict' => $historyStrict,
-			'genres' => \implode(',', $genres) ?: null,
-			'artists' => \implode(',', $artists) ?: null,
-			'composers' => \implode(',', $composers) ?: null,
-			'fromYear' => $fromYear ?: null,
-			'toYear' => $toYear ?: null,
-			'favorite' => $favorite ?: null,
-			'size' => $size
+			'genres'        => \implode(',', $genres) ?: null,
+			'artists'       => \implode(',', $artists) ?: null,
+			'composers'     => \implode(',', $composers) ?: null,
+			'fromYear'      => $fromYear ?: null,
+			'toYear'        => $toYear ?: null,
+			'favorite'      => $favorite ?: null,
+			'size'          => $size
 		];
 
 		return new JSONResponse($result);
@@ -290,14 +289,14 @@ class PlaylistApiController extends Controller {
 	 * @param string $path parent folder path
 	 * @param ?string $filename target file name, omit to use the playlist name
 	 * @param string $oncollision action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                            supported values:
+	 *                            - 'overwrite' The existing file will be overwritten
+	 *                            - 'keepboth' The new file is named with a suffix to make it unique
+	 *                            - 'abort' (default) The operation will fail
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function exportToFile(int $id, string $path, ?string $filename=null, string $oncollision='abort') : JSONResponse {
+	public function exportToFile(int $id, string $path, ?string $filename = null, string $oncollision = 'abort') : JSONResponse {
 		try {
 			$exportedFilePath = $this->playlistFileService->exportToFile(
 					$id, $this->userId, $this->userFolder, $path, $filename, $oncollision);
@@ -362,13 +361,13 @@ class PlaylistApiController extends Controller {
 				} else {
 					$file = $fileInfo['file'];
 					return [
-						'id' => $file->getId(),
-						'name' => $file->getName(),
-						'path' => $this->userFolder->getRelativePath($file->getParent()->getPath()),
-						'mimetype' => $file->getMimeType(),
-						'caption' => $fileInfo['caption'],
+						'id'         => $file->getId(),
+						'name'       => $file->getName(),
+						'path'       => $this->userFolder->getRelativePath($file->getParent()->getPath()),
+						'mimetype'   => $file->getMimeType(),
+						'caption'    => $fileInfo['caption'],
 						'in_library' => isset($libFileIds[$file->getId()]),
-						'external' => false
+						'external'   => false
 					];
 				}
 			}, $result['files']);
@@ -382,7 +381,7 @@ class PlaylistApiController extends Controller {
 
 	/**
 	 * Modify playlist by calling a supplied method from PlaylistBusinessLayer
-	 * @param string $funcName  Name of a function to call from PlaylistBusinessLayer
+	 * @param string $funcName Name of a function to call from PlaylistBusinessLayer
 	 * @param array $funcParams Parameters to pass to the function 'funcName'
 	 * @return JSONResponse JSON representation of the modified playlist
 	 */

@@ -7,7 +7,7 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2020 - 2025
+ * @copyright Pauli Järvinen 2020 - 2026
  */
 
 namespace OCA\Music\Service;
@@ -39,16 +39,12 @@ class LyricsParser {
 		if (!empty($data)) {
 			$offset = 0;
 
-			$fp = \fopen("php://temp", 'r+');
-			\assert($fp !== false, 'Unexpected error: opening temporary stream failed');
+			$lines = \preg_split("/\r\n|\n|\r/", $data);
 
-			\fputs($fp, $data);
-			\rewind($fp);
-			while ($line = \fgets($fp)) {
+			foreach ($lines as $line) {
 				$lineParseResult = self::parseTimestampedLrcLine($line, $offset);
 				$parsedLyrics += $lineParseResult;
 			}
-			\fclose($fp);
 
 			// sort the parsed lyric lines according the timestamps (which are keys of the array)
 			\ksort($parsedLyrics);
@@ -85,13 +81,17 @@ class LyricsParser {
 			// Extract timestamp tags and the offset tag and discard any other metadata tags.
 			$timestampMatches = [];
 			$offsetMatch = [];
-			if (\preg_match('/\[offset:(\d+)\]/', $tags, $offsetMatch)) {
+			if (\preg_match('/\[offset:(-?\d+)\]/', $tags, $offsetMatch)) {
 				$offset = \intval($offsetMatch[1]);
-			} elseif (\preg_match_all('/\[(\d\d:\d\d(\.\d\d)?)\]/', $tags, $timestampMatches)) {
+			} elseif (\preg_match_all('/\[(\d\d:\d\d(\.\d{2,3})?)\]/', $tags, $timestampMatches)) {
 				// some timestamp(s) were found
 				$timestamps = $timestampMatches[1];
 
-				// add the line text to the result set on each found timestamp
+				// Add the line text to the result set on each found timestamp, adjusted by the offset if any.
+				// Note: Conflicting information about the shift direction of the offset tag can be found from the Internet and no authoritative
+				// specification exists for LRC. The rule "Positive means lyrics appear sooner, negative means later" can be found from the
+				// OpenSubsonic specification https://opensubsonic.netlify.app/docs/responses/structuredlyrics/ and the Wikipedia article 
+				// https://en.wikipedia.org/wiki/LRC_(file_format). This is also what foobar2000 does and we follow the same.
 				foreach ($timestamps as $timestamp) {
 					$result[self::timestampToMs($timestamp) - $offset] = $text;
 				}
@@ -105,7 +105,7 @@ class LyricsParser {
 	 * Convert timestamp in "mm:ss.ff" format to milliseconds
 	 */
 	private static function timestampToMs(string $timestamp) : int {
-		list($minutes, $seconds) = \sscanf($timestamp, "%d:%f");
+		[$minutes, $seconds] = \sscanf($timestamp, '%d:%f');
 		return \intval($seconds * 1000 + $minutes * 60 * 1000);
 	}
 }

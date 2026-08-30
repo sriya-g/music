@@ -19,9 +19,9 @@ use Behat\Gherkin\Node\TableNode;
  */
 class SubsonicContext implements Context, SnippetAcceptingContext {
 	private $client;
-	/** @var  SimpleXMLElement */
+	/** @var SimpleXMLElement */
 	private $xml;
-	/** @var  array */
+	/** @var array */
 	private $json;
 	/** @var string specifies the requested resource */
 	private $resource;
@@ -63,8 +63,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 	}
 
 	private function storeAttributeFromXmlResult($attr, $entryType, $entryIndex, $storeName = null) {
-		$elements = $this->xpath('/subsonic-response/' .
-				self::resultElementForResource($this->resource) . '/' . $entryType);
+		$elements = $this->xpath('/subsonic-response/'
+				. self::resultElementForResource($this->resource) . '/' . $entryType);
 
 		$element = $elements[$entryIndex];
 
@@ -136,8 +136,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 	 * @Then the XML result should contain :entryType entry/entries:
 	 */
 	public function iShouldGetXmlWithEntries($entryType, TableNode $table) {
-		$elements = $this->xpath('/subsonic-response/' .
-			self::resultElementForResource($this->resource) . '/' . $entryType);
+		$elements = $this->xpath('/subsonic-response/'
+			. self::resultElementForResource($this->resource) . '/' . $entryType);
 
 		$expectedIterator = $table->getIterator();
 		foreach ($elements as $element) {
@@ -151,8 +151,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 			foreach ($expectedElement as $key => $expectedValue) {
 				$actualValue = $element[$key];
 				if ($actualValue != $expectedValue) {
-					throw new \Exception(\ucfirst($key) . " does not match - expected: '$expectedValue'" .
-										" got: '$actualValue'" . PHP_EOL . $this->xml->asXML());
+					throw new \Exception(\ucfirst($key) . " does not match - expected: '$expectedValue'"
+										. " got: '$actualValue'" . PHP_EOL . $this->xml->asXML());
 				}
 			}
 		}
@@ -160,8 +160,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 		$expectedCount = self::tableSize($table);
 		$actualCount = \count($elements);
 		if ($expectedCount !== $actualCount) {
-			throw new \Exception('Not all elements are in the result set - ' . $actualCount .
-								' does not match the expected ' . $expectedCount . PHP_EOL . $this->xml->asXML());
+			throw new \Exception('Not all elements are in the result set - ' . $actualCount
+								. ' does not match the expected ' . $expectedCount . PHP_EOL . $this->xml->asXML());
 		}
 	}
 
@@ -184,8 +184,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 			foreach ($expectedElement as $key => $expectedValue) {
 				$actualValue = $element[$key];
 				if ($actualValue != $expectedValue) {
-					throw new \Exception(\ucfirst($key) . " does not match - expected: '$expectedValue'" .
-										" got: '$actualValue'" . PHP_EOL . \json_encode($this->json));
+					throw new \Exception(\ucfirst($key) . " does not match - expected: '$expectedValue'"
+										. " got: '$actualValue'" . PHP_EOL . \json_encode($this->json));
 				}
 			}
 		}
@@ -193,8 +193,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 		$expectedCount = self::tableSize($table);
 		$actualCount = \count($elements);
 		if ($expectedCount !== $actualCount) {
-			throw new \Exception('Not all elements are in the result set - ' . $actualCount .
-								' does not match the expected ' . $expectedCount . PHP_EOL . \json_encode($this->json));
+			throw new \Exception('Not all elements are in the result set - ' . $actualCount
+								. ' does not match the expected ' . $expectedCount . PHP_EOL . \json_encode($this->json));
 		}
 	}
 
@@ -203,13 +203,13 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 	 * @Then the XML result should contain :expectedCount :entryType entry/entries
 	 */
 	public function iShouldGetXmlContainingEntries($expectedCount, $entryType) {
-		$elements = $this->xpath('/subsonic-response/' .
-			self::resultElementForResource($this->resource) . '/' . $entryType);
+		$elements = $this->xpath('/subsonic-response/'
+			. self::resultElementForResource($this->resource) . '/' . $entryType);
 		$actualCount = \count($elements);
 
 		if ((int)$expectedCount !== $actualCount) {
-			throw new \Exception('Unexpected number of entries in the result set - ' . $actualCount .
-								' does not match the expected ' . $expectedCount . PHP_EOL . $this->xml->asXML());
+			throw new \Exception('Unexpected number of entries in the result set - ' . $actualCount
+								. ' does not match the expected ' . $expectedCount . PHP_EOL . $this->xml->asXML());
 		}
 	}
 
@@ -217,8 +217,8 @@ class SubsonicContext implements Context, SnippetAcceptingContext {
 	 * @Then the first :entryType XML element should have a :childType child with attribute :attr value :expectedValue
 	 */
 	public function theFirstEntryTypeShouldHaveChildWithAttribute($entryType, $childType, $attr, $expectedValue) {
-		$elements = $this->xpath('/subsonic-response/' .
-			self::resultElementForResource($this->resource) . '/' . $entryType . '/' . $childType);
+		$elements = $this->xpath('/subsonic-response/'
+			. self::resultElementForResource($this->resource) . '/' . $entryType . '/' . $childType);
 
 		if (empty($elements)) {
 			throw new \Exception("No '$childType' child found under '$entryType'" . PHP_EOL . $this->xml->asXML());

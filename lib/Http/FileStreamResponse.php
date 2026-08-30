@@ -12,10 +12,10 @@
 
 namespace OCA\Music\Http;
 
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\ICallbackResponse;
 use OCP\AppFramework\Http\IOutput;
 use OCP\AppFramework\Http\Response;
-use OCP\AppFramework\Http;
 use OCP\Files\File;
 
 /**
@@ -33,7 +33,7 @@ class FileStreamResponse extends Response implements ICallbackResponse {
 		$size = $file->getSize();
 		$this->start = 0;
 		$this->end = $size - 1;
-	
+
 		$this->addHeader('Content-type', "$mime; charset=utf-8");
 
 		if (isset($_SERVER['HTTP_RANGE'])) {

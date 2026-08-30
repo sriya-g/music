@@ -12,13 +12,6 @@
 
 namespace OCA\Music\Controller;
 
-use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http;
-use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
-use OCP\AppFramework\Http\JSONResponse;
-use OCP\IRequest;
-
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\BusinessLayer\AlbumBusinessLayer;
 use OCA\Music\BusinessLayer\ArtistBusinessLayer;
@@ -27,6 +20,12 @@ use OCA\Music\BusinessLayer\PodcastChannelBusinessLayer;
 use OCA\Music\BusinessLayer\PodcastEpisodeBusinessLayer;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Http\ErrorResponse;
+use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\JSONResponse;
+use OCP\IRequest;
 
 class FavoritesController extends Controller {
 
@@ -39,7 +38,7 @@ class FavoritesController extends Controller {
 		private PodcastChannelBusinessLayer $podcastChannelBusinessLayer,
 		private PodcastEpisodeBusinessLayer $podcastEpisodeBusinessLayer,
 		private TrackBusinessLayer $trackBusinessLayer,
-		private string $userId
+		private string $userId,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -48,10 +47,10 @@ class FavoritesController extends Controller {
 	#[NoCSRFRequired]
 	public function favorites() : JSONResponse {
 		return new JSONResponse([
-			'tracks' => $this->trackBusinessLayer->findAllStarredIds($this->userId),
-			'albums' => $this->albumBusinessLayer->findAllStarredIds($this->userId),
-			'artists' => $this->artistBusinessLayer->findAllStarredIds($this->userId),
-			'playlists' => $this->playlistBusinessLayer->findAllStarredIds($this->userId),
+			'tracks'           => $this->trackBusinessLayer->findAllStarredIds($this->userId),
+			'albums'           => $this->albumBusinessLayer->findAllStarredIds($this->userId),
+			'artists'          => $this->artistBusinessLayer->findAllStarredIds($this->userId),
+			'playlists'        => $this->playlistBusinessLayer->findAllStarredIds($this->userId),
 			'podcast_channels' => $this->podcastChannelBusinessLayer->findAllStarredIds($this->userId),
 			'podcast_episodes' => $this->podcastEpisodeBusinessLayer->findAllStarredIds($this->userId),
 		]);

@@ -47,50 +47,24 @@ angular.module('Music').controller('SidebarController', [
 			$scope.adjustFixedPositions();
 		}
 
-		$rootScope.$on('showTrackDetails', function(_event, trackId) {
-			showSidebar('track', trackId);
-		});
+		$rootScope.subscribe('showTrackDetails', $scope, (_event, trackId) => showSidebar('track', trackId));
+		$rootScope.subscribe('showAlbumDetails', $scope, (_event, albumId) => showSidebar('album', albumId));
+		$rootScope.subscribe('showArtistDetails', $scope, (_event, artistId) => showSidebar('artist', artistId));
+		$rootScope.subscribe('showSmartListFilters', $scope, () => showSidebar('smartlist', null));
+		$rootScope.subscribe('showPlaylistDetails', $scope, (_event, playlistId) => showSidebar('playlist', playlistId));
+		$rootScope.subscribe('showRadioStationDetails', $scope, (_event, stationId) => showSidebar('radioStation', stationId));
+		$rootScope.subscribe('showRadioHint', $scope, () => showSidebar('radio', null));
+		$rootScope.subscribe('showPodcastChannelDetails', $scope, (_event, channelId) => showSidebar('podcastChannel', channelId));
+		$rootScope.subscribe('showPodcastEpisodeDetails', $scope, (_event, episodeId) => showSidebar('podcastEpisode', episodeId));
 
-		$rootScope.$on('showAlbumDetails', function(_event, albumId) {
-			showSidebar('album', albumId);
-		});
-
-		$rootScope.$on('showArtistDetails', function(_event, artistId) {
-			showSidebar('artist', artistId);
-		});
-
-		$rootScope.$on('showSmartListFilters', function() {
-			showSidebar('smartlist', null);
-		});
-
-		$rootScope.$on('showPlaylistDetails', function(_event, playlistId) {
-			showSidebar('playlist', playlistId);
-		});
-
-		$rootScope.$on('showRadioStationDetails', function(_event, stationId) {
-			showSidebar('radioStation', stationId);
-		});
-
-		$rootScope.$on('showRadioHint', function() {
-			showSidebar('radio', null);
-		});
-
-		$rootScope.$on('showPodcastChannelDetails', function(_event, channelId) {
-			showSidebar('podcastChannel', channelId);
-		});
-
-		$rootScope.$on('showPodcastEpisodeDetails', function(_event, episodeId) {
-			showSidebar('podcastEpisode', episodeId);
-		});
-
-		$rootScope.$on('hideDetails', function() {
+		$rootScope.subscribe('hideDetails', $scope, () => {
 			$('#app-sidebar').hide().addClass('disappear');
 			$('#app-content').css('margin-inline-end', '').removeClass('with-app-sidebar').trigger(new $.Event('appresized'));
 			$scope.contentId = null;
 			$scope.contentType = null;
 		});
 
-		$rootScope.$on('resize', $scope.adjustFixedPositions);
+		$rootScope.subscribe('resize', $scope, $scope.adjustFixedPositions);
 
 		function contentTypeForCurrentPlay() {
 			switch ($rootScope.playingView) {
@@ -221,14 +195,14 @@ angular.module('Music').controller('SidebarController', [
 				$rootScope.$emit('scrollTo' + OCA.Music.Utils.capitalize(type), entity.id);
 			};
 
-			let destinationView = '#';
+			let destinationView = '#/';
 			if (type.startsWith('station')) {
 				destinationView = '#/radio';
 			} else if (type.startsWith('podcast')) {
 				destinationView = '#/podcasts';
 			}
 
-			if ($rootScope.currentView !== destinationView) {
+			if ($scope.getCurrentViewId() !== destinationView) {
 				$scope.navigateTo(destinationView, doScroll);
 			} else {
 				doScroll();

@@ -7,7 +7,7 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright Morris Jobke 2013, 2014
- * @copyright Pauli Järvinen 2018 - 2025
+ * @copyright Pauli Järvinen 2018 - 2026
  */
 
 .invisible {
@@ -27,6 +27,10 @@
 #music-user h2 {
 	font-size: 22px;
 	margin-top: 40px;
+}
+
+#music-user .icon-loading-small {
+	display: inline-block;
 }
 
 #music-user a:not(.icon),
@@ -57,6 +61,14 @@
 
 #music-user #excluded-paths .key-action {
 	width: 52px;
+}
+
+#music-user .scan-controls button {
+	margin-inline-start: 10px;
+}
+
+#music-user .scan-controls .icon-loading-small {
+	margin-inline-end: 5px;
 }
 
 #music-user .reset-button {
@@ -229,4 +241,10 @@
 
 #music-user .dimmed {
 	opacity: .4;
+}
+
+#music-user #sponsor-link .icon {
+	display: inline-block;
+	background-size: contain;
+	vertical-align: text-bottom;
 }

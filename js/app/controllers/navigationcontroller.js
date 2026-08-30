@@ -13,11 +13,67 @@
 
 angular.module('Music').controller('NavigationController', [
 	'$rootScope', '$scope', '$timeout', '$location', 'gettextCatalog',
-	'playQueueService', 'playlistService', 'playlistFileService', 'podcastService', 'libraryService',
+	'playQueueService', 'playlistService', 'playlistFileService', 'podcastService', 'libraryService', 'libraryFactory',
 	function ($rootScope, $scope, $timeout, $location, gettextCatalog,
-			playQueueService, playlistService, playlistFileService, podcastService, libraryService) {
+			playQueueService, playlistService, playlistFileService, podcastService, libraryService, libraryFactory) {
 
-		$rootScope.loading = true;
+		function init() {
+			libraryFactory.getPlaylists().then((playlists) => $scope.playlists = playlists);
+		}
+		init();
+
+		libraryFactory.subscribe('collectionUpdating', $scope, init);
+
+		$scope.trackCountText = function(playlist) {
+			let trackCount = playlist ? playlist.tracks.length : libraryService.getTrackCount();
+			return gettextCatalog.getPlural(trackCount, '{{ count }} track', '{{ count }} tracks', { count: trackCount });
+		};
+
+		$scope.smartListTrackCountText = function() {
+			var trackCount = libraryService.getSmartListTrackCount();
+			return gettextCatalog.getPlural(trackCount, '{{ count }} track', '{{ count }} tracks', { count: trackCount });
+		};
+
+		$scope.albumCountText = function() {
+			let albumCount = libraryService.getAlbumCount();
+			return gettextCatalog.getPlural(albumCount, '{{ count }} album', '{{ count }} albums', { count: albumCount });
+		};
+
+		$scope.folderCountText = function() {
+			if (libraryService.foldersLoaded()) {
+				let folderCount = libraryService.getAllFoldersWithTracks().length;
+				return gettextCatalog.getPlural(folderCount, '{{ count }} folder', '{{ count }} folders', { count: folderCount });
+			} else {
+				return '';
+			}
+		};
+
+		$scope.genresCountText = function() {
+			if (libraryService.genresLoaded()) {
+				let genreCount = libraryService.getAllGenres().length;
+				return gettextCatalog.getPlural(genreCount, '{{ count }} genre', '{{ count }} genres', { count: genreCount });
+			} else {
+				return '';
+			}
+		};
+
+		$scope.radioCountText = function() {
+			if (libraryService.radioStationsLoaded()) {
+				let stationCount = libraryService.getAllRadioStations().length;
+				return gettextCatalog.getPlural(stationCount, '{{ count }} station', '{{ count }} stations', { count: stationCount });
+			} else {
+				return '';
+			}
+		};
+
+		$scope.podcastsCountText = function() {
+			if (libraryService.podcastsLoaded()) {
+				let channelsCount = libraryService.getPodcastChannelsCount();
+				return gettextCatalog.getPlural(channelsCount, '{{ count }} channel', '{{ count }} channels', { count: channelsCount });
+			} else {
+				return '';
+			}
+		};
 
 		$scope.newPlaylistName = '';
 		$scope.newPlaylistTrackIds = [];
@@ -62,7 +118,7 @@ angular.module('Music').controller('NavigationController', [
 			// because the field is not visible yet, it is shown by ng-show binding
 			// later during this digest loop.
 			$timeout(() => $('#search-input').trigger('focus'));
-			expandCollapsedNavigationPane();
+			$rootScope.$emit('openSnapper');
 		};
 
 		$scope.clearSearch = function() {
@@ -87,7 +143,7 @@ angular.module('Music').controller('NavigationController', [
 		 */
 		document.addEventListener('keydown', (e) => {
 			const noSearchViews = ['#/settings', '#/search'];
-			if (!noSearchViews.includes($rootScope.currentView)
+			if (!noSearchViews.includes($scope.getCurrentViewId())
 				&& !$('#search-input').is(':focus')
 				&& !$('#unified-search__input').is(':focus')
 				&& e.ctrlKey && e.key === 'f')
@@ -102,7 +158,7 @@ angular.module('Music').controller('NavigationController', [
 
 		$scope.showDetails = function(playlist) {
 			$rootScope.$emit('showPlaylistDetails', playlist.id);
-			$scope.collapseNavigationPaneOnMobile();
+			$rootScope.$emit('closeSnapper');
 		};
 
 		// Start renaming playlist
@@ -155,7 +211,7 @@ angular.module('Music').controller('NavigationController', [
 					if (confirmed) {
 						playlistService.deletePlaylist(playlist).then(() => {
 							// if the currently shown view is the playlist being removed, navigate away from it
-							if ($rootScope.currentView == '#/playlist/' + playlist.id) {
+							if ($scope.getCurrentViewId() == '#/playlist/' + playlist.id) {
 								$scope.navigateTo('#/');
 							}
 						});
@@ -253,7 +309,7 @@ angular.module('Music').controller('NavigationController', [
 		};
 
 		$scope.reloadSmartListView = function() {
-			$scope.reloadSmartList();
+			libraryFactory.reloadSmartList();
 
 			// also navigate to the Smart Playlist view if not already open
 			$scope.navigateTo('#smartlist');
@@ -283,16 +339,14 @@ angular.module('Music').controller('NavigationController', [
 					}
 				};
 
-				if (destination == '#') {
+				if (destination == '#/') {
 					play('albums', libraryService.getTracksInAlbumOrder());
 				} else if (destination == '#/alltracks') {
 					play('alltracks', libraryService.getTracksInAlphaOrder());
 				} else if (destination == '#/smartlist') {
 					play('smartlist', libraryService.getSmartList().tracks);
 				} else if (destination == '#/folders') {
-					$scope.$parent.loadFoldersAndThen(function() {
-						play('folders', libraryService.getTracksInFolderOrder(!$scope.foldersFlatLayout));
-					});
+					libraryFactory.getRootFolder().then(() => play('folders', libraryService.getTracksInFolderOrder(!$scope.foldersFlatLayout)));
 				} else if (destination == '#/genres') {
 					play('genres', libraryService.getTracksInGenreOrder());
 				} else if (destination === '#/radio') {
@@ -371,40 +425,9 @@ angular.module('Music').controller('NavigationController', [
 		$scope.allowDrop = function(playlist, draggable) {
 			// Don't allow dragging a track from a playlist back to the same playlist
 			let isFromPlaylist = ('srcIndex' in draggable);
-			let targetIsCurrentPlaylist = ($rootScope.currentView == '#/playlist/' + playlist.id);
+			let targetIsCurrentPlaylist = ($scope.getCurrentViewId() == '#/playlist/' + playlist.id);
 			return !isFromPlaylist || !targetIsCurrentPlaylist;
 		};
-
-		// Dragging an entity over the navigation toggle pops the navigation pane open.
-		// Subsequently, ending the drag closes the navigation pane.
-		// It occasionally happens (at least on Chrome) that the navigation toggle is not yet
-		// present when this controller is initialized. In those cases, the related logic
-		// is injected a bit later. See https://github.com/owncloud/music/issues/1137.
-		OCA.Music.Utils.executeOnceRefAvailable(
-			() => document.getElementById('app-navigation-toggle'),
-			(navToggle) => {
-				let navOpenedByDrag = false;
-				navToggle.addEventListener('dragenter', () => {
-					if (!navOpenedByDrag) {
-						navOpenedByDrag = true;
-						expandCollapsedNavigationPane();
-					}
-				});
-				document.addEventListener('dragend', () => {
-					if (navOpenedByDrag) { 
-						navOpenedByDrag = false;
-						$scope.collapseNavigationPaneOnMobile();
-					}
-				});
-			}
-		);
-
-		function expandCollapsedNavigationPane() {
-			const $navToggle = $('#app-navigation-toggle');
-			if (!$scope.mobileNavigationPaneExpanded() && $navToggle.is(':visible')) {
-				$timeout(() => $navToggle.trigger('click'));
-			}
-		}
 
 		function trackIdsFromAlbum(albumId) {
 			let album = libraryService.getAlbum(albumId);
@@ -458,16 +481,17 @@ angular.module('Music').controller('NavigationController', [
 			playlistService.updatePlaylistTracks(playlist);
 		}
 
-		$rootScope.$on('viewActivated', function() {
+		$rootScope.subscribe('viewActivated', $scope, () => {
 			// start playing the current view if the 'autoplay' argument is present in the URL and has a truthy value
 			if (OCA.Music.Utils.parseBoolean($location.search().autoplay)) {
 				if (!$rootScope.playing) {
 					let playlist = null;
-					if ($rootScope.currentView.startsWith('#/playlist/')) {
-						let id = _.last($rootScope.currentView.split('/'));
+					const curView = $scope.getCurrentViewId();
+					if (curView.startsWith('#/playlist/')) {
+						let id = _.last(curView.split('/'));
 						playlist = libraryService.getPlaylist(id);
 					}
-					$scope.togglePlay($rootScope.currentView, playlist);
+					$scope.togglePlay(curView, playlist);
 				}
 			}
 			// ensure that the link to the current view is visible in the navigation pane, 

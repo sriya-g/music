@@ -16,13 +16,10 @@ use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\BusinessLayer\PlaylistBusinessLayer;
 use OCA\Music\Db\Playlist;
 use OCA\Music\Service\PlaylistFileService;
-
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
-use OCP\Files\Node;
 use OCP\Files\NotFoundException;
-
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -30,11 +27,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 class PlaylistImport extends BaseCommand {
 
 	public function __construct(
-			\OCP\IUserManager $userManager,
-			\OCP\IGroupManager $groupManager,
-			private IRootFolder $rootFolder,
-			private PlaylistBusinessLayer $businessLayer,
-			private PlaylistFileService $playlistFileService) {
+		\OCP\IUserManager $userManager,
+		\OCP\IGroupManager $groupManager,
+		private IRootFolder $rootFolder,
+		private PlaylistBusinessLayer $businessLayer,
+		private PlaylistFileService $playlistFileService,
+	) {
 		parent::__construct($userManager, $groupManager);
 	}
 
@@ -77,7 +75,7 @@ class PlaylistImport extends BaseCommand {
 		}
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $files, $overwrite, $append) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $files, $overwrite, $append) {
 				$this->executeForUser($user->getUID(), $files, $overwrite, $append, $output);
 			});
 		} else {
@@ -134,7 +132,7 @@ class PlaylistImport extends BaseCommand {
 		$result = [];
 
 		foreach ($paths as $path) {
-			list('basename' => $basename, 'dirname' => $dirname) = \pathinfo($path);
+			['basename' => $basename, 'dirname' => $dirname] = \pathinfo($path);
 			if (\strpos($basename, '?') === false && \strpos($basename, '*') === false) {
 				// no wildcards, take the path as such
 				$result[] = $path;

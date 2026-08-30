@@ -202,6 +202,7 @@
 	width: 100%;
 	white-space: pre-wrap;
 	text-align: center;
+	min-height: 22.5px;
 }
 
 #app-sidebar .lyrics.highlight {

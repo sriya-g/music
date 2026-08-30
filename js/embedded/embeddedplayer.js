@@ -166,7 +166,7 @@ OCA.Music.EmbeddedPlayer = function() {
 
 	function createMenuItem(id, iconClasses, text, onClick) {
 		let li = $(document.createElement('li')).attr('id', id);
-		let a = $(document.createElement('a')).click(function(event) {
+		let a = $(document.createElement('a')).on('click', (event) => {
 			if (!li.hasClass('disabled')) {
 				onClick();
 			} else {
@@ -186,7 +186,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			.attr('src', playIconPath)
 			.attr('alt', t('music', 'Play'))
 			.css('display', 'inline-block')
-			.click(play);
+			.on('click', play);
 	}
 
 	function createPauseButton() {
@@ -196,7 +196,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			.attr('src', pauseIconPath)
 			.attr('alt', t('music', 'Pause'))
 			.css('display', 'none')
-			.click(pause);
+			.on('click', pause);
 	}
 
 	function createPrevButton() {
@@ -205,7 +205,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			.attr('class', 'control svg small')
 			.attr('src', skipPreviousIconPath)
 			.attr('alt', t('music', 'Previous'))
-			.click(previous);
+			.on('click', previous);
 	}
 
 	function createNextButton() {
@@ -214,7 +214,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			.attr('class', 'control svg small disabled')
 			.attr('src',  skipNextIconPath)
 			.attr('alt', t('music', 'Next'))
-			.click(next);
+			.on('click', next);
 	}
 
 	function createPlaybackControls() {
@@ -255,7 +255,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			.attr('class', 'control small svg')
 			.attr('src', closeIconPath)
 			.attr('alt', t('music', 'Close'))
-			.click(close);
+			.on('click', close);
 	}
 
 	function createSongArea() {
@@ -336,6 +336,12 @@ OCA.Music.EmbeddedPlayer = function() {
 		// However, the Share app still uses the old Files architecture before NC31; hence we can't remove the z-index yet from the CSS.
 		if (OCA.Music.Utils.getScrollContainer().is($('#app-content-vue .files-list'))) {
 			musicControls.css('z-index', 'unset');
+		}
+
+		// On NC 34+, the #content-vue element has the `backdrop-filter` property, which also makes it a containing element for any fixed-positioned descendants.
+		// In this case, the #music-controls element must not apply another margin on top of the one coming from the containing element.
+		if (musicControls[0].offsetParent !== null) {
+			musicControls.css('margin-bottom', 'unset');
 		}
 
 		// bind the player events to change the states of the UI controls
@@ -426,7 +432,7 @@ OCA.Music.EmbeddedPlayer = function() {
 			};
 			musicAppLinkElements()
 				.css('cursor', 'pointer')
-				.click(navigateToMusicApp)
+				.on('click', navigateToMusicApp)
 				.attr('title', t('music', 'Continue playing in Music'));
 		}
 		else {

@@ -25,7 +25,7 @@ class PodcastAdd extends BaseCommand {
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
 		private PodcastChannelBusinessLayer $channelBusinessLayer,
-		private PodcastEpisodeBusinessLayer $episodeBusinessLayer
+		private PodcastEpisodeBusinessLayer $episodeBusinessLayer,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -35,10 +35,10 @@ class PodcastAdd extends BaseCommand {
 			->setName('music:podcast-add')
 			->setDescription('add a podcast channel from an RSS feed')
 			->addOption(
-					'rss',
-					null,
-					InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
-					'URL to an RSS feed'
+				'rss',
+				null,
+				InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+				'URL to an RSS feed'
 			)
 		;
 	}
@@ -47,7 +47,7 @@ class PodcastAdd extends BaseCommand {
 		$rssUrls = $input->getOption('rss');
 
 		if (!$rssUrls) {
-			throw new \InvalidArgumentException("The named argument <error>rss</error> must be given!");
+			throw new \InvalidArgumentException('The named argument <error>rss</error> must be given!');
 		}
 		\assert(\is_array($rssUrls));
 
@@ -69,7 +69,7 @@ class PodcastAdd extends BaseCommand {
 		}
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $rss, $content, $xmlTree) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $rss, $content, $xmlTree) {
 				$this->addPodcastForUser($user->getUID(), $rss, $content, $xmlTree->channel, $output);
 			});
 		} else {
@@ -86,7 +86,7 @@ class PodcastAdd extends BaseCommand {
 
 			// loop the episodes from XML in reverse order to get chronological order
 			$items = $xmlNode->item;
-			for ($count = \count($items), $i = $count-1; $i >= 0; --$i) {
+			for ($count = \count($items), $i = $count - 1; $i >= 0; --$i) {
 				if ($items[$i] !== null) {
 					$this->episodeBusinessLayer->addOrUpdate($userId, $channel->getId(), $items[$i]);
 				}

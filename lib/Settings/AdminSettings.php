@@ -17,24 +17,23 @@ use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IL10N;
 use OCP\Settings\ISettings;
 
-class AdminSettings implements ISettings
-{
+class AdminSettings implements ISettings {
 	/**
 	 * @param array<int, ExternalScrobbler> $externalScrobblers
 	 */
 	public function __construct(
 		private IL10N $l10n,
 		private array $externalScrobblers,
-		private \OCP\AppFramework\Services\IInitialState $initialState
-	) {}
+		private \OCP\AppFramework\Services\IInitialState $initialState,
+	) {
+	}
 
-	public function getForm()
-	{
+	public function getForm() {
 		$this->initialState->provideInitialState('scrobblers', \array_map(
 			fn (ExternalScrobbler $scrobbler) => [
 				'identifier' => $scrobbler->getIdentifier(),
-				'name' => $scrobbler->getName(),
-				'api_key' => $scrobbler->getApiKey(),
+				'name'       => $scrobbler->getName(),
+				'api_key'    => $scrobbler->getApiKey(),
 				'api_secret' => $scrobbler->getApiSecret()
 			],
 			\array_filter(
@@ -48,13 +47,11 @@ class AdminSettings implements ISettings
 		]);
 	}
 
-	public function getSection()
-	{
+	public function getSection() {
 		return 'music';
 	}
 
-	public function getPriority()
-	{
+	public function getPriority() {
 		return 41;
 	}
 }

@@ -8,7 +8,7 @@
  * @copyright Matthew Wells 2026
  */
 
-import { MusicAdminSectionConstructor, MusicAdminSection } from './AdminSection'
+import { MusicAdminSectionConstructor, MusicAdminSection } from './MusicAdminSection'
 
 export default class MusicAdmin {
 	#children: Array<MusicAdminSection>;

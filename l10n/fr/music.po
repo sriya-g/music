@@ -1909,7 +1909,7 @@ msgstr ""
 "votre bibliothèque musicale pour qu'elle apparaisse ici."
 
 #: templates/main.php:47
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr ""
 "Téléversez de la musique dans l'application Fichiers pour l'écouter ici"
 

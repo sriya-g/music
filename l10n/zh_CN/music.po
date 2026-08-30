@@ -1087,7 +1087,7 @@ msgid ""
 msgstr "将名为“{{name}}”的图像上传到资料库路径内的任何地方，以便在此处查看。"
 
 #: ../templates/main.php:45
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "在文件应用中上传音乐，以便在此欣赏"
 
 #: ../templates/partials/sidebar/radiohint.php:11

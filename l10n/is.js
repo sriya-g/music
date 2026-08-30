@@ -30,7 +30,7 @@ OC.L10N.register(
     "Tracks" : "Hljóðspor",
     "Unknown album" : "Óþekkt albúm",
     "Unknown artist" : "Óþekktur flytjandi",
-    "Upload music in the files app to listen to it here" : "Sendu inn tónlist í skráaforritinu til að hlusta á hana hér",
+    "Upload music in the Files app to listen to it here" : "Sendu inn tónlist í skráaforritinu til að hlusta á hana hér",
     "Use this address to browse your music collection from any Ampache compatible player." : "Notaðu þetta vistfang til að vafra um tónlistarsafnið þitt í öllum Ampache-samhæfðum spilurum.",
     "Use your username and following password to connect to this Ampache instance:" : "Notaðu notandanafn þitt og eftirfarandi aðgangsorð til að tengjast þessu Ampache-tilviki:",
     "Volume" : "Hljóðstyrkur",

@@ -7,53 +7,39 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright Morris Jobke 2013
- * @copyright Pauli Järvinen 2017 - 2025
+ * @copyright Pauli Järvinen 2017 - 2026
  */
 
 
 angular.module('Music').controller('PlaylistViewController', [
-	'$rootScope', '$scope', '$routeParams', 'playQueueService', 'libraryService',
-	'gettextCatalog', 'Restangular', '$timeout',
-	function ($rootScope, $scope, $routeParams, playQueueService, libraryService,
-			gettextCatalog, Restangular, $timeout) {
+	'$rootScope', '$scope', '$routeParams', 'playQueueService', 'libraryService', 'libraryFactory', 'gettextCatalog', 'Restangular', '$timeout',
+	function ($rootScope, $scope, $routeParams, playQueueService, libraryService, libraryFactory, gettextCatalog, Restangular, $timeout) {
 
-		const INCREMENTAL_LOAD_STEP = 1000;
-		$scope.incrementalLoadLimit = INCREMENTAL_LOAD_STEP;
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
+
 		$scope.tracks = null;
-		$rootScope.currentView = $scope.getViewIdFromUrl();
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', function() {
-			_.each(unsubFuncs, function(func) { func(); });
-		});
 
 		$scope.getCurrentTrackIndex = function() {
 			return listIsPlaying() ? $scope.$parent.currentTrackIndex : null;
 		};
 
 		// Remove chosen track from the list
-		$scope.removeTrack = function(trackIndex) {
+		$scope.removeTrack = function(entry) {
 			let listId = $scope.playlist.id;
 
 			// Remove the element first from our internal array, without recreating the whole array.
 			// Doing this before the HTTP request improves the perceived performance.
-			libraryService.removeFromPlaylist(listId, trackIndex);
+			libraryService.removeFromPlaylist(listId, entry.index);
 
 			if (listIsPlaying()) {
 				let playingIndex = $scope.getCurrentTrackIndex();
-				if (trackIndex <= playingIndex) {
+				if (entry.index <= playingIndex) {
 					--playingIndex;
 				}
 				playQueueService.onPlaylistModified($scope.tracks, playingIndex);
 			}
 
-			Restangular.one('playlists', listId).all('remove').post({index: trackIndex}).then(function (result) {
+			Restangular.one('playlists', listId).all('remove').post({index: entry.index}).then(function (result) {
 				$scope.playlist.updated = result.updated;
 			});
 		};
@@ -70,16 +56,18 @@ angular.module('Music').controller('PlaylistViewController', [
 		};
 
 		// Play the list, starting from a specific track
-		$scope.onTrackClick = function(trackIndex) {
+		$scope.onTrackClick = function(track) {
 			// play/pause if currently playing list item clicked
-			if ($scope.getCurrentTrackIndex() === trackIndex) {
+			if ($scope.getCurrentTrackIndex() === track.index) {
 				playQueueService.publish('togglePlayback');
 			}
 			// on any other list item, start playing the list from this item
 			else {
-				play(trackIndex);
+				play(track.index);
 			}
 		};
+
+		$scope.draggedIndex = -1;
 
 		$scope.getDraggable = function(index) {
 			$scope.draggedIndex = index;
@@ -89,6 +77,8 @@ angular.module('Music').controller('PlaylistViewController', [
 				srcIndex: index
 			};
 		};
+
+		$rootScope.subscribe('ANGULAR_DRAG_END', $scope, () => $scope.draggedIndex = -1);
 
 		$scope.reorderDrop = function(draggable, dstIndex) {
 			let listId = $scope.playlist.id;
@@ -135,57 +125,63 @@ angular.module('Music').controller('PlaylistViewController', [
 			}
 		};
 
-		subscribe('scrollToTrack', function(event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
-				let currentIdx = $scope.getCurrentTrackIndex();
+				const currentIdx = $scope.getCurrentTrackIndex();
 				let index;
 
 				// There may be more than one playlist entry with the same track ID.
 				// Prefer to scroll to the currently playing entry if the requested
 				// track ID matches that. Otherwise scroll to the first match.
-				if (currentIdx &&  $scope.tracks[currentIdx].track.id == trackId) {
+				if (currentIdx !== null && $scope.tracks[currentIdx].track.id == trackId) {
 					index = currentIdx;
 				} else {
-					index = _.findIndex($scope.tracks, function(entry) {
-						return entry.track.id == trackId;
-					});
+					index = _.findIndex($scope.tracks, (entry) => entry.track.id == trackId);
 				}
-				$scope.$parent.scrollToItem('playlist-track-' + index);
+
+				// Because of the virtualization, the target element might not exist in the DOM tree yet.
+				// Hence, we can't just scroll to the element but need to manually calculate, where that
+				// element should be. The vs-repeat directive will instantiate the element once we are there.
+
+				// While searching, the effective index within the visible items may differ from the original index
+				if ($rootScope.searchMode) {
+					for (let i = index; i >= 0; --i) {
+						if (!$scope.tracks[i].searchMatched) {
+							--index;
+						}
+					}
+				}
+
+				const itemHeight = $('.vs-repeat-repeated-element').outerHeight();
+				const offset = itemHeight * index + $('.track-list').position().top - $scope.scrollOffset();
+				const animationTime = 500;
+				OCA.Music.Utils.getScrollContainer().scrollTo(0, offset, animationTime);
 			}
 		});
 
-		// Init happens either immediately (after making the loading animation visible)
-		// or once both aritsts and playlists have been loaded
+		$scope.entryNotHidden = function(entry) {
+			return !$rootScope.searchMode || entry.searchMatched;
+		};
+
 		$timeout(initViewFromRoute);
-		subscribe('collectionLoaded', initViewFromRoute);
-		subscribe('playlistsLoaded', initViewFromRoute);
 
 		// Reload the view if the currently viewed playlist got updated (by import from file)
-		subscribe('playlistUpdated', function(event, playlistId) {
-			if ($scope.playlist.id == playlistId) {
+		libraryService.subscribe('playlistUpdated', $scope, (_event, playlistId) => {
+			if ($scope.playlist?.id == playlistId) {
 				initViewFromRoute();
 			}
 		});
 
-		function listIsPlaying() {
-			return ($rootScope.playingView === $rootScope.currentView);
-		}
+		// Reload the view if the collection is updated (e.g. by change of the library path)
+		libraryFactory.subscribe('collectionUpdating', $scope, initViewFromRoute);
 
-		function showMore() {
-			// show more entries only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
-				$scope.incrementalLoadLimit += INCREMENTAL_LOAD_STEP;
-				if ($scope.incrementalLoadLimit < $scope.tracks.length) {
-					$timeout(showMore);
-				} else {
-					$rootScope.loading = false;
-					$rootScope.$emit('viewActivated');
-				}
-			}
+		function listIsPlaying() {
+			return ($rootScope.playingView === $scope.getCurrentViewId());
 		}
 
 		function initViewFromRoute() {
-			if (libraryService.collectionLoaded() && libraryService.playlistsLoaded()) {
+			$scope.tracks = null;
+			libraryFactory.getPlaylists().then(() => {
 				if ($routeParams.playlistId) {
 					let playlist = libraryService.getPlaylist($routeParams.playlistId);
 					if (playlist) {
@@ -197,23 +193,11 @@ angular.module('Music').controller('PlaylistViewController', [
 						window.location.hash = '#/';
 					}
 				}
-				$timeout(showMore);
-			}
+				$timeout(() => {
+					$rootScope.$emit('viewActivated', THIS_VIEW_ID);
+					$scope.$broadcast('vsRepeatTrigger'); // the virtual scroller often needs this manual trigger for the first draw
+				});
+			});
 		}
-
-		function showLess() {
-			$scope.incrementalLoadLimit -= INCREMENTAL_LOAD_STEP;
-			if ($scope.incrementalLoadLimit > 0) {
-				$timeout(showLess);
-			} else {
-				$scope.incrementalLoadLimit = 0;
-				$rootScope.$emit('viewDeactivated');
-			}
-		}
-
-		subscribe('deactivateView', function() {
-			$timeout(showLess);
-		});
-
 	}
 ]);

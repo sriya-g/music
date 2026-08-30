@@ -24,7 +24,7 @@ angular.module('Music').directive('popupMenu', ['$rootScope', function($rootScop
 				event.stopPropagation();
 			};
 
-			$rootScope.$on('popup-menu:close', function(_event, source) {
+			$rootScope.subscribe('popup-menu:close', scope, (_event, source) => {
 				if (source !== scope) {
 					scope.expanded = false;
 				}

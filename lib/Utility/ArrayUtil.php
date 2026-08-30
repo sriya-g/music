@@ -24,7 +24,7 @@ class ArrayUtil {
 	 * @return int[]
 	 */
 	public static function extractIds(array $arr) : array {
-		return \array_map(fn($i) => $i->getId(), $arr);
+		return \array_map(fn ($i) => $i->getId(), $arr);
 	}
 
 	/**
@@ -34,7 +34,7 @@ class ArrayUtil {
 	 * @return string[]
 	 */
 	public static function extractUserIds(array $arr) : array {
-		return \array_map(fn($i) => $i->getUserId(), $arr);
+		return \array_map(fn ($i) => $i->getUserId(), $arr);
 	}
 
 	/**
@@ -107,7 +107,7 @@ class ArrayUtil {
 	 * @return ?mixed Value matching the key or null if not found
 	 */
 	public static function getCaseInsensitive(array $dictionary, string $key) {
-		return self::find($dictionary, fn($_, $k) => StringUtil::caselessEqual((string)$k, $key));
+		return self::find($dictionary, fn ($_, $k) => StringUtil::caselessEqual((string)$k, $key));
 	}
 
 	/**
@@ -129,6 +129,40 @@ class ArrayUtil {
 	}
 
 	/**
+	 * Replacement for \array_all which is available only in PHP 8.4 and later
+	 *
+	 * @template K Array key
+	 * @template V Array value
+	 * @phpstan-param array<K,V> $array
+	 * @phpstan-param callable(V,K):bool $predicate
+	 */
+	public static function all(array $array, callable $predicate) : bool {
+		foreach ($array as $k => $v) {
+			if (!$predicate($v, $k)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Replacement for \array_any which is available only in PHP 8.4 and later
+	 *
+	 * @template K Array key
+	 * @template V Array value
+	 * @phpstan-param array<K,V> $array
+	 * @phpstan-param callable(V,K):bool $predicate
+	 */
+	public static function any(array $array, callable $predicate) : bool {
+		foreach ($array as $k => $v) {
+			if ($predicate($v, $k)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Get multiple items from @a $array, as indicated by a second array @a $keys.
 	 * If @a $preserveKeys is given as true, the result will have the original keys, otherwise
 	 * the result is re-indexed with keys 0, 1, 2, ...
@@ -136,7 +170,7 @@ class ArrayUtil {
 	 * @param array<int|string> $keys
 	 * @return array<int|string, mixed>
 	 */
-	public static function multiGet(array $array, array $keys, bool $preserveKeys=false) : array {
+	public static function multiGet(array $array, array $keys, bool $preserveKeys = false) : array {
 		$result = [];
 		foreach ($keys as $key) {
 			if ($preserveKeys) {
@@ -156,12 +190,12 @@ class ArrayUtil {
 	 * @param int|string|null $indexColumn
 	 * @return array<array<int|string, mixed>>
 	 */
-	public static function columns(array $array, array $columns, $indexColumn=null) : array {
+	public static function columns(array $array, array $columns, $indexColumn = null) : array {
 		if ($indexColumn !== null) {
 			$array = \array_column($array, null, $indexColumn);
 		}
 
-		return \array_map(fn($row) => self::multiGet($row, $columns, true), $array);
+		return \array_map(fn ($row) => self::multiGet($row, $columns, true), $array);
 	}
 
 	/**
@@ -196,7 +230,7 @@ class ArrayUtil {
 	 * @return mixed[]
 	 */
 	public static function rejectRecursive(array $array, callable $condition) : array {
-		$invCond = fn($item) => !$condition($item);
+		$invCond = fn ($item) => !$condition($item);
 		return self::filterRecursive($array, $invCond);
 	}
 
@@ -226,8 +260,8 @@ class ArrayUtil {
 	 * @param mixed[] $arr Input/output array to operate on
 	 * @param ?callable(mixed):bool $predicate
 	 */
-	public static function intCastValues(array &$arr, ?callable $predicate=null) : void {
-		\array_walk_recursive($arr, function(&$value) use($predicate) {
+	public static function intCastValues(array &$arr, ?callable $predicate = null) : void {
+		\array_walk_recursive($arr, function (&$value) use ($predicate) {
 			if ($predicate === null || $predicate($value)) {
 				$value = (int)$value;
 			}
@@ -240,7 +274,7 @@ class ArrayUtil {
 	 * @param array<array<string, mixed>> $arr Input/output array to operate on
 	 */
 	public static function sortByColumn(array &$arr, string $column) : void {
-		\usort($arr, fn($a, $b) => StringUtil::caselessCompare($a[$column], $b[$column]));
+		\usort($arr, fn ($a, $b) => StringUtil::caselessCompare($a[$column], $b[$column]));
 	}
 
 }

@@ -21,7 +21,7 @@ class Logger {
 
 	public function __construct(
 		protected string $appName,
-		protected LoggerInterface $logger
+		protected LoggerInterface $logger,
 	) {
 	}
 

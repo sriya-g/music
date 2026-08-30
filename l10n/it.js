@@ -30,7 +30,7 @@ OC.L10N.register(
     "Tracks" : "Tracce",
     "Unknown album" : "Album sconosciuto",
     "Unknown artist" : "Artista sconosciuto",
-    "Upload music in the files app to listen to it here" : "Carica la musica nella App File per sentirla da qui",
+    "Upload music in the Files app to listen to it here" : "Carica la musica nella App File per sentirla da qui",
     "Use this address to browse your music collection from any Ampache compatible player." : "Usa questo indirizzo per sfogliare le tue raccolte musicali da qualsiasi lettore compatibile con Ampache.",
     "Use your username and following password to connect to this Ampache instance:" : "Utilizza il tuo nome utente e la password per collegarti a questa istanza di Ampache:",
     "Volume" : "Volume",

@@ -6,8 +6,8 @@ namespace OCA\Music\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
-use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
+use OCP\Migration\SimpleMigrationStep;
 
 /**
  * Migrate the DB schema to Music v1.4.0 level from the v1.3.x level
@@ -67,7 +67,7 @@ class Version010400Date20211002223000 extends SimpleMigrationStep {
 	 */
 	private function setColumns($table, array $nameTypeArgsPerCol) : void {
 		foreach ($nameTypeArgsPerCol as $nameTypeArgs) {
-			list($name, $type, $args) = $nameTypeArgs;
+			[$name, $type, $args] = $nameTypeArgs;
 			$this->setColumn($table, $name, $type, $args);
 		}
 	}

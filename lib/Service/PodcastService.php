@@ -36,7 +36,7 @@ class PodcastService {
 	public function __construct(
 		private PodcastChannelBusinessLayer $channelBusinessLayer,
 		private PodcastEpisodeBusinessLayer $episodeBusinessLayer,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -94,7 +94,7 @@ class PodcastService {
 	 * Inject episodes to the given podcast channels
 	 * @param PodcastChannel[] $channels input/output
 	 * @param bool $allChannelsIncluded Set this to true if $channels contains all the podcasts of the user.
-	 *									This helps in optimizing the DB query.
+	 *                                  This helps in optimizing the DB query.
 	 */
 	public function injectEpisodes(array $channels, string $userId, bool $allChannelsIncluded) : void {
 		if ($allChannelsIncluded || \count($channels) >= $this->channelBusinessLayer::MAX_SQL_ARGS) {
@@ -155,11 +155,11 @@ class PodcastService {
 	/**
 	 * Check a single podcast channel for updates
 	 * @param ?string $prevHash Previous content hash known by the client. If given, the result will tell
-	 *							if the channel content has updated from this state. If omitted, the result
-	 *							will tell if the channel changed from its previous server-known state.
+	 *                          if the channel content has updated from this state. If omitted, the result
+	 *                          will tell if the channel changed from its previous server-known state.
 	 * @param bool $force Value true will cause the channel to be parsed and updated to the database even
-	 *					in case the RSS hasn't been changed at all since the previous update. This might be
-	 *					useful during the development or if the previous update was unexpectedly aborted.
+	 *                    in case the RSS hasn't been changed at all since the previous update. This might be
+	 *                    useful during the development or if the previous update was unexpectedly aborted.
 	 * @return array{status: int, updated: bool, channel: ?PodcastChannel, message: string}
 	 */
 	public function updateChannel(int $id, string $userId, ?string $prevHash = null, bool $force = false) : array {
@@ -203,7 +203,7 @@ class PodcastService {
 		}
 
 		return [
-			'status' => $status,
+			'status'  => $status,
 			'updated' => $updated,
 			'channel' => $channel,
 			'message' => $message ?? ''
@@ -254,7 +254,7 @@ class PodcastService {
 	private function updateEpisodesFromXml(\SimpleXMLElement $items, string $userId, int $channelId) : array {
 		$episodes = [];
 		// loop the episodes from XML in reverse order to store them to the DB in chronological order
-		for ($count = \count($items), $i = $count-1; $i >= 0; --$i) {
+		for ($count = \count($items), $i = $count - 1; $i >= 0; --$i) {
 			if ($items[$i] !== null) {
 				$episodes[] = $this->episodeBusinessLayer->addOrUpdate($userId, $channelId, $items[$i]);
 			}
@@ -270,17 +270,17 @@ class PodcastService {
 	 * @param string $folderPath target parent folder path
 	 * @param string $filename target file name
 	 * @param string $collisionMode action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                              supported values:
+	 *                              - 'overwrite' The existing file will be overwritten
+	 *                              - 'keepboth' The new file is named with a suffix to make it unique
+	 *                              - 'abort' (default) The operation will fail
 	 * @return string path of the written file
 	 * @throws \OCP\Files\NotFoundException if the $folderPath is not a valid folder
 	 * @throws \RuntimeException on name conflict if $collisionMode == 'abort'
 	 * @throws \OCP\Files\NotPermittedException if the user is not allowed to write to the given folder
 	 */
 	public function exportToFile(
-		string $userId, Folder $userFolder, string $folderPath, string $filename, string $collisionMode='abort') : string {
+		string $userId, Folder $userFolder, string $folderPath, string $filename, string $collisionMode = 'abort') : string {
 		$targetFolder = FilesUtil::getFolderFromRelativePath($userFolder, $folderPath);
 
 		$filename = FilesUtil::sanitizeFileName($filename, ['opml']);
@@ -335,9 +335,9 @@ class PodcastService {
 	 * @param Folder $userFolder user home dir
 	 * @param string $filePath path of the file to import
 	 * @return array with three keys:
-	 * 			- 'channels': Array of PodcastChannel objects imported from the file
-	 * 			- 'not_changed_count': An integer showing the number of channels in the file which were already subscribed by the user
-	 * 			- 'failed_count': An integer showing the number of entries in the file which were not valid URLs
+	 *               - 'channels': Array of PodcastChannel objects imported from the file
+	 *               - 'not_changed_count': An integer showing the number of channels in the file which were already subscribed by the user
+	 *               - 'failed_count': An integer showing the number of entries in the file which were not valid URLs
 	 * @throws \OCP\Files\NotFoundException if the $filePath is not a valid file
 	 * @throws \UnexpectedValueException if the $filePath points to a file of unsupported type
 	 */
@@ -365,9 +365,9 @@ class PodcastService {
 		}
 
 		return [
-			'channels' => $channels,
+			'channels'          => $channels,
 			'not_changed_count' => $existingCount,
-			'failed_count' => $failedCount
+			'failed_count'      => $failedCount
 		];
 	}
 

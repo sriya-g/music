@@ -17,7 +17,6 @@ use OCA\Music\Http\ErrorResponse;
 use OCA\Music\Http\FileStreamResponse;
 use OCA\Music\Service\PlaylistFileService;
 use OCA\Music\Service\Scanner;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -27,8 +26,8 @@ use OCP\AppFramework\Http\Response;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\IRequest;
-use OCP\Share\IManager;
 use OCP\Share\Exceptions\ShareNotFound;
+use OCP\Share\IManager;
 
 /**
  * End-points for shared audio file handling. Methods of this class may be
@@ -42,7 +41,7 @@ class ShareController extends Controller {
 		private Scanner $scanner,
 		private PlaylistFileService $playlistFileService,
 		private Logger $logger,
-		private IManager $shareManager
+		private IManager $shareManager,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -114,11 +113,11 @@ class ShareController extends Controller {
 				} else {
 					$file = $fileInfo['file'];
 					return [
-						'id' => $file->getId(),
-						'name' => $file->getName(),
-						'path' => $sharedFolder->getRelativePath($file->getParent()->getPath()),
+						'id'       => $file->getId(),
+						'name'     => $file->getName(),
+						'path'     => $sharedFolder->getRelativePath($file->getParent()->getPath()),
 						'mimetype' => $file->getMimeType(),
-						'caption' => $fileInfo['caption'],
+						'caption'  => $fileInfo['caption'],
 						'external' => false
 					];
 				}

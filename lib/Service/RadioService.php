@@ -29,7 +29,8 @@ class RadioService {
 	public function __construct(
 		private IURLGenerator $urlGenerator,
 		private StreamTokenService $tokenService,
-		private Logger $logger) {
+		private Logger $logger,
+	) {
 	}
 
 	/**
@@ -46,34 +47,6 @@ class RadioService {
 		return null;
 	}
 
-	private static function parseStreamUrl(string $url) : array {
-		$ret = [];
-		$parse_url = \parse_url($url);
-
-		$ret['port'] = 80;
-		if (isset($parse_url['port'])) {
-			$ret['port'] = $parse_url['port'];
-		} elseif ($parse_url['scheme'] == "https") {
-			$ret['port'] = 443;
-		}
-
-		$ret['scheme'] = $parse_url['scheme'];
-		$ret['hostname'] = $parse_url['host'];
-		$ret['pathname'] = $parse_url['path'] ?? '/';
-
-		if (isset($parse_url['query'])) {
-			$ret['pathname'] .= "?" . $parse_url['query'];
-		}
-
-		if ($parse_url['scheme'] == "https") {
-			$ret['sockAddress'] = "ssl://" . $ret['hostname'];
-		} else {
-			$ret['sockAddress'] = $ret['hostname'];
-		}
-
-		return $ret;
-	}
-
 	/**
 	 * @param resource $fp File handle
 	 */
@@ -81,7 +54,7 @@ class RadioService {
 		$meta_length = \ord(\fread($fp, 1)) * 16;
 		if ($meta_length) {
 			$metadatas = \explode(';', \fread($fp, $meta_length));
-			$title = self::findStrFollowing($metadatas, "StreamTitle=");
+			$title = self::findStrFollowing($metadatas, 'StreamTitle=');
 			if ($title) {
 				return StringUtil::truncate(\trim($title, "'"), 256);
 			}
@@ -92,7 +65,7 @@ class RadioService {
 	private function readMetadata(string $metaUrl, callable $parseResult) : ?array {
 		$maxLength = 32 * 1024;
 		$timeout_s = 8;
-		list('content' => $content, 'status_code' => $status_code, 'message' => $message)
+		['content' => $content, 'status_code' => $status_code, 'message' => $message]
 			= HttpUtil::loadFromUrl($metaUrl, $maxLength, $timeout_s);
 
 		if ($status_code == 200) {
@@ -120,8 +93,8 @@ class RadioService {
 				return null;
 			} else {
 				return [
-					'type' => 'shoutcast-v1',
-					'title' => $match[7],
+					'type'    => 'shoutcast-v1',
+					'title'   => $match[7],
 					'bitrate' => $match[6]
 				];
 			}
@@ -139,12 +112,12 @@ class RadioService {
 				return null;
 			} else {
 				return [
-					'type' => 'shoutcast-v2',
-					'title' => (string)$rootNode->SONGTITLE,
-					'station' => (string)$rootNode->SERVERTITLE,
+					'type'     => 'shoutcast-v2',
+					'title'    => (string)$rootNode->SONGTITLE,
+					'station'  => (string)$rootNode->SERVERTITLE,
 					'homepage' => (string)$rootNode->SERVERURL,
-					'genre' => (string)$rootNode->SERVERGENRE,
-					'bitrate' => (string)$rootNode->BITRATE
+					'genre'    => (string)$rootNode->SERVERGENRE,
+					'bitrate'  => (string)$rootNode->BITRATE
 				];
 			}
 		});
@@ -165,7 +138,7 @@ class RadioService {
 				return null;
 			} else {
 				// There may be one or multiple sources and the structure is slightly different in these two cases.
-				// In case there are multiple, try to found the source with a matching stream URL.
+				// In case there are multiple, try to find the source with a matching stream URL.
 				if (\is_int(\key($source))) {
 					// multiple sources
 					foreach ($source as $sourceItem) {
@@ -177,103 +150,60 @@ class RadioService {
 				}
 
 				return [
-					'type' => 'icecast',
-					'title' => $source['title'] ?? $source['yp_currently_playing'] ?? null,
-					'station' => $source['server_name'] ?? null,
+					'type'        => 'icecast',
+					'title'       => $source['title'] ?? $source['yp_currently_playing'] ?? null,
+					'station'     => $source['server_name'] ?? null,
 					'description' => $source['server_description'] ?? null,
-					'homepage' => $source['server_url'] ?? null,
-					'genre' => $source['genre'] ?? null,
-					'bitrate' => $source['bitrate'] ?? null
+					'homepage'    => $source['server_url'] ?? null,
+					'genre'       => $source['genre'] ?? null,
+					'bitrate'     => $source['bitrate'] ?? null
 				];
 			}
 		});
 	}
 
-	public function readIcyMetadata(string $streamUrl, int $maxattempts, int $maxredirect) : ?array {
+	public function readIcyMetadata(string $streamUrl, int $maxAttempts) : ?array {
 		$timeout = 10;
 		$result = null;
-		$pUrl = self::parseStreamUrl($streamUrl);
-		if ($pUrl['sockAddress'] && $pUrl['port']) {
-			$fp = \fsockopen($pUrl['sockAddress'], $pUrl['port'], $errno, $errstr, $timeout);
-			if ($fp !== false) {
-				$out = "GET " . $pUrl['pathname'] . " HTTP/1.1\r\n";
-				$out .= "Host: ". $pUrl['hostname'] . "\r\n";
-				$out .= "Accept: */*\r\n";
-				$out .= HttpUtil::userAgentHeader() . "\r\n";
-				$out .= "Icy-MetaData: 1\r\n";
-				$out .= "Connection: Close\r\n\r\n";
-				\fwrite($fp, $out);
-				\stream_set_timeout($fp, $timeout);
 
-				$header = \fread($fp, 1024);
-				$headers = \explode("\n", $header);
+		$reqHeaders = [
+			'Accept' => '*/*',
+			'Icy-MetaData' => '1',
+			'Connection' => 'Close',
+		];
+		$context = HttpUtil::createContext($timeout, $reqHeaders);
+		$resolved = HttpUtil::resolveRedirections($streamUrl, $context);
 
-				if (\strpos($headers[0], "200 OK") !== false) {
-					$interval = self::findStrFollowing($headers, "icy-metaint:") ?? '0';
-					$interval = (int)$interval;
+		// If the response headers contain any "icy-" headers, then this is an ICY stream and we can try to read the metadata from it.
+		if ($resolved['status_code'] >= 200 && $resolved['status_code'] < 300
+			&& ArrayUtil::find($resolved['headers'], fn($v, $k) => StringUtil::startsWith($k, 'icy-')) !== null) {
 
-					if ($interval > 0 && $interval <= 64*1024) {
-						$result = [
-							'type' => 'icy',
-							'title' => null, // fetched below
-							'station' => self::findStrFollowing($headers, 'icy-name:'),
-							'description' => self::findStrFollowing($headers, 'icy-description:'),
-							'homepage' => self::findStrFollowing($headers, 'icy-url:'),
-							'genre' => self::findStrFollowing($headers, 'icy-genre:'),
-							'bitrate' => self::findStrFollowing($headers, 'icy-br:')
-						];
+			$result = [
+				'type' => 'icy',
+				'title' => null, // fetched below
+				'station' => $resolved['headers']['icy-name'] ?? null,
+				'description' => $resolved['headers']['icy-description'] ?? null,
+				'homepage' => $resolved['headers']['icy-url'] ?? null,
+				'genre' => $resolved['headers']['icy-genre'] ?? null,
+				'bitrate' => $resolved['headers']['icy-br'] ?? null
+			];
 
-						$attempts = 0;
-						while ($attempts < $maxattempts && empty($result['title'])) {
-							$bytesToSkip = $interval;
-							if ($attempts === 0) {
-								// The first chunk containing the header may also already contain the beginning of the body,
-								// but this depends on the case. Subtract the body bytes which we already got.
-								$headerEndPos = \strpos($header, "\r\n\r\n") + 4;
-								$bytesToSkip -= \strlen($header) - $headerEndPos;
-							}
-
-							\fseek($fp, $bytesToSkip, SEEK_CUR);
-
-							$result['title'] = self::parseTitleFromStreamMetadata($fp);
-
-							$attempts++;
-						}
+			$interval = (int)($resolved['headers']['icy-metaint'] ?? '0');
+			if ($interval > 0 && $interval <= 64*1024) {
+				$fp = \fopen($resolved['url'], 'rb', false, $context);
+				if ($fp !== false) {
+					$attempts = 0;
+					while ($attempts < $maxAttempts && empty($result['title'])) {
+						\fseek($fp, $interval, SEEK_CUR);
+						$result['title'] = self::parseTitleFromStreamMetadata($fp);
+						$attempts++;
 					}
 					\fclose($fp);
-				} else {
-					\fclose($fp);
-					if ($maxredirect > 0 && \strpos($headers[0], "302 Found") !== false) {
-						$location = self::findStrFollowing($headers, "Location:");
-						if ($location) {
-							$result = $this->readIcyMetadata($location, $maxattempts, $maxredirect-1);
-						}
-					}
 				}
 			}
 		}
 
 		return $result;
-	}
-
-	private static function convertUrlOnPlaylistToAbsolute(string $containedUrl, string $playlistUrl) : string {
-		if (!StringUtil::startsWith($containedUrl, 'http://', true) && !StringUtil::startsWith($containedUrl, 'https://', true)) {
-			$urlParts = \parse_url($playlistUrl);
-
-			if ($containedUrl[0] == '/') {
-				// the contained URL is absolute to the server root => keep only the scheme and host from the playlist URL
-				$urlParts['path'] = $containedUrl;
-			} else {
-				// the contained URL is relative to the playlist URL => keep the path up to the last '/' and append the contained URL
-				$path = $urlParts['path'] ?? '/';
-				$lastSlash = \strrpos($path, '/');
-				$urlParts['path'] = \substr($path, 0, $lastSlash + 1) . $containedUrl;
-			}
-			unset($urlParts['query'], $urlParts['fragment']);
-
-			$containedUrl = Util::buildUrl($urlParts);
-		}
-		return $containedUrl;
 	}
 
 	/**
@@ -316,7 +246,7 @@ class RadioService {
 					// in case the playlist contains multiple entries, the first ones are probably advertisements and the actual stream is the last one
 					$entryUrl = \end($entries)['path'];
 					// the path in the playlist may be relative => convert to absolute
-					$url = self::convertUrlOnPlaylistToAbsolute($entryUrl, $url);
+					$url = Util::urlToAbsolute($entryUrl, $url);
 
 					// make a recursive call, sometimes playlist may contain another playlist URL
 					['url' => $url, 'hls' => $isHls] = $this->resolveStreamUrl($url);
@@ -336,7 +266,7 @@ class RadioService {
 
 		if ($result['status_code'] == 200) {
 			// read the manifest line-by-line, and create a modified copy where each fragment URL is relayed through this server
-			$fp = \fopen("php://temp", 'r+');
+			$fp = \fopen('php://temp', 'r+');
 			\assert($fp !== false, 'Unexpected error: opening temporary stream failed');
 
 			\fputs($fp, /** @scrutinizer ignore-type */ $result['content']);
@@ -346,7 +276,7 @@ class RadioService {
 			while ($line = \fgets($fp)) {
 				$line = \trim($line);
 				if (!empty($line) && !StringUtil::startsWith($line, '#')) {
-					$segUrl = self::convertUrlOnPlaylistToAbsolute($line, $url);
+					$segUrl = Util::urlToAbsolute($line, $url);
 					$segToken = $this->tokenService->tokenForUrl($segUrl);
 					$line = $this->urlGenerator->linkToRoute(
 						'music.radioApi.hlsSegment',
@@ -354,7 +284,7 @@ class RadioService {
 					);
 				} elseif (\preg_match('/^#EXT-X-.+:URI="([^"]*)"/', $line, $matches) === 1) {
 					// also rewrite HLS headers containing URLs, such as the decryption key URL in #EXT-X-KEY
-					$segUrl = self::convertUrlOnPlaylistToAbsolute($matches[1], $url);
+					$segUrl = Util::urlToAbsolute($matches[1], $url);
 					$segToken = $this->tokenService->tokenForUrl($segUrl);
 					$line = \str_replace($matches[1], $this->urlGenerator->linkToRoute(
 						'music.radioApi.hlsSegment',

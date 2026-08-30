@@ -12,9 +12,8 @@
 
 namespace OCA\Music\Db;
 
-use OCP\IDBConnection;
-
 use OCA\Music\AppFramework\Db\UniqueConstraintViolationException;
+use OCP\IDBConnection;
 
 class Cache {
 	private IDBConnection $db;
@@ -55,7 +54,7 @@ class Cache {
 	 * @param string $key
 	 * @param string $data
 	 * @param bool $probablyExists True if the caller thinks that a matching entry already exists. This is just a hint to
-	 * 								optimize the number of queries but the method will work correctly regardless of the value.
+	 *                             optimize the number of queries but the method will work correctly regardless of the value.
 	 */
 	public function set(string $userId, string $key, string $data, bool $probablyExists = false) : void {
 		$updated = 0;
@@ -173,7 +172,7 @@ class Cache {
 			try {
 				$id = $this->add($userId, $key, '');
 			} catch (UniqueConstraintViolationException $e) {
-				// with a really bad luck, the item didn't exist an eyeblick ago but now it does
+				// with a really bad luck, the item didn't exist an eyeblink ago but now it does
 				$id = (int)$this->getId($userId, $key);
 			}
 		}

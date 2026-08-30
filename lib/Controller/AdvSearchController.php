@@ -32,7 +32,6 @@ use OCA\Music\Service\AdvSearchRules;
 use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\Random;
 use OCA\Music\Utility\StringUtil;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -57,7 +56,7 @@ class AdvSearchController extends Controller {
 		private TrackBusinessLayer $trackBusinessLayer,
 		private ?string $userId, // null if this gets called after the user has logged out or on a public page
 		private Random $random,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -69,12 +68,12 @@ class AdvSearchController extends Controller {
 
 		return new JSONResponse(
 			\array_map(
-				fn($rulesForType) =>
-					\array_map(
-						fn($rulesForLabel, $label) => [
-							'label' => $label,
-							'options' => \array_map(fn($ruleTitle, $ruleKey) => [
-								'key' => $ruleKey,
+				fn ($rulesForType)
+					=> \array_map(
+						fn ($rulesForLabel, $label) => [
+							'label'   => $label,
+							'options' => \array_map(fn ($ruleTitle, $ruleKey) => [
+								'key'  => $ruleKey,
 								'name' => $ruleTitle,
 								'type' => AdvSearchRules::typeForRule($ruleKey)
 							], $rulesForLabel, \array_keys($rulesForLabel))
@@ -88,11 +87,11 @@ class AdvSearchController extends Controller {
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function search(string $entity, string $rules, string $conjunction='and', string $order='name', ?int $limit=null, ?int $offset=null) : JSONResponse {
+	public function search(string $entity, string $rules, string $conjunction = 'and', string $order = 'name', ?int $limit = null, ?int $offset = null) : JSONResponse {
 		$rules = \json_decode($rules, true);
 
 		foreach ($rules as $rule) {
-			if (empty($rule['rule'] || empty($rule['operator'] || !isset($rule['input'])))) {
+			if (empty($rule['rule']) || empty($rule['operator']) || !isset($rule['input'])) {
 				return new ErrorResponse(Http::STATUS_BAD_REQUEST, 'Invalid search rule');
 			}
 		}
@@ -103,13 +102,13 @@ class AdvSearchController extends Controller {
 			if ($businessLayer !== null) {
 				\assert($this->userId !== null, 'Unexpected error: AdvSearch run with userId === null');
 				$entities = $businessLayer->findAllAdvanced(
-					$conjunction, $rules, $this->userId, self::mapSortBy($order), ($order==='random') ? $this->random : null, $limit, $offset);
+					$conjunction, $rules, $this->userId, self::mapSortBy($order), ($order === 'random') ? $this->random : null, $limit, $offset);
 				$entityIds = ArrayUtil::extractIds($entities);
 				return new JSONResponse([
-					'id' => \md5($entity.\serialize($entityIds)), // use hash => identical results will have identical ID
-					StringUtil::snakeToCamelCase($entity).'Ids' => $entityIds,
-					'date' => (new \DateTime())->format(BaseMapper::SQL_DATE_FORMAT),
-					'criteria' => \compact('entity', 'rules', 'conjunction', 'order', 'limit', 'offset')
+					'id'                                          => \md5($entity . \serialize($entityIds)), // use hash => identical results will have identical ID
+					StringUtil::snakeToCamelCase($entity) . 'Ids' => $entityIds,
+					'date'                                        => (new \DateTime())->format(BaseMapper::SQL_DATE_FORMAT),
+					'criteria'                                    => \compact('entity', 'rules', 'conjunction', 'order', 'limit', 'offset')
 				]);
 			} else {
 				return new ErrorResponse(Http::STATUS_BAD_REQUEST, "Entity type '$entity' is not supported");
@@ -122,27 +121,27 @@ class AdvSearchController extends Controller {
 	/** @phpstan-return ?BusinessLayer<covariant Entity> */
 	private function businessLayerForType(string $type) : ?BusinessLayer {
 		$map = [
-			'album' => $this->albumBusinessLayer,
-			'artist' => $this->artistBusinessLayer,
-			'bookmark' => $this->bookmarkBusinessLayer,
-			'genre' => $this->genreBusinessLayer,
-			'playlist' => $this->playlistBusinessLayer,
+			'album'           => $this->albumBusinessLayer,
+			'artist'          => $this->artistBusinessLayer,
+			'bookmark'        => $this->bookmarkBusinessLayer,
+			'genre'           => $this->genreBusinessLayer,
+			'playlist'        => $this->playlistBusinessLayer,
 			'podcast_channel' => $this->podcastChannelBusinessLayer,
 			'podcast_episode' => $this->podcastEpisodeBusinessLayer,
-			'radio_station' => $this->radioStationBusinessLayer,
-			'track' => $this->trackBusinessLayer,
+			'radio_station'   => $this->radioStationBusinessLayer,
+			'track'           => $this->trackBusinessLayer,
 		];
 		return $map[$type] ?? null;
 	}
 
 	private static function mapSortBy(string $order) : int {
 		$map = [
-			'name'			=> SortBy::Name,
-			'parent'		=> SortBy::Parent,
-			'newest'		=> SortBy::Newest,
-			'play_count'	=> SortBy::PlayCount,
-			'last_played'	=> SortBy::LastPlayed,
-			'rating'		=> SortBy::Rating,
+			'name'        => SortBy::Name,
+			'parent'      => SortBy::Parent,
+			'newest'      => SortBy::Newest,
+			'play_count'  => SortBy::PlayCount,
+			'last_played' => SortBy::LastPlayed,
+			'rating'      => SortBy::Rating,
 		];
 		return $map[$order] ?? SortBy::Name;
 	}

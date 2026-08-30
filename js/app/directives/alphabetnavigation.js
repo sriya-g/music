@@ -7,12 +7,12 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright 2013 Morris Jobke
- * @copyright 2018 - 2025 Pauli Järvinen
+ * @copyright 2018 - 2026 Pauli Järvinen
  *
  */
 
-angular.module('Music').directive('alphabetNavigation', ['$rootScope', '$timeout', 'alphabetIndexingService',
-function($rootScope, $timeout, alphabetIndexingService) {
+angular.module('Music').directive('alphabetNavigation', ['$rootScope', '$timeout', 'alphabetIndexingService', 'libraryFactory',
+function($rootScope, $timeout, alphabetIndexingService, libraryFactory) {
 	return {
 		restrict: 'E',
 		scope: {
@@ -135,17 +135,12 @@ function($rootScope, $timeout, alphabetIndexingService) {
 
 			// Trigger resize on #app-view resize and player status changes.
 			// Trigger re-evaluation of available scroll targets when collection reloaded.
-			let unsubscribeFuncs = [
-				$rootScope.$on('resize', onResize),
-				$rootScope.$watch('started', onPlayerBarShownOrHidden),
-				$rootScope.$on('collectionLoaded', setUpTargets),
-				$rootScope.$on('viewContentChanged', setUpTargets)
-			];
+			libraryFactory.subscribe('collectionLoaded', scope, setUpTargets);
+			$rootScope.subscribe('resize', scope, onResize);
+			$rootScope.subscribe('viewContentChanged', scope, setUpTargets);
 
-			// unsubscribe listeners when the scope is destroyed
-			scope.$on('$destroy', function () {
-				_.each(unsubscribeFuncs, function(func) { func(); });
-			});
+			const unsubscribeWatch = $rootScope.$watch('started', onPlayerBarShownOrHidden);
+			scope.$on('$destroy', unsubscribeWatch);
 		}
 	};
 }]);

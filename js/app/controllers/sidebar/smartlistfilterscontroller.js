@@ -10,11 +10,13 @@
 
 
 angular.module('Music').controller('SmartListFiltersController', [
-	'$scope', '$rootScope', '$timeout', 'libraryService', 'gettextCatalog',
-	function ($scope, $rootScope, $timeout, libraryService, gettextCatalog) {
+	'$scope', '$rootScope', '$timeout', 'libraryFactory', 'gettextCatalog',
+	function ($scope, $rootScope, $timeout, libraryFactory, gettextCatalog) {
 
-		$scope.allGenres = libraryService.getAllGenres();
-		$scope.allArtists = libraryService.getAllArtists();
+		$scope.smartListParams = null;
+		$scope.fieldsValid = false;
+		$scope.allGenres = null;
+		$scope.allArtists = null;
 
 		// for artists and genres, the selection box can't use the smartListParams
 		// directly as model as we need conversions between string and array formats
@@ -22,15 +24,13 @@ angular.module('Music').controller('SmartListFiltersController', [
 		$scope.artists = [];
 		$scope.composers = [];
 
-		$scope.$watch('smartListParams', () => {
-			if ($scope.smartListParams !== null) {
-				$scope.genres = $scope.smartListParams.genres?.split(',') ?? [];
-				$scope.artists = $scope.smartListParams.artists?.split(',') ?? [];
-				$scope.composers = $scope.smartListParams.composers?.split(',') ?? [];
-			}
+		libraryFactory.getSmartListParams().then((params) => {
+			$scope.smartListParams = params;
+			$scope.genres = params.genres?.split(',') ?? [];
+			$scope.artists = params.artists?.split(',') ?? [];
+			$scope.composers = params.composers?.split(',') ?? [];
+			$scope.fieldsValid = allFieldsValid();
 		});
-
-		$scope.fieldsValid = allFieldsValid();
 
 		$timeout(() => {
 			$('#filter-genres').chosen();
@@ -54,7 +54,8 @@ angular.module('Music').controller('SmartListFiltersController', [
 		});
 
 		function allFieldsValid() {
-			let valid = true;
+			let valid = ($scope.smartListParams !== null);
+
 			$('#smartlist-filters input[type=number]').each((_index, elem) =>
 				valid &&= elem.checkValidity()
 			);
@@ -71,7 +72,7 @@ angular.module('Music').controller('SmartListFiltersController', [
 				$scope.smartListParams.genres = $scope.genres.join(',');
 				$scope.smartListParams.artists = $scope.artists.join(',');
 				$scope.smartListParams.composers = $scope.composers.join(',');
-				$scope.reloadSmartList();
+				libraryFactory.reloadSmartList($scope.smartListParams);
 				// also navigate to the Smart Playlist view if not already open
 				$scope.navigateTo('#smartlist');
 			} else {
@@ -79,23 +80,20 @@ angular.module('Music').controller('SmartListFiltersController', [
 			}
 		};
 
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
+		function init() {
+			libraryFactory.getGenres().then((genres) => {
+				$scope.allGenres = genres;
+				$timeout(() => $('#filter-genres').trigger('chosen:updated'));
+			});
+			libraryFactory.getAllArtists().then((artists) => {
+				$scope.allArtists = artists;
+				$timeout(() => $('#filter-artists').trigger('chosen:updated'));
+				$timeout(() => $('#filter-composers').trigger('chosen:updated'));
+			});
 		}
-		$scope.$on('$destroy', () => {
-			_.each(unsubFuncs, (func) => func());
-		});
+		init();
 
-		// the artists and genres may be (re)loaded after this controller has been initialized
-		subscribe('collectionLoaded', () => {
-			$scope.allArtists = libraryService.getAllArtists();
-			$timeout(() => $('#filter-artists').trigger('chosen:updated'));
-		});
-		subscribe('genresLoaded', () => {
-			$scope.allGenres = libraryService.getAllGenres();
-			$timeout(() => $('#filter-genres').trigger('chosen:updated'));
-		});
+		// the artists and genres may be (re)loaded also after this controller has been initialized
+		libraryFactory.subscribe('collectionUpdating', $scope, init);
 	}
 ]);

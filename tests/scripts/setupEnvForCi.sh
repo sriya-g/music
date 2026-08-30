@@ -19,6 +19,7 @@ fi
 DB=$1
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_DIR=$SCRIPT_DIR/../..
+USERNAME=ampache
 
 # copy the repository under server/apps
 rm -rf /tmp/nc_music_ci/server/apps/music
@@ -42,7 +43,7 @@ mkdir data
 cd server
 touch config/CAN_INSTALL
 php occ maintenance:install --database-name owncloud --database-user oc_autotest --admin-user admin --admin-pass 0aVnqOWH1rurCrNdTJTM --database $DB --database-pass=oc_autotest --data-dir=/tmp/nc_music_ci/data
-OC_PASS=ampache123456 php occ user:add ampache --password-from-env
+OC_PASS=ampache123456 php occ user:add $USERNAME --password-from-env
 
 # set log level as 'info'
 php occ config:system:set loglevel --type=integer --value=1
@@ -51,12 +52,13 @@ php occ config:system:set loglevel --type=integer --value=1
 php occ app:enable music --force
 
 # download and scan the test content
-./apps/music/tests/scripts/downloadTestData.sh /tmp/nc_music_ci/data/ampache
-php occ files:scan ampache
-php occ music:scan ampache
+./apps/music/tests/scripts/downloadTestData.sh /tmp/nc_music_ci/data/$USERNAME
+php occ user:setting $USERNAME music path /testcontent/
+php occ files:scan $USERNAME
+php occ music:scan $USERNAME
 
 # setup the API key
-SQL_QUERY="INSERT INTO oc_music_ampache_users (user_id, hash) VALUES ('ampache', '3e60b24e84cfa047e41b6867efc3239149c54696844fd3a77731d6d8bb105f18');"
+SQL_QUERY="INSERT INTO oc_music_ampache_users (user_id, hash) VALUES ('$USERNAME', '3e60b24e84cfa047e41b6867efc3239149c54696844fd3a77731d6d8bb105f18');"
 if [ $DB == 'sqlite' ]; then
     sqlite3 /tmp/nc_music_ci/data/owncloud.db "$SQL_QUERY"
 elif [ $DB == 'mysql' ]; then

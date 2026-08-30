@@ -52,18 +52,18 @@ class AlbumTest extends \PHPUnit\Framework\TestCase {
 		$l10n = $this->getMockBuilder('\OCP\IL10N')->getMock();
 
 		$this->assertEquals([
-			'id' => 3,
-			'name' => 'The name',
-			'year' => 2013,
-			'cover' => '/link/to/album/3/cover',
-			'slug' => 'the-name',
+			'id'      => 3,
+			'name'    => 'The name',
+			'year'    => 2013,
+			'cover'   => '/link/to/album/3/cover',
+			'slug'    => 'the-name',
 			'artists' => [
 				['id' => 1, 'uri' => '/link/to/artist/1'],
 				['id' => 2, 'uri' => '/link/to/artist/2']
 			],
-			'uri' => '/link/to/album/3',
+			'uri'           => '/link/to/album/3',
 			'albumArtistId' => 3,
-			], $album->toShivaApi($this->urlGenerator, $l10n));
+		], $album->toShivaApi($this->urlGenerator, $l10n));
 	}
 
 	public function testNameLocalization() {

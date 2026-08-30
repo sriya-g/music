@@ -16,21 +16,21 @@ namespace OCA\Music\AppInfo;
 
 use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\Files_Sharing\Event\BeforeTemplateRenderedEvent;
-
 use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\BusinessLayer\AlbumBusinessLayer;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Dashboard\MusicWidget;
-use OCA\Music\Hooks\FileHooks;
-use OCA\Music\Hooks\ShareHooks;
-use OCA\Music\Hooks\UserHooks;
+use OCA\Music\Event\FileEventListener;
+use OCA\Music\Event\ShareEventListener;
+use OCA\Music\Event\UserEventListener;
 use OCA\Music\Middleware\AmpacheMiddleware;
 use OCA\Music\Middleware\SubsonicMiddleware;
+use OCA\Music\Service\CoverService;
+use OCA\Music\Service\LibrarySettings;
 use OCA\Music\Service\Scrobbling\AggregateScrobbler;
 use OCA\Music\Service\Scrobbling\ExternalScrobbler;
 use OCA\Music\Service\Scrobbling\ListenBrainzScrobbler;
 use OCA\Music\Service\Scrobbling\IScrobbler;
-
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -39,12 +39,13 @@ use OCP\AppFramework\Services\IInitialState;
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IConfig;
 use OCP\IRequest;
+use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\Security\IContentSecurityPolicyManager;
 use OCP\Security\ICrypto;
 
 class Application extends App implements IBootstrap {
-	public function __construct(array $urlParams=[]) {
+	public function __construct(array $urlParams = []) {
 		parent::__construct('music', $urlParams);
 
 		\mb_internal_encoding('UTF-8');
@@ -64,13 +65,28 @@ class Application extends App implements IBootstrap {
 	public function boot(IBootContext $context) : void {
 		$this->init();
 		$this->registerEmbeddedPlayer();
+		$this->provideInitialState();
+	}
 
+	private function provideInitialState() : void {
 		$initialState = $this->get(IInitialState::class);
-		$initialState->provideInitialState('default_volume', $this->get(IConfig::class)->getSystemValue('music.default_volume', 50));
+		$userId = $this->get('userId');
+
+		// Use the lazy variant of the state providing to not provide the state for webdav requests, for example.
+		$initialState->provideLazyInitialState('default_volume', fn () => $this->get(IConfig::class)->getSystemValue('music.default_volume', 50));
+
+		if ($userId !== null) {
+			$libSettings = $this->get(LibrarySettings::class);
+			$coverService = $this->get(CoverService::class);
+			$session = $this->get(ISession::class);
+
+			$initialState->provideLazyInitialState('ignored_articles', fn () => $libSettings->getIgnoredArticles($userId));
+			$initialState->provideLazyInitialState('cover_access_token', fn () => $coverService->getAccessToken($userId, $session));
+		}
 	}
 
 	public function init() : void {
-		$this->registerHooks();
+		$this->registerEventListeners();
 
 		// Adjust the CSP if loading the Music app proper or the NC dashboard
 		$url = $this->getRequestUrl();
@@ -105,10 +121,12 @@ class Application extends App implements IBootstrap {
 		return $url;
 	}
 
-	private function registerHooks() : void {
-		$this->get(FileHooks::class)->register();
-		$this->get(ShareHooks::class)->register();
-		$this->get(UserHooks::class)->register();
+	private function registerEventListeners() : void {
+		$dispatcher = $this->get(IEventDispatcher::class);
+
+		FileEventListener::register($dispatcher);
+		ShareEventListener::register($dispatcher);
+		UserEventListener::register($dispatcher);
 	}
 
 	private function registerEmbeddedPlayer() : void {

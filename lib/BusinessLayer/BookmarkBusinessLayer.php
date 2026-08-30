@@ -17,13 +17,11 @@ namespace OCA\Music\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
-
-use OCA\Music\Db\BookmarkMapper;
 use OCA\Music\Db\Bookmark;
+use OCA\Music\Db\BookmarkMapper;
 use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\SortBy;
 use OCA\Music\Utility\StringUtil;
-
 use OCP\AppFramework\Db\DoesNotExistException;
 
 /**
@@ -38,7 +36,7 @@ class BookmarkBusinessLayer extends BusinessLayer {
 
 	public function __construct(
 		BookmarkMapper $bookmarkMapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($bookmarkMapper);
 		$this->logger = $logger;

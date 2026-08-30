@@ -23,7 +23,8 @@ class BogusTrackRemoval implements IRepairStep {
 
 	public function __construct(
 		private IDBConnection $db,
-		private IConfig $config) {
+		private IConfig $config,
+	) {
 	}
 
 	public function getName() {
@@ -43,13 +44,13 @@ class BogusTrackRemoval implements IRepairStep {
 			$n = $this->removePlaylistFiles();
 			$output->info("$n files with audio/mpegurl or audio/x-scpls mime type removed from the music library");
 			// Clean cache
-			$this->db->executeStatement("DELETE FROM `*PREFIX*music_cache`");
+			$this->db->executeStatement('DELETE FROM `*PREFIX*music_cache`');
 		}
 	}
 
 	private function removePlaylistFiles() : int {
 		// Find and delete tracks with mime audio/mpegurl and audio/x-scpls.
-		// This may leave some stray albums and artists in the DB but that is not a major probelm
+		// This may leave some stray albums and artists in the DB but that is not a major problem
 		// since the background cleanup task should get rid of those, eventually.
 		$sql = "DELETE FROM `*PREFIX*music_tracks` WHERE `mimetype` = 'audio/mpegurl' OR `mimetype` = 'audio/x-scpls'";
 		return $this->db->executeStatement($sql);

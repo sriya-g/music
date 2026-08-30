@@ -13,9 +13,7 @@
 namespace OCA\Music\Command;
 
 use OCA\Music\Service\PodcastService;
-
 use OCP\Files\IRootFolder;
-
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -26,7 +24,7 @@ class PodcastExport extends BaseCommand {
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
 		private IRootFolder $rootFolder,
-		private PodcastService $podcastService
+		private PodcastService $podcastService,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -54,7 +52,7 @@ class PodcastExport extends BaseCommand {
 	protected function doExecute(InputInterface $input, OutputInterface $output, array $users) : void {
 		$path = $input->getOption('file');
 
-		list('basename' => $file, 'dirname' => $dir) = \pathinfo($path);
+		['basename' => $file, 'dirname' => $dir] = \pathinfo($path);
 
 		$overwrite = (bool)$input->getOption('overwrite');
 
@@ -63,7 +61,7 @@ class PodcastExport extends BaseCommand {
 		}
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $dir, $file, $overwrite) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $dir, $file, $overwrite) {
 				$this->executeForUser($user->getUID(), $dir, $file, $overwrite, $output);
 			});
 		} else {

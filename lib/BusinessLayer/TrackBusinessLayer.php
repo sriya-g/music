@@ -20,13 +20,14 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\Db\Cache;
 use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\SortBy;
-use OCA\Music\Db\TrackMapper;
 use OCA\Music\Db\Track;
+use OCA\Music\Db\TrackMapper;
 use OCA\Music\Service\FileSystemService;
 use OCA\Music\Service\Scrobbling\IScrobbler;
+use OCA\Music\Utility\AppInfo;
 use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\StringUtil;
-
+use OCA\Music\Utility\Util;
 use OCP\AppFramework\Db\DoesNotExistException;
 
 /**
@@ -43,7 +44,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 		TrackMapper $trackMapper,
 		private FileSystemService $fileSystemService,
 		private Logger $logger,
-		private Cache $cache
+		private Cache $cache,
 	) {
 		parent::__construct($trackMapper);
 	}
@@ -53,7 +54,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * @param int|int[] $artistId
 	 * @return Track[]
 	 */
-	public function findAllByArtist(int|array $artistId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByArtist(int|array $artistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		if (empty($artistId)) {
 			return [];
 		} else {
@@ -69,7 +70,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * @param int|int[] $albumId
 	 * @return Track[]
 	 */
-	public function findAllByAlbum(int|array $albumId, string $userId, ?int $artistId=null, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByAlbum(int|array $albumId, string $userId, ?int $artistId = null, ?int $limit = null, ?int $offset = null) : array {
 		if (empty($albumId)) {
 			return [];
 		} else {
@@ -84,7 +85,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Returns all tracks filtered by parent folder
 	 * @return Track[]
 	 */
-	public function findAllByFolder(int $folderId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByFolder(int $folderId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findAllByFolder($folderId, $userId, $limit, $offset);
 	}
 
@@ -92,7 +93,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Returns all tracks filtered by genre
 	 * @return Track[]
 	 */
-	public function findAllByGenre(int $genreId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByGenre(int $genreId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findAllByGenre($genreId, $userId, $limit, $offset);
 	}
 
@@ -102,7 +103,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * @param string $userId the name of the user
 	 * @return Track[]
 	 */
-	public function findAllByNameRecursive(string $name, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByNameRecursive(string $name, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$name = \trim($name);
 		return $this->mapper->findAllByNameRecursive($name, $userId, $limit, $offset);
 	}
@@ -126,7 +127,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Find most frequently played tracks
 	 * @return Track[]
 	 */
-	public function findFrequentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findFrequentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findFrequentPlay($userId, $limit, $offset);
 	}
 
@@ -134,7 +135,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Find most recently played tracks
 	 * @return Track[]
 	 */
-	public function findRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findRecentPlay($userId, $limit, $offset);
 	}
 
@@ -142,7 +143,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Find least recently played tracks
 	 * @return Track[]
 	 */
-	public function findNotRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findNotRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findNotRecentPlay($userId, $limit, $offset);
 	}
 
@@ -163,7 +164,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Optionally, limit the search to files residing (directly or indirectly) in the given folder.
 	 * @return int[]
 	 */
-	public function findAllFileIds(string $userId, ?int $folderId=null) : array {
+	public function findAllFileIds(string $userId, ?int $folderId = null) : array {
 		$parentIds = ($folderId !== null) ? $this->fileSystemService->findAllDescendantFolders($folderId) : null;
 		return $this->mapper->findAllFileIds($userId, $parentIds);
 	}
@@ -176,9 +177,20 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Optionally, limit the search to files residing (directly or indirectly) in the given folder.
 	 * @return int[]
 	 */
-	public function findDirtyFileIds(string $userId, ?int $folderId=null) : array {
+	public function findDirtyFileIds(string $userId, ?int $folderId = null) : array {
 		$parentIds = ($folderId !== null) ? $this->fileSystemService->findAllDescendantFolders($folderId) : null;
 		return $this->mapper->findDirtyFileIds($userId, $parentIds);
+	}
+
+	/**
+	 * Returns file IDs of all indexed tracks of the user which have been scanned before the latest DB schema change.
+	 * These need to be rescanned to take full advantage of the latest features.
+	 * Optionally, limit the search to files residing (directly or indirectly) in the given folder.
+	 * @return int[]
+	 */
+	public function findFileIdsWithOldScanVersion(string $userId, ?int $folderId = null) : array {
+		$parentIds = ($folderId !== null) ? $this->fileSystemService->findAllDescendantFolders($folderId) : null;
+		return $this->mapper->findFileIdsScannedBeforeVersion($userId, Util::encodeVersionString(Library::DB_SCHEMA_VERSION), $parentIds);
 	}
 
 	/**
@@ -187,16 +199,6 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 */
 	public function getGenresByArtistId(int $artistId, string $userId) : array {
 		return $this->mapper->getGenresByArtistId($artistId, $userId);
-	}
-
-	/**
-	 * Returns file IDs of the tracks which do not have genre scanned. This is not the same
-	 * thing as unknown genre, which is stored as empty string and means that the genre has
-	 * been scanned but was not found from the track metadata.
-	 * @return int[]
-	 */
-	public function findFilesWithoutScannedGenre(string $userId) : array {
-		return $this->mapper->findFilesWithoutScannedGenre($userId);
 	}
 
 	public function countByArtist(int $artistId) : int {
@@ -224,7 +226,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	/**
 	 * Update "last played" timestamp and increment the total play count of the track.
 	 */
-	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null) : void {
+	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null) : void {
 		$timeOfPlay = $timeOfPlay ?? new \DateTime();
 		$userId = $track->getUserId();
 
@@ -256,23 +258,32 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 			}
 		}
 
-		$this->setNowPlaying($track, $timeOfPlay);
+		$this->setNowPlaying($track, $timeOfPlay, $client);
 	}
 
 	/**
 	 * Save the track to config as the "now playing" track with the provided timestamp
+	 * @param ?string $client Name of the application reporting the play, when it is known
 	 */
-	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null) : void {
+	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null) : void {
 		$data = [
-			'trackId' => $track->getId(),
-			'timeOfPlay' => ($timeOfPlay ?? new \DateTime())->getTimestamp()
+			'trackId'    => $track->getId(),
+			'timeOfPlay' => ($timeOfPlay ?? new \DateTime())->getTimestamp(),
+			'client'     => $client
 		];
 		$this->cache->set($track->getUserId(), 'nowPlaying', \json_encode($data));
 	}
 
 	/**
+	 * Drop the "now playing" state of the user, e.g. when a client reports that it has stopped playing
+	 */
+	public function clearNowPlaying(string $userId) : void {
+		$this->cache->remove($userId, 'nowPlaying');
+	}
+
+	/**
 	 * Return the "now playing" track along with its time of play
-	 * @return ?array{track: Track, timeOfPlay: int} - null if no data available
+	 * @return ?array{track: Track, timeOfPlay: int, client: ?string} - null if no data available
 	 * @throws BusinessLayerException if data available but somehow incorrect
 	 */
 	public function getNowPlaying(string $userId) : ?array {
@@ -291,31 +302,40 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 		$track = $this->find($trackId, $userId);
 
 		return [
-			'track' => $track,
-			'timeOfPlay' => $timeOfPlay
+			'track'      => $track,
+			'timeOfPlay' => $timeOfPlay,
+			'client'     => $nowPlayingData['client'] ?? null
 		];
 	}
 
 	/**
 	 * Adds a track if it does not exist already or updates an existing track
 	 * @param string $title the title of the track
-	 * @param int|null $number the number of the track
-	 * @param int|null $discNumber the number of the disc
-	 * @param int|null $year the year of the release
+	 * @param ?int $number the number of the track
+	 * @param ?int $discNumber the number of the disc
+	 * @param ?int $year the year of the release
 	 * @param int $genreId the genre id of the track
 	 * @param int $artistId the artist id of the track
 	 * @param int $albumId the album id of the track
 	 * @param int $fileId the file id of the track
 	 * @param string $mimetype the mimetype of the track
 	 * @param string $userId the name of the user
-	 * @param int $length track length in seconds
-	 * @param int $bitrate track bitrate in bits (not kbits)
+	 * @param ?int $recordLabelId the ID for the track's record label
+	 * @param ?int $length track length in seconds
+	 * @param ?int $bitrate track bitrate in bits (not kbits)
+	 * @param ?int $bpm beats per minute
+	 * @param ?int $composerId the composer id of the track
+	 * @param ?string $comment the comment of the track
+	 * @param ?string $mbid the MusicBrainz Recording Id of the track
+	 * @param ?string $mbidRelTrack the MusicBrainz Release Track Id of the track
 	 * @return Track The added/updated track
 	 */
 	public function addOrUpdateTrack(
 			string $title, ?int $number, ?int $discNumber, ?int $year, int $genreId, int $artistId, int $albumId,
-			int $fileId, string $mimetype, string $userId, ?int $length=null, ?int $bitrate=null,
-			?int $bpm=null, ?int $composerId=null, ?string $comment=null) : Track {
+			int $fileId, string $mimetype, string $userId, ?int $recordLabelId = null, ?int $length = null, ?int $bitrate = null,
+			?int $sampleRate = null, ?int $bpm = null, ?int $composerId = null, ?string $comment = null, ?string $mbid = null, 
+			?string $mbidRelTrack = null, ?float $replaygainAlbumGain = null, ?float $replaygainAlbumPeak = null,
+			?float $replaygainTrackGain = null, ?float $replaygainTrackPeak = null, ?float $r128AlbumGain = null, ?float $r128TrackGain = null) : Track {
 		$track = new Track();
 		$track->setTitle(StringUtil::truncate($title, 256)); // some DB setups can't truncate automatically to column max size
 		$track->setNumber($number);
@@ -329,10 +349,21 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 		$track->setUserId($userId);
 		$track->setLength($length);
 		$track->setBitrate($bitrate);
+		$track->setSampleRate($sampleRate);
 		$track->setBpm($bpm);
 		$track->setComposerId($composerId);
+		$track->setRecordLabelId($recordLabelId);
 		$track->setComment($comment);
 		$track->setDirty(0);
+		$track->setMbid(StringUtil::truncate($mbid, 36)); // valid mbid is always 36 characters, prepare for invalid data
+		$track->setMbidRelTrack(StringUtil::truncate($mbidRelTrack, 36));
+		$track->setScanVersion(AppInfo::getEncodedVersion());
+		$track->setReplaygainAlbumGain($replaygainAlbumGain);
+		$track->setReplaygainAlbumPeak($replaygainAlbumPeak);
+		$track->setReplaygainTrackGain($replaygainTrackGain);
+		$track->setReplaygainTrackPeak($replaygainTrackPeak);
+		$track->setR128AlbumGain($r128AlbumGain);
+		$track->setR128TrackGain($r128TrackGain);
 		return $this->mapper->updateOrInsert($track);
 	}
 
@@ -340,14 +371,14 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Deletes tracks
 	 * @param int[] $fileIds file IDs of the tracks to delete
 	 * @param string[]|null $userIds the target users; if omitted, the tracks matching the
-	 *                      $fileIds are deleted from all users
-	 * @return array|false  False is returned if no such track was found; otherwise array of six arrays
-	 *         (named 'deletedTracks', 'remainingAlbums', 'remainingArtists', 'obsoleteAlbums',
-	 *         'obsoleteArtists', and 'affectedUsers'). These contain the track, album, artist, and
-	 *         user IDs of the deleted tracks. The 'obsolete' entities are such which no longer
-	 *         have any tracks while 'remaining' entities have some left.
+	 *                               $fileIds are deleted from all users
+	 * @return array|false False is returned if no such track was found; otherwise array of six arrays
+	 *                     (named 'deletedTracks', 'remainingAlbums', 'remainingArtists', 'obsoleteAlbums',
+	 *                     'obsoleteArtists', and 'affectedUsers'). These contain the track, album, artist, and
+	 *                     user IDs of the deleted tracks. The 'obsolete' entities are such which no longer
+	 *                     have any tracks while 'remaining' entities have some left.
 	 */
-	public function deleteTracks(array $fileIds, ?array $userIds=null) {
+	public function deleteTracks(array $fileIds, ?array $userIds = null) {
 		$tracks = ($userIds !== null)
 			? $this->mapper->findByFileIds($fileIds, $userIds)
 			: $this->mapper->findAllByFileIds($fileIds);
@@ -415,9 +446,9 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * Marks tracks as dirty, ultimately requesting the user to rescan them
 	 * @param int[] $fileIds file IDs of the tracks to mark as dirty
 	 * @param string[]|null $userIds the target users; if omitted, the tracks matching the
-	 *                      $fileIds are marked for all users
+	 *                               $fileIds are marked for all users
 	 */
-	public function markTracksDirty(array $fileIds, ?array $userIds=null) : void {
+	public function markTracksDirty(array $fileIds, ?array $userIds = null) : void {
 		// be prepared for huge number of file IDs
 		$chunkMaxSize = self::MAX_SQL_ARGS - \count($userIds ?? []);
 		$idChunks = \array_chunk($fileIds, $chunkMaxSize);
@@ -425,4 +456,5 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 			$this->mapper->markTracksDirty($idChunk, $userIds);
 		}
 	}
+
 }

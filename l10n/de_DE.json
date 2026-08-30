@@ -211,7 +211,7 @@
     "Unknown artist" : "Unbekannter Künstler",
     "Unlike the other settings, this switch is stored per browser and not per user account." : "Im Gegensatz zu anderen Einstellungen wird diese Auswahl per Browser gespeichert und nicht per Benutzeraccount.",
     "Upload image named \"{{name}}\" to anywhere within your library path to see it here." : "Laden Sie das Bild mit dem Namen \"{{ name }}\" an einen beliebigen Ort in der Musiksammlung, um es hier zu sehen.",
-    "Upload music in the files app to listen to it here" : "Laden Sie Musik in der Dateien-App hoch, um sie hier anzuhören",
+    "Upload music in the Files app to listen to it here" : "Laden Sie Musik in der Dateien-App hoch, um sie hier anzuhören",
     "Upload the previously obtained PLS file to your cloud using the Files app." : "Laden Sie die zuvor erhaltene PLS-Datei mithilfe der Dateien-App in die Cloud hoch.",
     "Use the Community Radio Browser <a href=\"{{url}}\" target=\"_blank\">search</a> to find the radio stations of interest. Instead of using the search, you may also browse the channels in Community Radio Browser by category or popularity." : "Verwenden Sie die <a href=\"{{url}}\" target=\"_blank\">Suche</a> des Community-Radio-Browsers, um die Radiosender zu finden, die Sie interessieren. Anstatt die Suche zu verwenden, können Sie auch die Kanäle im Community-Radio-Browser auch nach Kategorie oder Beliebtheit durchsuchen.",
     "Use the following credentials to connect to this Ampache/Subsonic instance." : "Nutzen Sie die folgenden Anmeldeinformationen, um sich mit dieser Ampache/Subsonic-Instanz zu verbinden.",

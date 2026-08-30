@@ -12,18 +12,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 	'$rootScope', '$scope', '$document', 'libraryService', 'playQueueService', '$timeout', 'Restangular', 'gettextCatalog',
 	function ($rootScope, $scope, $document, libraryService, playQueueService, $timeout, Restangular, gettextCatalog) {
 
-		$rootScope.currentView = $scope.getViewIdFromUrl();
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let _unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			_unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', () => {
-			_.each(_unsubFuncs, (func) => func());
-		});
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		$scope.maxResults = '100';
 		$scope.order = 'name';
@@ -37,7 +26,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 		};
 
 		// hide the results context menu when user clicks anywhere on the page
-		$document.click(function(_event) {
+		$document.on('click', (_event) => {
 			$timeout(() => $scope.showResultsMenu = false);
 		});
 
@@ -367,10 +356,15 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 			playQueueService.publish('play', '#/playlist/' + playlistId);
 		};
 
+		function trackCountText(playlist) {
+			let trackCount = playlist.tracks.length;
+			return gettextCatalog.getPlural(trackCount, '{{ count }} track', '{{ count }} tracks', { count: trackCount });
+		}
+
 		$scope.getPlaylistData = function(listItem, index, _scope) {
 			return {
 				title: listItem.name,
-				title2: $scope.trackCountText(listItem),
+				title2: trackCountText(listItem),
 				tooltip: listItem.name,
 				number: index + 1,
 				id: listItem.id,
@@ -391,7 +385,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 		$scope.getGenreData = function(listItem, index, _scope) {
 			return {
 				title: listItem.name || gettextCatalog.getString('(Unknown genre)'),
-				title2: $scope.trackCountText(listItem),
+				title2: trackCountText(listItem),
 				tooltip: listItem.name,
 				number: index + 1,
 				id: listItem.id,
@@ -469,7 +463,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 			};
 		};
 
-		subscribe('scrollToTrack', function(_event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
 				if ($scope.results?.tracks.length) {
 					$scope.$parent.scrollToItem('track-' + trackId);
@@ -487,7 +481,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 			}
 		});
 
-		subscribe('scrollToPodcastEpisode', function(_event, episodeId) {
+		$rootScope.subscribe('scrollToPodcastEpisode', $scope, (_event, episodeId) => {
 			if ($scope.$parent) {
 				if ($scope.results?.podcastEpisodes.length) {
 					$scope.$parent.scrollToItem('podcast-episode-' + episodeId);
@@ -500,14 +494,7 @@ angular.module('Music').controller('AdvancedSearchViewController', [
 			}
 		});
 
-		$timeout(() => {
-			$rootScope.loading = false;
-			$rootScope.$emit('viewActivated');
-		});
-
-		subscribe('deactivateView', () => {
-			$rootScope.$emit('viewDeactivated');
-		});
+		$timeout(() => $rootScope.$emit('viewActivated', THIS_VIEW_ID));
 
 	}
 ]);

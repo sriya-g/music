@@ -1,4 +1,4 @@
-<div class="view-container" id="albums" ng-show="!loading && !loadingCollection">
+<div class="view-container" id="albums" ng-class="{ compact: albumsCompactLayout }" ng-show="!loading">
 	<div class="artist-area" id="artist-{{ ::artist.id }}" in-view-observer
 		ng-repeat="artist in artists | limitTo: incrementalLoadLimit"
 	>

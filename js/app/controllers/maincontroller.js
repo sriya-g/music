@@ -11,37 +11,51 @@
  */
 
 angular.module('Music').controller('MainController', [
-'$rootScope', '$scope', '$document', '$timeout', '$window', 'ArtistFactory', 
-'playQueueService', 'libraryService', 'inViewService', 'gettextCatalog', 'Restangular',
-function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory, 
-		playQueueService, libraryService, inViewService, gettextCatalog, Restangular) {
+'$rootScope', '$scope', '$document', '$timeout', '$window', 'gettextCatalog', 'Restangular',
+'scanService', 'libraryFactory', 'playQueueService', 'inViewService',
+function ($rootScope, $scope, $document, $timeout, $window, gettextCatalog, Restangular,
+		scanService, libraryFactory, playQueueService, inViewService) {
 
-	// retrieve language from backend - is set in ng-app HTML element
-	gettextCatalog.currentLanguage = $rootScope.lang;
+	gettextCatalog.currentLanguage = OC.getLanguage();
 
 	// Create a global rule to use themed icons for folders everywhere, the default icon-folder is not themed on NC 25 and later.
 	// It happens sometimes (at least on Chrome), that OC.MimeType is not yet present when we come here (see 
-	// https://github.com/owncloud/music/issues/1137). In those cases, we need to postpone registering the folder style.
-	OCA.Music.Utils.executeOnceRefAvailable(() => OC.MimeType, (ocMimeType) => {
+	// https://github.com/nc-music/oc-music/issues/1137). In those cases, we need to postpone registering the folder style.
+
+	// On NC33, it's possible that OC.MimeType is not ready to use even when it's available; it depends on window.OCA.Theming
+	// which may still be absent. According to https://github.com/nc-music/music/issues/146, this happens always on Safari but
+	// occasionally it has been seen on Firefox and Chrome, too.
+	Promise.all([
+		OCA.Music.Utils.getValueOnceAvailable(() => window.OC.MimeType),
+		OCA.Music.Utils.getValueOnceAvailable(() => window.OCA.Theming)
+	]).then(([ocMimeType, _ocaTheming]) => {
 		const folderStyle = document.createElement('style');
 		folderStyle.innerHTML = `#app-view .icon-folder { background-image: url(${ocMimeType.getIconUrl('dir')}) }`;
 		document.head.appendChild(folderStyle);
 	});
 
+	// Wrapper for $rootScope.$on which provides automatic unsubscribing on scope destruction
+	$rootScope.subscribe = function(eventName, listenerScope, listener) {
+		const handle = $rootScope.$on(eventName, listener);
+		listenerScope.$on('$destroy', handle);
+	};
+
+	$rootScope.loading = true;
 	$rootScope.playing = false;
 	$rootScope.playingView = null;
 	$scope.currentTrack = null;
-	playQueueService.subscribe('trackChanged', function(listEntry) {
+
+	playQueueService.subscribe('trackChanged', $scope, (listEntry) => {
 		$scope.currentTrack = listEntry.track;
 		$scope.currentTrackIndex = playQueueService.getCurrentIndex();
 	});
 
-	playQueueService.subscribe('play', function(playingView) {
+	playQueueService.subscribe('play', $scope, (playingView) => {
 		// assume that the play started from current view if no other view given
-		$rootScope.playingView = playingView || $rootScope.currentView;
+		$rootScope.playingView = playingView || $scope.getCurrentViewId();
 	});
 
-	playQueueService.subscribe('playlistEnded', function() {
+	playQueueService.subscribe('playlistEnded', $scope, () => {
 		$rootScope.playingView = null;
 		$scope.currentTrack = null;
 		$scope.currentTrackIndex = -1;
@@ -52,301 +66,122 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 		$timeout(() => $rootScope.$emit('popup-menu:close'));
 	});
 
-	$scope.getViewIdFromUrl = function() {
+	$scope.getCurrentViewId = function() {
 		return window.location.hash.split('?')[0];
 	};
 
-	$scope.trackCountText = function(playlist) {
-		let trackCount = playlist ? playlist.tracks.length : libraryService.getTrackCount();
-		return gettextCatalog.getPlural(trackCount, '{{ count }} track', '{{ count }} tracks', { count: trackCount });
-	};
-
-	$scope.smartListTrackCountText = function() {
-		var trackCount = libraryService.getSmartListTrackCount();
-		return gettextCatalog.getPlural(trackCount, '{{ count }} track', '{{ count }} tracks', { count: trackCount });
-	};
-
-	$scope.albumCountText = function() {
-		let albumCount = libraryService.getAlbumCount();
-		return gettextCatalog.getPlural(albumCount, '{{ count }} album', '{{ count }} albums', { count: albumCount });
-	};
-
-	$scope.folderCountText = function() {
-		if (libraryService.foldersLoaded()) {
-			let folderCount = libraryService.getAllFoldersWithTracks().length;
-			return gettextCatalog.getPlural(folderCount, '{{ count }} folder', '{{ count }} folders', { count: folderCount });
-		} else {
-			return '';
-		}
-	};
-
-	$scope.genresCountText = function() {
-		if (libraryService.genresLoaded()) {
-			let genreCount = libraryService.getAllGenres().length;
-			return gettextCatalog.getPlural(genreCount, '{{ count }} genre', '{{ count }} genres', { count: genreCount });
-		} else {
-			return '';
-		}
-	};
-
-	$scope.radioCountText = function() {
-		if (libraryService.radioStationsLoaded()) {
-			let stationCount = libraryService.getAllRadioStations().length;
-			return gettextCatalog.getPlural(stationCount, '{{ count }} station', '{{ count }} stations', { count: stationCount });
-		} else {
-			return '';
-		}
-	};
-
-	$scope.podcastsCountText = function() {
-		if (libraryService.podcastsLoaded()) {
-			let channelsCount = libraryService.getPodcastChannelsCount();
-			return gettextCatalog.getPlural(channelsCount, '{{ count }} channel', '{{ count }} channels', { count: channelsCount });
-		} else {
-			return '';
-		}
-	};
-
 	$scope.loadIndicatorVisible = function() {
-		let contentNotReady = ($rootScope.loadingCollection || $rootScope.searchInProgress || $scope.checkingUnscanned);
+		let contentNotReady = ($rootScope.searchInProgress || $scope.checkingScanStatus);
 		return $rootScope.loading
 			|| (contentNotReady && $scope.viewingLibrary());
 	};
 
 	$scope.viewingLibrary = function() {
-		return $rootScope.currentView != '#/settings'
-			&& $rootScope.currentView != '#/radio'
-			&& $rootScope.currentView != '#/podcasts';
+		return !['#/settings', '#/radio', '#/podcasts'].includes($scope.getCurrentViewId());
 	};
 
-	$rootScope.$on('updateIgnoredArticles', function(_event, ignoredArticles) {
-		libraryService.setIgnoredArticles(ignoredArticles);
-	});
+	$scope.updateCollection = () => libraryFactory.reloadCollection();
 
-	$scope.update = function() {
+	libraryFactory.subscribe('collectionUpdating', $scope, () => {
 		$scope.updateAvailable = false;
-		$rootScope.loadingCollection = true;
 
-		$scope.artists = null; // the null-value tells the views that data is not yet available
-		libraryService.setFolders(null); // invalidate any out-dated folders
-		$rootScope.$emit('collectionUpdating');
+		if ($scope.viewingLibrary()) {
+			$rootScope.loading = true;
+		}
 
-		// load the music collection
-		ArtistFactory.getArtists().then(function(artists) {
-			libraryService.setCollection(artists);
-			$scope.artists = libraryService.getCollection();
-
-			// Emit the event asynchronously so that the DOM tree has already been
-			// manipulated and rendered by the browser when observers get the event.
-			$timeout(function() {
-				$rootScope.$emit('collectionLoaded');
-			});
-
-			// Load playlists once the collection has been loaded
-			Restangular.all('playlists').getList({type: 'music-app'}).then(function(playlists) {
-				libraryService.setPlaylists(playlists);
-				$scope.playlists = libraryService.getAllPlaylists();
-				$rootScope.$emit('playlistsLoaded');
-
-				// fetch favorites once library, playlists, and podcasts are all loaded
-				if (libraryService.podcastsLoaded()) {
-					updateFavorites();
-				}
-			});
-
-			// Load also the smart playlist once the collection is ready
-			$scope.reloadSmartList();
-
-			// Load also genres once the collection has been loaded
-			Restangular.one('genres').get().then(function(genres) {
-				libraryService.setGenres(genres.genres);
-				$scope.filesWithUnscannedGenre = genres.unscanned;
-				$rootScope.$emit('genresLoaded');
-			});
-
+		libraryFactory.getCollection().then((collection) => {
 			// The "no content"/"click to scan"/"scanning" banner uses "collapsed" layout
 			// if there are any tracks already visible
-			let collapsiblePopups = $('#app-content .emptycontent:not(.no-collapse)');
-			if (libraryService.getTrackCount() > 0) {
+			const collapsiblePopups = $('#app-content .emptycontent:not(.no-collapse)');
+			if (collection.length > 0) {
 				collapsiblePopups.addClass('collapsed');
 			} else {
 				collapsiblePopups.removeClass('collapsed');
 			}
-
-			$rootScope.loadingCollection = false;
-
-			// check the availability of unscanned files after the collection has been loaded,
-			// unless we are already in the middle of scanning (and intermediate results were just loaded)
-			if (!$scope.scanning) {
-				updateFilesToScan();
-			}
-		},
-		function(response) { // error handling
-			$rootScope.loadingCollection = false;
-
-			let reason = null;
-			switch (response.status) {
-			case 500:
-				reason = gettextCatalog.getString('Internal server error');
-				break;
-			case 504:
-				reason = gettextCatalog.getString('Timeout');
-				break;
-			default:
-				reason = response.status;
-				break;
-			}
-			const errMsg = gettextCatalog.getString('Failed to load the collection:');
-			OCA.Music.Dialogs.showNotification(errMsg + ' ' + reason);
 		});
+	});
 
+	$scope.hideScanBar = function(event) {
+		event.stopPropagation();
+		// Acknowledge the scanning needs without taking any action. The files can still be (re)scanned in the Settings view.
+		$scope.filesToScanBannerHidden = true;
 	};
 
-	$scope.updateRadio = function() {
-		Restangular.one('radio').get().then(function(radioStations) {
-			libraryService.setRadioStations(radioStations);
-			$rootScope.$emit('radioStationsLoaded');
-		});
+	$scope.filesToScanBannerAllowed = function() {
+		return !$scope.filesToScanBannerHidden && !$scope.scanning && $scope.viewingLibrary();
 	};
 
-	$scope.updatePodcasts = function() {
-		Restangular.one('podcasts').get().then(function(podcasts) {
-			libraryService.setPodcasts(podcasts);
-			$rootScope.$emit('podcastsLoaded');
+	$scope.updateFilesToScan = function() {
+		$scope.unscannedFiles = null;
+		$scope.dirtyFiles = null;
+		$scope.obsoleteFiles = null;
+		$scope.filesScannedOnOldSw = null;
+		$scope.filesToScanBannerHidden = false;
+		$scope.checkingScanStatus = true;
 
-			// fetch favorites once library, playlists, and podcasts are all loaded
-			if (libraryService.collectionLoaded() && libraryService.playlistsLoaded()) {
-				updateFavorites();
-			}
-		});
-	};
-
-	function updateFavorites() {
-		Restangular.one('favorites').get().then((favorites) => libraryService.setFavorites(favorites));
-	}
-
-	// initial loading of artists and radio stations
-	$scope.update();
-	$scope.updateRadio();
-	$scope.updatePodcasts();
-
-	const FILES_TO_SCAN_PER_STEP = 20;
-	let filesToScan = null;
-	$scope.unscannedFiles = null;
-	$scope.dirtyFiles = null;
-	$scope.obsoleteFiles = null;
-
-	function updateFilesToScan() {
-		$scope.checkingUnscanned = true;
 		Restangular.one('scanstate').get().then(function(state) {
-			$scope.checkingUnscanned = false;
+			$scope.checkingScanStatus = false;
 			$scope.unscannedFiles = state.unscannedFiles;
 			$scope.dirtyFiles = state.dirtyFiles;
 			$scope.obsoleteFiles = state.obsoleteFiles;
+			$scope.filesScannedOnOldSw = state.filesScannedOnOldSw;
 			$scope.noMusicAvailable = (state.scannedCount + state.unscannedFiles.length === 0);
 		},
 		function(error) {
-			$scope.checkingUnscanned = false;
+			$scope.checkingScanStatus = false;
 			OCA.Music.Dialogs.showNotification(
 					gettextCatalog.getString('Failed to check for new audio files (error {{ code }}); check the server logs for details', {code: error.status})
 			);
 		});
-	}
-
-	function processNextScanStep() {
-		let sliceEnd = $scope.scanningScanned + FILES_TO_SCAN_PER_STEP;
-		let filesForStep = filesToScan.slice($scope.scanningScanned, sliceEnd);
-		let params = {
-				files: filesForStep.join(','),
-				finalize: sliceEnd >= filesToScan.length
-		};
-		Restangular.all('scan').post(params).then(function(result) {
-			// Ignore the results if scanning has been cancelled while we
-			// were waiting for the result.
-			if ($scope.scanning) {
-				$scope.scanningScanned = sliceEnd;
-
-				if (result.filesScanned || result.albumCoversUpdated) {
-					$scope.updateAvailable = true;
-				}
-
-				if ($scope.scanningScanned < filesToScan.length) {
-					processNextScanStep();
-				} else {
-					$scope.scanning = false;
-				}
-
-				// Update the newly scanned tracks to UI automatically when
-				// a) the first batch is ready
-				// b) the scanning process is completed.
-				// Otherwise the UI state is updated only when the user hits the 'update' button
-				if ($scope.updateAvailable && $scope.artists && ($scope.artists.length === 0 || !$scope.scanning)) {
-					$scope.update();
-				}
-			}
-		});
-	}
+	};
 
 	$scope.startScanning = function(fileIds) {
-		filesToScan = fileIds;
-		$scope.scanningScanned = 0;
-		$scope.scanningTotal = filesToScan.length;
+		scanService.scan(fileIds).then(
+			() => { // done
+				// Update the collection automatically. During the scanning, the user can also click the "update" button to update the collection.
+				$scope.scanning = false;
+				libraryFactory.reloadCollection();
+				$scope.updateFilesToScan();
+			},
+			(error) => {
+				$scope.scanning = false;
+				console.log('Scan aborted: ' + error);
+			},
+			(progress) => {
+				$scope.scanning = true;
+				$scope.scanningScanned = progress.scannedCount;
+				$scope.scanningTotal = progress.totalCount;
+				$scope.updateAvailable ||= (progress.scannedCount > 0);
+			}
+		);
 
 		if (fileIds === $scope.unscannedFiles) {
 			$scope.unscannedFiles = null;
 		} else if (fileIds === $scope.dirtyFiles) {
 			$scope.dirtyFiles = null;
 		}
-		$scope.scanning = true;
-		processNextScanStep();
 	};
 
-	$scope.stopScanning = function() {
-		$scope.scanning = false;
-	};
+	$scope.stopScanning = () => scanService.stopScan();
 
 	$scope.removeObsolete = function() {
-		Restangular.all('removescanned').post({files: $scope.obsoleteFiles.join(',')}).then(_result => {
-			$scope.obsoleteFiles = null;
-			$scope.update();
-		});
-	};
-
-	$scope.resetScanned = function() {
-		$scope.unscannedFiles = null;
-		$scope.dirtyFiles = null;
-		$scope.obsoleteFiles = null;
-		filesToScan = null;
-		// Genre and artist IDs have got invalidated while resetting the library, drop any related filters
-		if ($scope.smartListParams !== null) {
-			$scope.smartListParams.genres = [];
-			$scope.smartListParams.artists = [];
-			$scope.smartListParams.composers = [];
-		}
-	};
-
-	$scope.loadFoldersAndThen = function(callback) {
-		if (libraryService.foldersLoaded()) {
-			$timeout(callback);
-		} else {
-			Restangular.one('folders').get().then(function (folders) {
-				libraryService.setFolders(folders);
-				callback();
-			});
-		}
-	};
-
-	$scope.smartListParams = null; // fetched from the server on the first list load
-	$scope.reloadSmartList = function() {
-		libraryService.setSmartList(null);
-
-		const genArgs = $scope.smartListParams ?? { useLatestParams: true };
-
-		Restangular.one('playlists/generate').get(genArgs).then((list) => {
-			libraryService.setSmartList(list);
-			$scope.smartListParams = list.params;
-			$rootScope.$emit('smartListLoaded');
-		});
+		const count = $scope.obsoleteFiles.length;
+		OC.dialogs.confirm(
+			gettextCatalog.getPlural(count,
+				'{{ count }} previously scanned file is no longer available. Remove it from the collection?',
+				'{{ count }} previously scanned files are no longer available. Remove them from the collection?',
+				{ count: count }),
+			gettextCatalog.getString('Remove unavailable files'),
+			function(confirmed) {
+				if (confirmed) {
+					Restangular.all('removescanned').post({files: $scope.obsoleteFiles.join(',')}).then(_result => {
+						$scope.obsoleteFiles = null;
+						libraryFactory.reloadCollection();
+					});
+				}
+			},
+			true
+		);
 	};
 
 	function showDetails(entityType, id) {
@@ -409,16 +244,7 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 		$rootScope.$emit('hideDetails');
 	};
 
-	$scope.hideScanBar = function(event) {
-		event.stopPropagation();
-		// Acknowledge the scanning needs without taking any action. The page needs to be reloaded
-		// to check them again.
-		$scope.unscannedFiles = null;
-		$scope.dirtyFiles = null;
-		$scope.obsoleteFiles = null;
-	};
-
-	function scrollOffset() {
+	$scope.scrollOffset = function() {
 		let controls = document.getElementById('controls');
 		let offset = controls?.offsetHeight ?? 0;
 		if (OCA.Music.Utils.getScrollContainer()[0] !== document.getElementById('app-content')) {
@@ -426,14 +252,14 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 			offset += header?.offsetHeight;
 		}
 		return offset;
-	}
+	};
 
 	$scope.scrollToItem = function(itemId, animationTime = 500) {
 		if (itemId) {
 			let container = OCA.Music.Utils.getScrollContainer();
 			let element = $('#' + itemId);
 			if (container && element) {
-				container.scrollToElement(element, scrollOffset(), animationTime);
+				container.scrollToElement(element, $scope.scrollOffset(), animationTime);
 			}
 		}
 	};
@@ -446,79 +272,87 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 	let navigationDestination = null;
 	let afterNavigationCallback = null;
 	$scope.navigateTo = function(destination, callback = null) {
-		let curView = $rootScope.currentView;
+		let curView = $scope.getCurrentViewId();
 		if (curView != destination) {
-			$rootScope.currentView = null;
 			navigationDestination = destination;
 			afterNavigationCallback = callback;
 			$rootScope.loading = true;
-			// Deactivate the current view. The view emits 'viewDeactivated' once that is done.
-			// In the abnormal special case of no active view, activate the new view immediately.
-			if (_.isString(curView)) {
-				$rootScope.$emit('deactivateView');
-			} else {
-				window.location.hash = navigationDestination;
-			}
+			$rootScope.$emit('deactivateView');
+			$timeout(() => window.location.hash = navigationDestination);
 		}
 
 		$scope.collapseNavigationPaneOnMobile();
 	};
 
-	// Compact/normal layout of the Albums view
-	$scope.albumsCompactLayout = (OCA.Music.Storage.get('albums_compact') === 'true');
-	$scope.toggleAlbumsCompactLayout = function(useCompact = !$scope.albumsCompactLayout) {
-		$scope.albumsCompactLayout = useCompact;
-		$('#albums').toggleClass('compact', useCompact);
-		$rootScope.$emit('albumsLayoutChanged');
-
-		OCA.Music.Storage.set('albums_compact', useCompact.toString());
-
-		// also navigate to the Albums view if not already open
-		$scope.navigateTo('#');
-	};
-
-	// Flat/tree layout of the Folders view
-	$scope.foldersFlatLayout = (OCA.Music.Storage.get('folders_flat') === 'true');
-	$scope.toggleFoldersFlatLayout = function(useFlat = !$scope.foldersFlatLayout) {
-		$scope.foldersFlatLayout = useFlat;
-		$rootScope.$emit('foldersLayoutChanged');
-
-		OCA.Music.Storage.set('folders_flat', useFlat.toString());
-
-		// also navigate to the Folders view if not already open
-		$scope.navigateTo('#/folders');
-	};
-
-	$scope.mobileNavigationPaneExpanded = function() {
-		return $('body').hasClass('snapjs-left') || $('body').hasClass('snapjs-right');
-	};
-
-	$scope.collapseNavigationPaneOnMobile = function() {
-		if ($scope.mobileNavigationPaneExpanded()) {
-			$timeout(() => {
-				$rootScope.$emit('closeSnapper');
-				// Remove any active input focus to ensure that the focus is not left to an input field within the collapsed pane
-				$(document.activeElement).trigger('blur');
-			});
+	$rootScope.subscribe('viewActivated', $scope, (_event, viewId) => {
+		if (viewId === $scope.getCurrentViewId()) {
+			$rootScope.loading = false;
 		}
-	};
-
-	$rootScope.$on('viewDeactivated', function() {
-		// carry on with the navigation once the previous view is deactivated
-		window.location.hash = navigationDestination;
-	});
-
-	$rootScope.$on('viewActivated', function() {
-		// execute the callback after view activation if any
+		// execute the callback after view activation if given
 		if (afterNavigationCallback !== null) {
 			$timeout(afterNavigationCallback);
 			afterNavigationCallback = null;
 		}
 	});
 
+	$rootScope.subscribe('viewBusy', $scope, (_event, viewId) => {
+		if (viewId === $scope.getCurrentViewId()) {
+			$rootScope.loading = true;
+		}
+	});
+
+	// Compact/normal layout of the Albums view
+	$scope.albumsCompactLayout = (OCA.Music.Storage.get('albums_compact') === 'true');
+	$scope.toggleAlbumsCompactLayout = function(useCompact = !$scope.albumsCompactLayout) {
+		if ($scope.getCurrentViewId() === '#/') {
+			// albums view already active, change the layout in place
+			$rootScope.loading = true;
+			$timeout(() => {
+				$scope.albumsCompactLayout = useCompact;
+				$timeout(() => {
+					// the active view could have changed by now...
+					if ($scope.getCurrentViewId() === '#/') {
+						$rootScope.loading = false;
+						$timeout(() => $rootScope.$emit('albumsLayoutChanged'));
+					}
+				});
+			});
+		} else {
+			// navigate to the albums view using the new layout
+			$scope.albumsCompactLayout = useCompact;
+			$scope.navigateTo('#/');
+		}
+
+		OCA.Music.Storage.set('albums_compact', useCompact.toString());
+	};
+
+	// Flat/tree layout of the Folders view
+	$scope.foldersFlatLayout = (OCA.Music.Storage.get('folders_flat') === 'true');
+	$scope.toggleFoldersFlatLayout = function(useFlat = !$scope.foldersFlatLayout) {
+		if ($scope.getCurrentViewId() === '#/folders') {
+			// folders view already active, change the layout in place
+			$rootScope.loading = true;
+			$timeout(() => {
+				$scope.foldersFlatLayout = useFlat;
+				$rootScope.$emit('foldersLayoutChanged');
+				// foldersviewcontroller emits 'viewActivated' once it's ready
+			});
+		} else {
+			// navigate to the folders view using the new layout
+			$scope.foldersFlatLayout = useFlat;
+			$scope.navigateTo('#/folders');
+		}
+
+		OCA.Music.Storage.set('folders_flat', useFlat.toString());
+	};
+
+	$scope.collapseNavigationPaneOnMobile = function() {
+		$timeout(() => $rootScope.$emit('closeSnapper'));
+	};
+
 	// Test if element is at least partially within the view-port
 	function isElementInViewPort(el) {
-		return inViewService.isElementInViewPort(el, -scrollOffset());
+		return inViewService.isElementInViewPort(el, -$scope.scrollOffset());
 	}
 
 	function setMasterLayout(classes) {
@@ -533,8 +367,14 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 		});
 	}
 
-	$rootScope.$on('resize', function(_event, appView) {
+	$rootScope.subscribe('resize', $scope, (_event, appView) => {
 		const appViewWidth = appView.outerWidth();
+
+		// For some reason, there may be resize events with 0-width during view switching.
+		// Reacting to those would cause UI flickering.
+		if (appViewWidth == 0) {
+			return;
+		}
 
 		// Adjust controls bar width to not overlap with the scroll bar.
 		// Subtract one pixel from the width because outerWidth() seems to
@@ -599,6 +439,13 @@ function ($rootScope, $scope, $document, $timeout, $window, ArtistFactory,
 	$scope.scanning = false;
 	$scope.scanningScanned = 0;
 	$scope.scanningTotal = 0;
+
+	// initial loading of the library data
+	libraryFactory.reloadCollection();
+	libraryFactory.getRadioStations();
+	libraryFactory.getPodcastChannels();
+	libraryFactory.updateFavorites();
+	$scope.updateFilesToScan();
 
 	$('#app').addClass('loaded');
 }]);

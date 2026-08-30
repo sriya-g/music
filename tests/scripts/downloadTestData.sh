@@ -22,7 +22,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-url="https://github.com/paulijar/music/files/2364060/testcontent.zip"
+url="https://github.com/user-attachments/files/30780531/testcontent.zip"
 
 if [ ! -d /tmp/downloadedData ];
 then
@@ -31,19 +31,19 @@ fi
 
 cd /tmp/downloadedData
 
-name=`echo $url | cut -d "/" -f 8`
+name=`echo "$url" | cut -d "/" -f 7`
 if [ ! -f "$name" ];
 then
     echo "Downloading $name ..."
-    wget $url -q --no-check-certificate -O $name
+    wget "$url" -q --no-check-certificate -O "$name"
     if [ $? -ne 0 ];
     then
         sleep 5
-        wget $url --no-check-certificate -O $name
+        wget "$url" --no-check-certificate -O "$name"
         if [ $? -ne 0 ];
         then
             sleep 5
-            wget $url --no-check-certificate -O $name
+            wget "$url" --no-check-certificate -O "$name"
             if [ $? -ne 0 ];
             then
                 exit 1
@@ -55,10 +55,10 @@ else
 fi
 
 # extract
-unzip -o $name -d .
+unzip -o "$name" -d .
 
 # go back to the old folder
 cd -
 
-mkdir -p $1/files/music
-cp -r /tmp/downloadedData/* $1/files/music
+mkdir -p "$1/files"
+cp -r /tmp/downloadedData/* "$1/files"

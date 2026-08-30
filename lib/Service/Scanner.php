@@ -15,7 +15,20 @@
 namespace OCA\Music\Service;
 
 use OC\Hooks\PublicEmitter;
-
+use OCA\Music\AppFramework\Core\Logger;
+use OCA\Music\BusinessLayer\AlbumBusinessLayer;
+use OCA\Music\BusinessLayer\ArtistBusinessLayer;
+use OCA\Music\BusinessLayer\GenreBusinessLayer;
+use OCA\Music\BusinessLayer\PlaylistBusinessLayer;
+use OCA\Music\BusinessLayer\RecordLabelBusinessLayer;
+use OCA\Music\BusinessLayer\TrackBusinessLayer;
+use OCA\Music\Db\ArtistMapper;
+use OCA\Music\Db\Cache;
+use OCA\Music\Db\Maintenance;
+use OCA\Music\Utility\ArrayUtil;
+use OCA\Music\Utility\FilesUtil;
+use OCA\Music\Utility\StringUtil;
+use OCA\Music\Utility\Util;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
@@ -23,20 +36,6 @@ use OCP\Files\Node;
 use OCP\IConfig;
 use OCP\IL10N;
 use OCP\L10N\IFactory;
-
-use OCA\Music\AppFramework\Core\Logger;
-use OCA\Music\BusinessLayer\ArtistBusinessLayer;
-use OCA\Music\BusinessLayer\AlbumBusinessLayer;
-use OCA\Music\BusinessLayer\GenreBusinessLayer;
-use OCA\Music\BusinessLayer\PlaylistBusinessLayer;
-use OCA\Music\BusinessLayer\TrackBusinessLayer;
-use OCA\Music\Db\Cache;
-use OCA\Music\Db\Maintenance;
-use OCA\Music\Utility\ArrayUtil;
-use OCA\Music\Utility\FilesUtil;
-use OCA\Music\Utility\StringUtil;
-use OCA\Music\Utility\Util;
-
 use Symfony\Component\Console\Output\OutputInterface;
 
 class Scanner extends PublicEmitter {
@@ -48,6 +47,7 @@ class Scanner extends PublicEmitter {
 		private TrackBusinessLayer $trackBusinessLayer,
 		private PlaylistBusinessLayer $playlistBusinessLayer,
 		private GenreBusinessLayer $genreBusinessLayer,
+		private RecordLabelBusinessLayer $recordLabelBusinessLayer,
 		private Cache $cache,
 		private CoverService $coverService,
 		private Logger $logger,
@@ -55,7 +55,7 @@ class Scanner extends PublicEmitter {
 		private LibrarySettings $librarySettings,
 		private IRootFolder $rootFolder,
 		private IConfig $config,
-		private IFactory $l10nFactory
+		private IFactory $l10nFactory,
 	) {
 	}
 
@@ -83,13 +83,13 @@ class Scanner extends PublicEmitter {
 		$mimetype = $file->getMimeType();
 
 		if (StringUtil::startsWith($mimetype, 'image')) {
-			$this->logger->debug('image file moved: '. $file->getPath());
+			$this->logger->debug('image file moved: ' . $file->getPath());
 			// we don't need to track the identity of images and moving a file can be handled as it was
 			// a file deletion followed by a file addition
 			$this->deleteImage([$file->getId()], [$userId]);
 			$this->updateImage($file, $userId);
 		} elseif (StringUtil::startsWith($mimetype, 'audio') && !self::isPlaylistMime($mimetype)) {
-			$this->logger->debug('audio file moved: '. $file->getPath());
+			$this->logger->debug('audio file moved: ' . $file->getPath());
 			if ($this->librarySettings->pathBelongsToMusicLibrary($file->getPath(), $userId)) {
 				// In the new path, the file (now or still) belongs to the library. Even if it was already in the lib,
 				// the new path may have an influence on the album or artist name (in case of incomplete metadata).
@@ -108,7 +108,7 @@ class Scanner extends PublicEmitter {
 		$audioCount = \count($audioFiles);
 
 		if ($audioCount > 0) {
-			$this->logger->debug("folder with $audioCount audio files moved: ". $folder->getPath());
+			$this->logger->debug("folder with $audioCount audio files moved: " . $folder->getPath());
 
 			if ($this->librarySettings->pathBelongsToMusicLibrary($folder->getPath(), $userId)) {
 				// The new path of the folder belongs to the library but this doesn't necessarily mean
@@ -164,32 +164,43 @@ class Scanner extends PublicEmitter {
 		$time2 = \hrtime(true);
 
 		// add/update artist and get artist entity
-		$artist = $this->artistBusinessLayer->addOrUpdateArtist($meta['artist'], $userId);
+		$artist = $this->artistBusinessLayer->addOrUpdateArtist($meta['artist'], $meta['mb_artist_id'], $userId);
 		$artistId = $artist->getId();
 
 		// add/update albumArtist and get artist entity
-		$albumArtist = $this->artistBusinessLayer->addOrUpdateArtist($meta['albumArtist'], $userId);
+		$albumArtist = $this->artistBusinessLayer->addOrUpdateArtist($meta['album_artist'], $meta['mb_release_artist_id'], $userId);
 		$albumArtistId = $albumArtist->getId();
 
 		// add/update album and get album entity
-		$album = $this->albumBusinessLayer->addOrUpdateAlbum($meta['album'], $albumArtistId, $userId);
+		$album = $this->albumBusinessLayer->addOrUpdateAlbum(
+			$meta['album'], $albumArtistId, $meta['album_artist_uncertain'] ?? false, $meta['compilation'],
+			$meta['mb_release_id'], $meta['mb_release_group_id'], $userId);
 		$albumId = $album->getId();
 
 		// add/update genre and get genre entity
 		$genre = $this->genreBusinessLayer->addOrUpdateGenre($meta['genre'], $userId);
 
+		// add/update record label and get the entity
+		$recordLabelId = null;
+		if (!empty($meta['record_label'])) {
+			$label = $this->recordLabelBusinessLayer->addOrUpdate($meta['record_label'], $userId);
+			$recordLabelId = $label->getId();
+		}
+
 		// add/update composer artist and get artist entity (if composer metadata exists)
 		$composerId = null;
 		if (!empty($meta['composer'])) {
-			$composerArtist = $this->artistBusinessLayer->addOrUpdateArtist($meta['composer'], $userId);
+			$composerArtist = $this->artistBusinessLayer->addOrUpdateArtist($meta['composer'], $meta['mb_composer_id'], $userId);
 			$composerId = $composerArtist->getId();
 		}
 
 		// add/update track and get track entity
 		$track = $this->trackBusinessLayer->addOrUpdateTrack(
-				$meta['title'], $meta['trackNumber'], $meta['discNumber'], $meta['year'], $genre->getId(),
-				$artistId, $albumId, $fileId, $mimetype, $userId, $meta['length'], $meta['bitrate'],
-				$meta['bpm'], $composerId, $meta['comment']);
+				$meta['title'], $meta['track_number'], $meta['disc_number'], $meta['year'], $genre->getId(),
+				$artistId, $albumId, $fileId, $mimetype, $userId, $recordLabelId, $meta['length'], $meta['bitrate'],
+				$meta['sample_rate'], $meta['bpm'], $composerId, $meta['comment'], $meta['mb_recording_id'],
+				$meta['mb_release_track_id'], $meta['replaygain_album_gain'], $meta['replaygain_album_peak'],
+				$meta['replaygain_track_gain'], $meta['replaygain_track_peak'], $meta['r128_album_gain'], $meta['r128_track_gain']);
 
 		// if present, use the embedded album art as cover for the respective album
 		if (!empty($meta['picture'])) {
@@ -213,11 +224,11 @@ class Scanner extends PublicEmitter {
 			$this->cache->remove($userId, 'collection');
 		}
 
-		$this->logger->debug('imported entities - ' .
-				"artist: $artistId, albumArtist: $albumArtistId, album: $albumId, track: {$track->getId()}");
+		$this->logger->debug('imported entities - '
+				. "artist: $artistId, albumArtist: $albumArtistId, album: $albumId, track: {$track->getId()}");
 
 		return [
-			'analyze' => $time2 - $time1,
+			'analyze'   => $time2 - $time1,
 			'db update' => $time3 - $time2
 		];
 	}
@@ -227,17 +238,26 @@ class Scanner extends PublicEmitter {
 		$fileInfo = $analyzeFile ? $this->extractor->extract($file) : [];
 		$meta = [];
 
+		// Is the album a compilation? (i.e. various artists)
+		$meta['compilation'] = (int)ExtractorGetID3::getFirstOfTags($fileInfo, ['part_of_a_compilation', 'compilation']) !== 0;
+
 		// Track artist and album artist
 		$meta['artist'] = ExtractorGetID3::getTag($fileInfo, 'artist');
-		$meta['albumArtist'] = ExtractorGetID3::getFirstOfTags($fileInfo, ['band', 'albumartist', 'album artist', 'album_artist']);
+		$meta['album_artist'] = ExtractorGetID3::getFirstOfTags($fileInfo, ['band', 'albumartist', 'album artist', 'album_artist']);
 
-		// use artist and albumArtist as fallbacks for each other
-		if (!StringUtil::isNonEmptyString($meta['albumArtist'])) {
-			$meta['albumArtist'] = $meta['artist'];
+		// use artist and albumArtist as fallbacks for each other (album tagged as compilation is a special case)
+		if (!StringUtil::isNonEmptyString($meta['album_artist'])) {
+			if ($meta['compilation']) {
+				// if the album is a compilation, then default to setting the album artist as "Various Artists"
+				$meta['album_artist'] = 'Various Artists';
+			} else {
+				$meta['album_artist'] = $meta['artist'];
+				$meta['album_artist_uncertain'] = true;
+			}
 		}
 
 		if (!StringUtil::isNonEmptyString($meta['artist'])) {
-			$meta['artist'] = $meta['albumArtist'];
+			$meta['artist'] = $meta['album_artist'];
 		}
 
 		if (!StringUtil::isNonEmptyString($meta['artist'])) {
@@ -251,7 +271,10 @@ class Scanner extends PublicEmitter {
 			}
 
 			$meta['artist'] = $artistName;
-			$meta['albumArtist'] = $artistName;
+			$meta['album_artist'] = $artistName;
+			// Although the artist name is evaluated by a heuristic rule, it is not "uncertain" in the sense
+			// that we would want allow merging this album with another album with different artist name.
+			$meta['album_artist_uncertain'] = false;
 		}
 
 		// title
@@ -273,22 +296,23 @@ class Scanner extends PublicEmitter {
 		}
 
 		// track number
-		$meta['trackNumber'] = ExtractorGetID3::getFirstOfTags(
-			$fileInfo,
-			['track_number', 'tracknumber', 'track'],
-			$fieldsFromFileName['track_number']
+		$meta['track_number'] = self::normalizeOrdinal(
+			ExtractorGetID3::getFirstOfTags($fileInfo,['track_number', 'tracknumber', 'track'], $fieldsFromFileName['track_number'])
 		);
-		$meta['trackNumber'] = self::normalizeOrdinal($meta['trackNumber']);
 
 		// disc number
-		$meta['discNumber'] = ExtractorGetID3::getFirstOfTags($fileInfo, ['disc_number', 'discnumber', 'part_of_a_set'], '1');
-		$meta['discNumber'] = self::normalizeOrdinal($meta['discNumber']);
+		$meta['disc_number'] = self::normalizeOrdinal(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['disc_number', 'discnumber', 'part_of_a_set'], '1')
+		);
 
 		// year
-		$meta['year'] = ExtractorGetID3::getFirstOfTags($fileInfo, ['year', 'date', 'creation_date']);
-		$meta['year'] = self::normalizeYear($meta['year']);
+		$meta['year'] = self::normalizeYear(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['year', 'date', 'creation_date'])
+		);
 
 		$meta['genre'] = ExtractorGetID3::getTag($fileInfo, 'genre') ?: ''; // empty string used for "scanned but unknown"
+
+		$meta['record_label'] = ExtractorGetID3::getTag($fileInfo, 'publisher');
 
 		$meta['bpm'] = self::normalizeUnsigned(ExtractorGetID3::getTag($fileInfo, 'bpm'));
 
@@ -301,6 +325,44 @@ class Scanner extends PublicEmitter {
 		$meta['length'] = self::normalizeUnsigned($fileInfo['playtime_seconds'] ?? null);
 
 		$meta['bitrate'] = self::normalizeUnsigned($fileInfo['audio']['bitrate'] ?? null);
+
+		$meta['sample_rate'] = self::normalizeUnsigned($fileInfo['audio']['sample_rate'] ?? null);
+
+		// MusicBrainz IDs
+		$meta['mb_recording_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Recording Id', 'musicbrainz_trackid'])
+		);
+		$meta['mb_release_track_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Release Track Id', 'musicbrainz_releasetrackid'])
+		);
+		$meta['mb_artist_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Artist Id', 'musicbrainz_artistid'])
+		);
+		$meta['mb_release_artist_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Album Artist Id', 'musicbrainz_albumartistid'])
+		);
+		$meta['mb_composer_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Composer Id', 'musicbrainz_composerid'])
+		);
+		$meta['mb_release_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Album Id', 'musicbrainz_albumid'])
+		);
+		$meta['mb_release_group_id'] = self::normalizeMbid(
+			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Release Group Id', 'musicbrainz_releasegroupid'])
+		);
+
+		// default MusicBrainz Release Artist Id for compilation albums to the MusicBrainz Various Artists Id
+		if ($meta['compilation'] && empty($meta['mb_release_artist_id'])) {
+			$meta['mb_release_artist_id'] = ArtistMapper::VARIOUS_ARTISTS_MBID;
+		}
+
+		// Replay gain
+		$meta['replaygain_album_gain'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'replaygain_album_gain'));
+		$meta['replaygain_album_peak'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'replaygain_album_peak'));
+		$meta['replaygain_track_gain'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'replaygain_track_gain'));
+		$meta['replaygain_track_peak'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'replaygain_track_peak'));
+		$meta['r128_album_gain'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'r128_album_gain'));
+		$meta['r128_track_gain'] = self::normalizeFloat(ExtractorGetID3::getTag($fileInfo, 'r128_track_gain'));
 
 		return $meta;
 	}
@@ -320,8 +382,8 @@ class Scanner extends PublicEmitter {
 		$userCount = \count($affectedUsers);
 
 		if ($albumCount + $artistCount > 100) {
-			$this->logger->debug("Delete operation affected $albumCount albums and $artistCount artists. " .
-								"Invalidate the whole cache of all affected users ($userCount).");
+			$this->logger->debug("Delete operation affected $albumCount albums and $artistCount artists. "
+								. "Invalidate the whole cache of all affected users ($userCount).");
 			foreach ($affectedUsers as $user) {
 				$this->cache->remove($user);
 			}
@@ -354,11 +416,11 @@ class Scanner extends PublicEmitter {
 	 * @param string[]|null $userIds
 	 * @return boolean true if anything was removed
 	 */
-	public function deleteAudio(array $fileIds, ?array $userIds=null) : bool {
+	public function deleteAudio(array $fileIds, ?array $userIds = null) : bool {
 		$result = $this->trackBusinessLayer->deleteTracks($fileIds, $userIds);
 
 		if ($result) { // one or more tracks were removed
-			$this->logger->debug('library updated when audio file(s) removed: '. \implode(', ', $fileIds));
+			$this->logger->debug('library updated when audio file(s) removed: ' . \implode(', ', $fileIds));
 
 			// remove obsolete artists and albums, and track references in playlists
 			$this->albumBusinessLayer->deleteById($result['obsoleteAlbums']);
@@ -392,14 +454,14 @@ class Scanner extends PublicEmitter {
 	 * @param string[]|null $userIds
 	 * @return boolean true if anything was removed
 	 */
-	private function deleteImage(array $fileIds, ?array $userIds=null) : bool {
+	private function deleteImage(array $fileIds, ?array $userIds = null) : bool {
 		$affectedAlbums = $this->albumBusinessLayer->removeCovers($fileIds, $userIds);
 		$affectedArtists = $this->artistBusinessLayer->removeCovers($fileIds, $userIds);
 
 		$anythingAffected = (\count($affectedAlbums) + \count($affectedArtists) > 0);
 
 		if ($anythingAffected) {
-			$this->logger->debug('library covers updated when image file(s) removed: '. \implode(', ', $fileIds));
+			$this->logger->debug('library covers updated when image file(s) removed: ' . \implode(', ', $fileIds));
 
 			$affectedUsers = \array_merge(
 				ArrayUtil::extractUserIds($affectedAlbums),
@@ -424,7 +486,7 @@ class Scanner extends PublicEmitter {
 	 * @param string[]|null $userIds the IDs of the users to remove the file from; if omitted,
 	 *                               the file is removed from all users (ie. owner and sharees)
 	 */
-	public function delete(int $fileId, ?array $userIds=null) : void {
+	public function delete(int $fileId, ?array $userIds = null) : void {
 		// The removed file may or may not be of interesting type and belong to the library. It's
 		// most efficient just to try to remove it as audio or image. It will take just a few simple
 		// DB queries to notice if the file had nothing to do with our library.
@@ -441,7 +503,7 @@ class Scanner extends PublicEmitter {
 	 * @param string[]|null $userIds the IDs of the users to remove the folder from; if omitted,
 	 *                               the folder is removed from all users (ie. owner and sharees)
 	 */
-	public function deleteFolder(Folder $folder, ?array $userIds=null) : void {
+	public function deleteFolder(Folder $folder, ?array $userIds = null) : void {
 		$audioFiles = $folder->searchByMime('audio');
 		if (\count($audioFiles) > 0) {
 			$this->deleteAudio(ArrayUtil::extractIds($audioFiles), $userIds);
@@ -462,7 +524,7 @@ class Scanner extends PublicEmitter {
 	private function getImageFiles(string $userId) : array {
 		try {
 			$folder = $this->librarySettings->getFolder($userId);
-		} catch (\OCP\Files\NotFoundException $e) {
+		} catch (LibraryFolderException $e) {
 			return [];
 		}
 
@@ -489,13 +551,27 @@ class Scanner extends PublicEmitter {
 	 *
 	 * @return int[]
 	 */
-	public function getDirtyMusicFileIds(string $userId, ?string $path = null) : array {
+	private function getDirtyMusicFileIds(string $userId, ?string $path = null) : array {
 		try {
 			$folderId = $this->pathInLibToFolderId($userId, $path);
 		} catch (\OCP\Files\NotFoundException $e) {
 			return [];
 		}
 		return $this->trackBusinessLayer->findDirtyFileIds($userId, $folderId);
+	}
+
+	/**
+	 * Find already scanned music files which were scanned on an older version of the software and may need to be rescanned for new metadata fields
+	 *
+	 * @return int[]
+	 */
+	private function getFileIdsScannedOnOldSoftware(string $userId, ?string $path = null) : array {
+		try {
+			$folderId = $this->pathInLibToFolderId($userId, $path);
+		} catch (\OCP\Files\NotFoundException $e) {
+			return [];
+		}
+		return $this->trackBusinessLayer->findFileIdsWithOldScanVersion($userId, $folderId);
 	}
 
 	/**
@@ -549,8 +625,8 @@ class Scanner extends PublicEmitter {
 		// Search files with mime 'audio/*' but filter out the playlist files and files under excluded folders
 		$files = $folder->searchByMime('audio');
 
-		$files = \array_filter($files, fn(Node $f) =>
-					!self::isPlaylistMime($f->getMimeType())
+		$files = \array_filter($files, fn (Node $f)
+					=> !self::isPlaylistMime($f->getMimeType())
 					&& $this->librarySettings->pathBelongsToMusicLibrary($f->getPath(), $userId)
 		);
 
@@ -558,17 +634,18 @@ class Scanner extends PublicEmitter {
 	}
 
 	/**
-	 * @return array{unscannedFiles: int[], obsoleteFiles: int[], dirtyFiles: int[], scannedCount: int}
+	 * @return array{unscannedFiles: int[], obsoleteFiles: int[], dirtyFiles: int[], filesScannedOnOldSw: int[], scannedCount: int}
 	 */
 	public function getStatusOfLibraryFiles(string $userId, ?string $path = null) : array {
 		$scannedIds = $this->getScannedFileIds($userId, $path);
 		$availableIds = $this->getAllMusicFileIds($userId, $path);
 
 		return [
-			'unscannedFiles' => ArrayUtil::diff($availableIds, $scannedIds),
-			'obsoleteFiles' => ArrayUtil::diff($scannedIds, $availableIds),
-			'dirtyFiles' => $this->getDirtyMusicFileIds($userId, $path),
-			'scannedCount' => \count($scannedIds)
+			'unscannedFiles'      => ArrayUtil::diff($availableIds, $scannedIds),
+			'obsoleteFiles'       => ArrayUtil::diff($scannedIds, $availableIds),
+			'dirtyFiles'          => $this->getDirtyMusicFileIds($userId, $path),
+			'filesScannedOnOldSw' => $this->getFileIdsScannedOnOldSoftware($userId, $path),
+			'scannedCount'        => \count($scannedIds)
 		];
 	}
 
@@ -603,7 +680,7 @@ class Scanner extends PublicEmitter {
 			}
 			if ($file instanceof File) {
 				$memBefore = $debugOutput ? \memory_get_usage(true) : 0;
-				list('analyze' => $analyzeTime, 'db update' => $dbTime)
+				['analyze' => $analyzeTime, 'db update' => $dbTime]
 					= $this->updateAudio($file, $userId, $libraryRoot, $file->getPath(), $file->getMimetype(), /*partOfScan=*/true);
 				if ($debugOutput) {
 					$memAfter = \memory_get_usage(true);
@@ -619,8 +696,7 @@ class Scanner extends PublicEmitter {
 				$totalAnalyzeTime += $analyzeTime;
 				$totalDbTime += $dbTime;
 			} else {
-				$this->logger->info("File with id $fileId not found for user $userId, removing it from the library if present");
-				$this->deleteAudio([$fileId], [$userId]);
+				$this->logger->info("File with id $fileId is not available within the library path of the user $userId");
 			}
 		}
 
@@ -633,9 +709,9 @@ class Scanner extends PublicEmitter {
 		$this->cache->remove($userId, 'scanning', $scanTimestamp);
 
 		return [
-			'count' => $count,
+			'count'     => $count,
 			'anlz_time' => (int)($totalAnalyzeTime / 1000000),
-			'db_time' => (int)($totalDbTime / 1000000)
+			'db_time'   => (int)($totalDbTime / 1000000)
 		];
 	}
 
@@ -651,8 +727,8 @@ class Scanner extends PublicEmitter {
 
 		$count = \count($unavailableFiles);
 		if ($count > 0) {
-			$this->logger->info('The following files are no longer available within the library of the '.
-				"user $userId, removing: " . (string)\json_encode($unavailableFiles));
+			$this->logger->info('The following files are no longer available within the library of the '
+				. "user $userId, removing: " . (string)\json_encode($unavailableFiles));
 			$this->deleteAudio($unavailableFiles, [$userId]);
 		}
 		return $count;
@@ -698,7 +774,7 @@ class Scanner extends PublicEmitter {
 			if (!empty($cover)) {
 				$cover = $this->coverService->scaleDownAndCrop([
 					'mimetype' => $cover['image_mime'],
-					'content' => $cover['data']
+					'content'  => $cover['data']
 				], 200);
 			}
 			return [
@@ -765,7 +841,7 @@ class Scanner extends PublicEmitter {
 		// scratch the cache for those users whose music collection was touched
 		foreach ($affectedUsers as $user) {
 			$this->cache->remove($user, 'collection');
-			$this->logger->debug('album cover(s) were found for user '. $user);
+			$this->logger->debug('album cover(s) were found for user ' . $user);
 		}
 		return !empty($affectedUsers);
 	}
@@ -846,6 +922,29 @@ class Scanner extends PublicEmitter {
 		return $value;
 	}
 
+	private static function normalizeFloat(int|float|string|null $value) : ?float {
+		if (\is_numeric($value)) {
+			$value = (float)$value;
+		} elseif (\is_string($value) && \preg_match('/(\d+(\.\d+)?).*/', $value, $matches) === 1) {
+			// numeric value followed by something, probably the unit
+			$value = (float)$matches[1];
+		} else {
+			$value = null;
+		}
+		return $value;
+	}
+
+	private static function normalizeMbid(?string $mbid) : ?string {
+		if (!empty($mbid)) {
+			$mbid = StringUtil::truncate(\trim($mbid), 36, ''); // valid MBID is always 36 characters but prepare for invalid data
+			$mbid = \mb_strtolower($mbid);
+		}
+		if (empty($mbid)) {
+			$mbid = null; // empty or whitespace-only string will get converted to null
+		}
+		return $mbid;
+	}
+
 	/**
 	 * Loop through the tracks of an album and set the first track containing embedded cover art
 	 * as cover file for the album
@@ -853,7 +952,7 @@ class Scanner extends PublicEmitter {
 	 * @param string|null $userId name of user, deducted from $albumId if omitted
 	 * @param Folder|null $baseFolder base folder for the search, library root of $userId is used if omitted
 	 */
-	private function findEmbeddedCoverForAlbum(int $albumId, ?string $userId=null, ?Folder $baseFolder=null) : void {
+	private function findEmbeddedCoverForAlbum(int $albumId, ?string $userId = null, ?Folder $baseFolder = null) : void {
 		if ($userId === null) {
 			$userId = $this->albumBusinessLayer->findAlbumOwner($albumId);
 		}

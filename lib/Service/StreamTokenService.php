@@ -12,7 +12,7 @@
 
 namespace OCA\Music\Service;
 
-use OCA\Music\Db\Cache;
+use OCP\IConfig;
 
 /**
  * Service creating signature tokens for given URLs. This can be used to prove that an URL passed
@@ -23,8 +23,11 @@ use OCA\Music\Db\Cache;
 class StreamTokenService {
 
 	private ?string $secret = null; // lazy load
+	private const PRIVATE_SECRET_KEY = 'radio_stream_secret';
 
-	public function __construct(private Cache $cache) {
+	public function __construct(
+		private IConfig $config,
+	) {
 	}
 
 	public function tokenForUrl(string $url) : string {
@@ -60,12 +63,12 @@ class StreamTokenService {
 	}
 
 	private function getPrivateSecretFromDb() : string {
-		$privateSecretBase64 = $this->cache->get('', 'radioStreamSecret');
+		$privateSecretBase64 = $this->config->getAppValue('music', self::PRIVATE_SECRET_KEY);
 
-		if ($privateSecretBase64 === null) {
+		if (empty($privateSecretBase64)) {
 			$privateSecret = \random_bytes(32);
 			$privateSecretBase64 = \base64_encode($privateSecret);
-			$this->cache->set('', 'radioStreamSecret', $privateSecretBase64);
+			$this->config->setAppValue('music', self::PRIVATE_SECRET_KEY, $privateSecretBase64);
 		} else {
 			$privateSecret = \base64_decode($privateSecretBase64);
 		}

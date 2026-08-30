@@ -69,19 +69,22 @@ OCA.Music.Utils = class {
 	}
 
 	/**
-	 * Attempt to get a reference with the first supplied function. If the reference is available, then call the second
-	 * function giving the reference as an argument. Otherwise retry in a while. Keep trying until the reference is available.
+	 * Attempt to get a value with the supplied function. If the value is not available, then retry in a while and
+	 * keep trying until the value is available. Return a promise which resolves once the value is obtained.
 	 */
-	static executeOnceRefAvailable<T>(getRef : () => T|null|undefined, callback : (arg : T) => any, attemptInterval_ms = 500) : void {
-		const attempt = () => {
-			let ref = getRef();
-			if (ref) {
-				callback(ref);
-			} else {
-				setTimeout(attempt, attemptInterval_ms);
-			}
-		};
-		attempt();
+	static getValueOnceAvailable<T>(getRef : () => T|null|undefined, attemptInterval_ms = 500) : Promise<T> {
+		const promise = new Promise<T>((resolve, _reject) => {
+			const attempt = () => {
+				let ref = getRef();
+				if (ref) {
+					resolve(ref);
+				} else {
+					setTimeout(attempt, attemptInterval_ms);
+				}
+			};
+			attempt();
+		});
+		return promise;
 	}
 
 	/**

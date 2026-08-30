@@ -123,7 +123,10 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 
 	function onEnd() {
 		scrobbleCurrentTrackIfAppropriate();
-		if ($scope.repeat === 'one') {
+		if ($scope.currentTrack?.type === 'radio') {
+			console.warn('Radio stream ended, attempt to restart');
+			setCurrentTrack(playQueueService.getCurrentTrack());
+		} else if ($scope.repeat === 'one') {
 			scrobblePending = true;
 			$scope.player.seek(0);
 			$scope.player.play();
@@ -442,7 +445,7 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 		$timeout(() => $scope.playPauseContextMenuVisible = true);
 	};
 	// hide the popup menu when the user clicks anywhere on the page
-	$document.click(function(_event) {
+	$document.on('click', function(_event) {
 		$timeout(() => $scope.playPauseContextMenuVisible = false);
 	});
 
@@ -496,11 +499,11 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 		}
 	};
 
-	playQueueService.subscribe('play', function(_playingView = null, startOffset = 0) {
+	playQueueService.subscribe('play', $scope, (_playingView = null, startOffset = 0) => {
 		$scope.next(startOffset); /* fetch track and start playing*/
 	});
 
-	playQueueService.subscribe('togglePlayback', $scope.togglePlayback);
+	playQueueService.subscribe('togglePlayback', $scope, $scope.togglePlayback);
 
 	$scope.scrollToCurrentTrack = function() {
 		if ($scope.currentTrack) {
@@ -514,7 +517,7 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 				}
 			};
 
-			if ($rootScope.currentView !== $rootScope.playingView) {
+			if ($scope.getCurrentViewId() !== $rootScope.playingView) {
 				$scope.navigateTo($rootScope.playingView, doScroll);
 			} else {
 				doScroll();
@@ -685,10 +688,15 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 	* server, this looks like there's no logged in user. The token is used as an alternative means of
 	* authentication, which will provide access only to the cover art images.
 	*/
-	let coverArtToken = null;
-	$rootScope.$on('newCoverArtToken', function(_event, token) {
-		coverArtToken = token;
-	});
+	const coverArtToken = OCP.InitialState.loadState('music', 'cover_access_token', null);
+	if (!coverArtToken) {
+		// When the browser is set to remember open tabs and the previous user session is restored after restarting the computer,
+		// it often happens that the back-end doesn't have the userId available yet at the time when the initial state is provided.
+		// This prevents providing the cover_access_token. The root cause for this is unknown but reloading the page seems to be the
+		// simplest work-around.
+		console.warn('No initial state for cover_access_token, reload to recover');
+		window.location.reload();
+	}
 
 	/**
 	 * Media session API

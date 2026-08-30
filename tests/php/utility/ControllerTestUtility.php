@@ -29,7 +29,7 @@ abstract class ControllerTestUtility extends \PHPUnit\Framework\TestCase {
 	 * @param string[] $expected an array containing the expected attributes
 	 * @param string[] $valid if you define your own attributes, pass them here
 	 */
-	protected function assertAttributes(Controller|string $controller, string $method, array $expected, array $valid=[]) {
+	protected function assertAttributes(Controller|string $controller, string $method, array $expected, array $valid = []) {
 		$standard = [
 			\OCP\AppFramework\Http\Attribute\PublicPage::class,
 			\OCP\AppFramework\Http\Attribute\NoAdminRequired::class,
@@ -68,7 +68,7 @@ abstract class ControllerTestUtility extends \PHPUnit\Framework\TestCase {
 	 * @param array $params a hashmap with the parameters for request
 	 * @return \PHPUnit\Framework\MockObject\MockObject acting as \OCP\IRequest instance
 	 */
-	protected function getRequest(array $params=[]) : \PHPUnit\Framework\MockObject\MockObject {
+	protected function getRequest(array $params = []) : \PHPUnit\Framework\MockObject\MockObject {
 		$mock = $this->getMockBuilder('\OCP\IRequest')->getMock();
 
 		$merged = [];

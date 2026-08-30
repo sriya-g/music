@@ -14,6 +14,7 @@
 
 namespace OCA\Music\Db;
 
+use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\StringUtil;
 use OCA\Music\Utility\Util;
 use OCP\IL10N;
@@ -38,10 +39,14 @@ use OCP\IURLGenerator;
  * @method void setFileId(int $fileId)
  * @method ?int getBitrate()
  * @method void setBitrate(?int $bitrate)
+ * @method ?int getSampleRate()
+ * @method void setSampleRate(?int $sampleRate)
  * @method string getMimetype()
  * @method void setMimetype(string $mimetype)
  * @method ?string getMbid()
  * @method void setMbid(?string $mbid)
+ * @method ?string getMbidRelTrack()
+ * @method void setMbidRelTrack(?string $mbid)
  * @method ?string getStarred()
  * @method void setStarred(?string $timestamp)
  * @method int getRating()
@@ -58,8 +63,24 @@ use OCP\IURLGenerator;
  * @method void setBpm(?int $bpm)
  * @method ?int getComposerId()
  * @method void setComposerId(?int $composerId)
+ * @method ?int getRecordLabelId()
+ * @method void setRecordLabelId(?int $labelId)
  * @method ?string getComment()
  * @method void setComment(?string $comment)
+ * @method ?int getScanVersion()
+ * @method void setScanVersion(?int $version)
+ * @method ?float getReplaygainAlbumGain()
+ * @method void setReplaygainAlbumGain(?float $gain)
+ * @method ?float getReplaygainAlbumPeak()
+ * @method void setReplaygainAlbumPeak(?float $peak)
+ * @method ?float getReplaygainTrackGain()
+ * @method void setReplaygainTrackGain(?float $gain)
+ * @method ?float getReplaygainTrackPeak()
+ * @method void setReplaygainTrackPeak(?float $peak)
+ * @method ?float getR128AlbumGain()
+ * @method void setR128AlbumGain(?float $gain)
+ * @method ?float getR128TrackGain()
+ * @method void setR128TrackGain(?float $gain)
  *
  * @method string getFilename()
  * @method int getSize()
@@ -68,6 +89,7 @@ use OCP\IURLGenerator;
  * @method ?string getArtistName()
  * @method ?string getGenreName()
  * @method ?string getComposerName()
+ * @method ?string getRecordLabelName()
  * @method int getFolderId()
  */
 class Track extends Entity {
@@ -80,8 +102,10 @@ class Track extends Entity {
 	public ?int $length = null;
 	public int $fileId = 0;
 	public ?int $bitrate = null;
+	public ?int $sampleRate = null;
 	public string $mimetype = '';
-	public ?string $mbid = null;
+	public ?string $mbid = null; // MusicBrainz Recording Id
+	public ?string $mbidRelTrack = null; // MusicBrainz Release Track Id
 	public ?string $starred = null;
 	public int $rating = 0;
 	public ?int $genreId = null;
@@ -90,7 +114,15 @@ class Track extends Entity {
 	public int $dirty = 0;
 	public ?int $bpm = null;
 	public ?int $composerId = null;
+	public ?int $recordLabelId = null;
 	public ?string $comment = null;
+	public ?int $scanVersion = null; // version of the Music app used to scan this track
+	public ?float $replaygainAlbumGain = null;
+	public ?float $replaygainAlbumPeak = null;
+	public ?float $replaygainTrackGain = null;
+	public ?float $replaygainTrackPeak = null;
+	public ?float $r128AlbumGain = null;
+	public ?float $r128TrackGain = null;
 
 	// not from the music_tracks table but still part of the standard content of this entity:
 	public string $filename = '';
@@ -100,10 +132,12 @@ class Track extends Entity {
 	public ?string $artistName = null;
 	public ?string $genreName = null;
 	public ?string $composerName = null;
+	public ?string $recordLabelName = null;
 	public int $folderId = 0;
 
 	// the rest of the variables are injected separately when needed
 	private ?Album $album = null;
+	private ?Artist $artist = null;
 	private ?int $numberOnPlaylist = null;
 	private ?string $folderPath = null;
 	private ?string $lyrics = null;
@@ -116,6 +150,7 @@ class Track extends Entity {
 		$this->addType('albumId', 'int');
 		$this->addType('length', 'int');
 		$this->addType('bitrate', 'int');
+		$this->addType('sampleRate', 'int');
 		$this->addType('fileId', 'int');
 		$this->addType('genreId', 'int');
 		$this->addType('playCount', 'int');
@@ -123,9 +158,17 @@ class Track extends Entity {
 		$this->addType('dirty', 'int');
 		$this->addType('bpm', 'int');
 		$this->addType('composerId', 'int');
+		$this->addType('recordLabelId', 'int');
+		$this->addType('scanVersion', 'int');
 		$this->addType('size', 'int');
 		$this->addType('fileModTime', 'int');
 		$this->addType('folderId', 'int');
+		$this->addType('replaygainAlbumGain', 'float');
+		$this->addType('replaygainAlbumPeak', 'float');
+		$this->addType('replaygainTrackGain', 'float');
+		$this->addType('replaygainTrackPeak', 'float');
+		$this->addType('r128AlbumGain', 'float');
+		$this->addType('r128TrackGain', 'float');
 	}
 
 	public function getAlbum() : ?Album {
@@ -134,6 +177,14 @@ class Track extends Entity {
 
 	public function setAlbum(?Album $album) : void {
 		$this->album = $album;
+	}
+
+	public function getArtist() : ?Artist {
+		return $this->artist;
+	}
+
+	public function setArtist(?Artist $artist) : void {
+		$this->artist = $artist;
 	}
 
 	public function getNumberOnPlaylist() : ?int {
@@ -165,7 +216,7 @@ class Track extends Entity {
 
 	public function getArtistWithUri(IURLGenerator $urlGenerator) : array {
 		return [
-			'id' => $this->artistId,
+			'id'  => $this->artistId,
 			'uri' => $urlGenerator->linkToRoute(
 				'music.shivaApi.artist',
 				['id' => $this->artistId]
@@ -175,7 +226,7 @@ class Track extends Entity {
 
 	public function getAlbumWithUri(IURLGenerator $urlGenerator) : array {
 		return [
-			'id' => $this->albumId,
+			'id'  => $this->albumId,
 			'uri' => $urlGenerator->linkToRoute(
 				'music.shivaApi.album',
 				['id' => $this->albumId]
@@ -197,32 +248,35 @@ class Track extends Entity {
 
 	public function toCollection() : array {
 		return [
-			'title' => $this->getTitle(),
-			'number' => $this->getNumber(),
-			'disk' => $this->getDisk(),
-			'artistId' => $this->getArtistId(),
+			'title'      => $this->getTitle(),
+			'number'     => $this->getNumber(),
+			'disk'       => $this->getDisk(),
+			'artistId'   => $this->getArtistId(),
 			'composerId' => $this->getComposerId(),
-			'length' => $this->getLength(),
-			'files' => [$this->getMimetype() => $this->getFileId()],
-			'id' => $this->getId(),
+			'length'     => $this->getLength(),
+			'files'      => [$this->getMimetype() => $this->getFileId()],
+			'id'         => $this->getId(),
 		];
 	}
 
-	public function toShivaApi(IURLGenerator $urlGenerator) : array {
+	/**
+	 * @param ?IL10N $l10n Passing null will prevent the "full tree" formatting even when $artist and/or $album are present.
+	 */
+	public function toShivaApi(IURLGenerator $urlGenerator, ?IL10N $l10n) : array {
 		return [
-			'title' => $this->getTitle(),
+			'title'   => $this->getTitle(),
 			'ordinal' => $this->getAdjustedTrackNumber(),
-			'artist' => $this->getArtistWithUri($urlGenerator),
-			'album' => $this->getAlbumWithUri($urlGenerator),
-			'length' => $this->getLength(),
-			'files' => [$this->getMimetype() => $urlGenerator->linkToRoute(
+			'artist'  => ($this->artist && $l10n) ? $this->artist->toShivaApi($urlGenerator, $l10n) : $this->getArtistWithUri($urlGenerator),
+			'album'   => ($this->album && $l10n) ? $this->album->toShivaApi($urlGenerator, $l10n) : $this->getAlbumWithUri($urlGenerator),
+			'length'  => $this->getLength(),
+			'files'   => [$this->getMimetype() => $urlGenerator->linkToRoute(
 				'music.musicApi.download',
 				['fileId' => $this->getFileId()]
 			)],
 			'bitrate' => $this->getBitrate(),
-			'id' => $this->getId(),
-			'slug' => $this->slugify('title'),
-			'uri' => $this->getUri($urlGenerator)
+			'id'      => $this->getId(),
+			'slug'    => $this->slugify('title'),
+			'uri'     => $this->getUri($urlGenerator)
 		];
 	}
 
@@ -236,43 +290,45 @@ class Track extends Entity {
 		$album = $this->getAlbum();
 
 		$result = [
-			'id' => (string)$this->getId(),
-			'title' => $this->getTitle() ?: '',
-			'name' => $this->getTitle() ?: '',
-			'artist' => $renderAlbumOrArtistRef($this->getArtistId() ?: 0, $this->getArtistNameString($l10n)),
-			'albumartist' => $renderAlbumOrArtistRef($album->getAlbumArtistId() ?: 0, $album->getAlbumArtistNameString($l10n)),
-			'album' => $renderAlbumOrArtistRef($album->getId() ?: 0, $album->getNameString($l10n)),
-			'composer' => $this->getComposerName() ?: null,
-			'url' => $createPlayUrl($this),
-			'time' => $this->getLength(),
-			'year' => $this->getYear(),
-			'track' => $this->getAdjustedTrackNumber(), // TODO: maybe there should be a user setting to select plain or adjusted number
-			'playlisttrack' => $this->getAdjustedTrackNumber(),
-			'disk' => $this->getDisk(),
-			'filename' => $this->getFilename(),
-			'format' => $this->getFileExtension(),
-			'stream_format' => $this->getFileExtension(),
-			'bitrate' => $this->getBitrate(),
-			'stream_bitrate' => $this->getBitrate(),
-			'mime' => $this->getMimetype(),
-			'stream_mime' => $this->getMimetype(),
-			'size' => $this->getSize(),
-			'art' => $createImageUrl($this),
-			'rating' => $this->getRating(),
-			'preciserating' => $this->getRating(),
-			'playcount' => $this->getPlayCount(),
-			'flag' => !empty($this->getStarred()),
-			'language' => null,
-			'lyrics' => $this->lyrics,
-			'mode' => null, // cbr/vbr
-			'rate' => null, // sample rate [Hz]
-			'comment' => $this->getComment() ?: null,
-			'replaygain_album_gain' => null,
-			'replaygain_album_peak' => null,
-			'replaygain_track_gain' => null,
-			'replaygain_track_peak' => null,
-			'r128_album_gain' => null,
-			'r128_track_gain' => null,
+			'id'                    => (string)$this->getId(),
+			'title'                 => $this->getTitle() ?: '',
+			'name'                  => $this->getTitle() ?: '',
+			'artist'                => $renderAlbumOrArtistRef($this->getArtistId() ?: 0, $this->getArtistNameString($l10n)),
+			'albumartist'           => $renderAlbumOrArtistRef($album->getAlbumArtistId() ?: 0, $album->getAlbumArtistNameString($l10n)),
+			'album'                 => $renderAlbumOrArtistRef($album->getId() ?: 0, $album->getNameString($l10n)),
+			'composer'              => $this->getComposerName() ?: null,
+			'url'                   => $createPlayUrl($this),
+			'time'                  => $this->getLength(),
+			'year'                  => $this->getYear(),
+			'track'                 => $this->getAdjustedTrackNumber(), // TODO: maybe there should be a user setting to select plain or adjusted number
+			'playlisttrack'         => $this->getAdjustedTrackNumber(),
+			'disk'                  => $this->getDisk(),
+			'filename'              => $this->getFilename(),
+			'format'                => $this->getFileExtension(),
+			'stream_format'         => $this->getFileExtension(),
+			'bitrate'               => $this->getBitrate(),
+			'stream_bitrate'        => $this->getBitrate(),
+			'mime'                  => $this->getMimetype(),
+			'stream_mime'           => $this->getMimetype(),
+			'size'                  => $this->getSize(),
+			'art'                   => $createImageUrl($this),
+			'rating'                => $this->getRating(),
+			'preciserating'         => $this->getRating(),
+			'playcount'             => $this->getPlayCount(),
+			'flag'                  => !empty($this->getStarred()),
+			'language'              => null,
+			'lyrics'                => $this->lyrics,
+			'mode'                  => null, // cbr/vbr
+			'rate'                  => $this->getSampleRate(),
+			'comment'               => $this->getComment() ?: null,
+			'publisher'             => $this->getRecordLabelName(),
+			'mbid'                  => $this->getMbid(),
+			'replaygain_album_gain' => $this->getReplaygainAlbumGain(),
+			'replaygain_album_peak' => $this->getReplaygainAlbumPeak(),
+			'replaygain_track_gain' => $this->getReplaygainTrackGain(),
+			'replaygain_track_peak' => $this->getReplaygainTrackPeak(),
+			'r128_album_gain'       => $this->getR128AlbumGain(),
+			'r128_track_gain'       => $this->getR128TrackGain(),
 		];
 
 		$result['has_art'] = !empty($result['art']);
@@ -280,8 +336,8 @@ class Track extends Entity {
 		$genreId = $this->getGenreId();
 		if ($genreId !== null) {
 			$result[$genreKey] = [[
-				'id' => (string)$genreId,
-				'text' => $this->getGenreNameString($l10n),
+				'id'    => (string)$genreId,
+				'text'  => $this->getGenreNameString($l10n),
 				'count' => 1
 			]];
 		}
@@ -291,7 +347,7 @@ class Track extends Entity {
 			// but we don't have such possibility and this is always just a 1-item array.
 			$result['artists'] = [$result['artist']];
 		}
-	
+
 		return $result;
 	}
 
@@ -302,48 +358,63 @@ class Track extends Entity {
 	 *
 	 * @param string[] $ignoredArticles
 	 * @param bool $legacyCompatibilityMode if true, the `contributors` sub-element is omitted from the result;
-	 * 										DSub would parse the response incorrectly if it had nested `artist` element(s)
+	 *                                      DSub would parse the response incorrectly if it had nested `artist` element(s)
 	 */
 	public function toSubsonicApi(IL10N $l10n, array $ignoredArticles, bool $legacyCompatibilityMode) : array {
 		$albumId = $this->getAlbumId();
 		$album = $this->getAlbum();
 		$hasCoverArt = ($album !== null && !empty($album->getCoverFileId()));
 
-		return [
-			'id' => 'track-' . $this->getId(),
-			'parent' => 'album-' . $albumId,
-			'discNumber' => $this->getDisk(),
-			'title' => $this->getTitle(),
-			'artist' => $this->getArtistNameString($l10n),
-			'isDir' => false,
-			'album' => $this->getAlbumNameString($l10n),
-			'year' => $this->getYear(),
-			'size' => $this->getSize(),
-			'contentType' => $this->getMimetype(),
-			'suffix' => $this->getFileExtension(),
-			'duration' => $this->getLength() ?? 0,
-			'bitRate' => empty($this->getBitrate()) ? null : (int)\round($this->getBitrate()/1000), // convert bps to kbps
-			'path' => $this->getPath(),
-			'isVideo' => false,
-			'albumId' => 'album-' . $albumId,
-			'artistId' => 'artist-' . $this->getArtistId(),
-			'type' => 'music',
-			'mediaType' => 'song', // OpenSubsonic
-			'created' => Util::formatZuluDateTime($this->getCreated()),
-			'track' => $this->getAdjustedTrackNumber(false), // DSub would get confused of playlist numbering, https://github.com/owncloud/music/issues/994
-			'starred' => Util::formatZuluDateTime($this->getStarred()),
-			'userRating' => $this->getRating() ?: null,
-			'averageRating' => $this->getRating() ?: null,
-			'genre' => empty($this->getGenreId()) ? null : $this->getGenreNameString($l10n),
-			'bpm' => $this->getBpm() ?: null, // OpenSubsonic
-			'comment' => $this->getComment() ?: null, // OpenSubsonic
-			'contributors' => $legacyCompatibilityMode ? null : $this->buildContributors(), // OpenSubsonic
+		$result = [
+			'id'              => 'track-' . $this->getId(),
+			'parent'          => 'album-' . $albumId,
+			'discNumber'      => $this->getDisk(),
+			'title'           => $this->getTitle(),
+			'artist'          => $this->getArtistNameString($l10n),
+			'isDir'           => false,
+			'album'           => $this->getAlbumNameString($l10n),
+			'year'            => $this->getYear(),
+			'size'            => $this->getSize(),
+			'contentType'     => $this->getMimetype(),
+			'suffix'          => $this->getFileExtension(),
+			'duration'        => $this->getLength() ?? 0,
+			'bitRate'         => empty($this->getBitrate()) ? null : (int)\round($this->getBitrate() / 1000), // convert bps to kbps
+			'samplingRate'    => $this->getSampleRate(), // OpenSubsonic
+			'path'            => $this->getPath(),
+			'isVideo'         => false,
+			'albumId'         => 'album-' . $albumId,
+			'artistId'        => 'artist-' . $this->getArtistId(),
+			'type'            => 'music',
+			'mediaType'       => 'song', // OpenSubsonic
+			'created'         => Util::formatZuluDateTime($this->getCreated()),
+			'track'           => $this->getAdjustedTrackNumber(false), // DSub would get confused of playlist numbering, https://github.com/nc-music/oc-music/issues/994
+			'starred'         => Util::formatZuluDateTime($this->getStarred()),
+			'userRating'      => $this->getRating() ?: null,
+			'averageRating'   => $this->getRating() ?: null,
+			'genre'           => empty($this->getGenreId()) ? null : $this->getGenreNameString($l10n),
+			'bpm'             => $this->getBpm() ?: null, // OpenSubsonic
+			'comment'         => $this->getComment() ?: null, // OpenSubsonic
+			'contributors'    => $legacyCompatibilityMode ? null : $this->buildContributors(), // OpenSubsonic
 			'displayComposer' => $this->getComposerName() ?: null, // OpenSubsonic
-			'coverArt' => !$hasCoverArt ? null : 'album-' . $albumId,
-			'playCount' => $this->getPlayCount(),
-			'played' => Util::formatZuluDateTime($this->getLastPlayed()) ?? '', // OpenSubsonic
-			'sortName' => StringUtil::splitPrefixAndBasename($this->getTitle(), $ignoredArticles)['basename'], // OpenSubsonic
+			'coverArt'        => !$hasCoverArt ? null : 'album-' . $albumId,
+			'playCount'       => $this->getPlayCount(),
+			'played'          => Util::formatZuluDateTime($this->getLastPlayed()) ?? '', // OpenSubsonic
+			'sortName'        => StringUtil::splitPrefixAndBasename($this->getTitle(), $ignoredArticles)['basename'], // OpenSubsonic
+			'musicBrainzId'   => $this->getMbid(), // OpenSubsonic
+			'replayGain'      => [ // OpenSubsonic
+				'albumGain' => $this->getReplaygainAlbumGain(),
+				'albumPeak' => $this->getReplaygainAlbumPeak(),
+				'trackGain' => $this->getReplaygainTrackGain(),
+				'trackPeak' => $this->getReplaygainTrackPeak(),
+			],
 		];
+
+		// replayGain is removed if it doesn't contain any data
+		if (ArrayUtil::all($result['replayGain'], fn ($val) => \is_null($val))) {
+			$result['replayGain'] = null;
+		}
+
+		return $result;
 	}
 
 	private function buildContributors() : array {
@@ -354,7 +425,7 @@ class Track extends Entity {
 		return $contributors;
 	}
 
-	public function getAdjustedTrackNumber(bool $enablePlaylistNumbering=true) : ?int {
+	public function getAdjustedTrackNumber(bool $enablePlaylistNumbering = true) : ?int {
 		// Unless disabled, the number on playlist overrides the track number if it is set.
 		if ($enablePlaylistNumbering && $this->numberOnPlaylist !== null) {
 			$trackNumber = $this->numberOnPlaylist;

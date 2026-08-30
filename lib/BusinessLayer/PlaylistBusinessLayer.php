@@ -14,7 +14,6 @@ namespace OCA\Music\BusinessLayer;
 
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\Playlist;
 use OCA\Music\Db\PlaylistMapper;
@@ -38,7 +37,7 @@ class PlaylistBusinessLayer extends BusinessLayer {
 	public function __construct(
 		PlaylistMapper $playlistMapper,
 		private TrackMapper $trackMapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($playlistMapper);
 	}
@@ -139,7 +138,7 @@ class PlaylistBusinessLayer extends BusinessLayer {
 	 * get list of Track objects belonging to a given playlist
 	 * @return Track[]
 	 */
-	public function getPlaylistTracks(int $playlistId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function getPlaylistTracks(int $playlistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$trackIds = $this->getPlaylistTrackIds($playlistId, $userId);
 
 		$trackIds = \array_slice($trackIds, \intval($offset), $limit);
@@ -196,13 +195,13 @@ class PlaylistBusinessLayer extends BusinessLayer {
 	 *
 	 * @param string|null $history One of: 'recently-played', 'not-recently-played', 'often-played', 'rarely-played', 'recently-added', 'not-recently-added'
 	 * @param bool $historyStrict In the "strict" mode, there's no element of randomness when applying the history filter and e.g.
-	 *             'recently-played' meas "The most recently played" instead of "Among the most recently played"
+	 *                            'recently-played' meas "The most recently played" instead of "Among the most recently played"
 	 * @param int[] $genres Array of genre IDs
 	 * @param int[] $artists Array of artist IDs
 	 * @param int[] $composers Array of composer IDs
 	 * @param int|null $fromYear Earliest release year to include
 	 * @param int|null $toYear Latest release year to include
-	 * @param string|null $favorite One of: 'track', 'album', 'artists', 'track_album_artist', null
+	 * @param string|null $favorite One of: 'track', 'album', 'artist', 'track_album_artist', null
 	 * @param int $size Size of the playlist to generate, provided that there are enough matching tracks
 	 * @param string $userId the name of the user
 	 */
@@ -219,7 +218,7 @@ class PlaylistBusinessLayer extends BusinessLayer {
 		$playlist->setName('Generated ' . $nowStr);
 		$playlist->setUserId($userId);
 
-		list('sortBy' => $sortBy, 'invert' => $invertSort) = self::sortRulesForHistory($history);
+		['sortBy' => $sortBy, 'invert' => $invertSort] = self::sortRulesForHistory($history);
 		$limit = ($sortBy === SortBy::None) ? null : ($historyStrict ? $size : $size * 4);
 
 		$favoriteMask = self::favoriteMask($favorite);

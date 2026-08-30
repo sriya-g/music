@@ -12,6 +12,19 @@
 
 namespace OCA\Music\Controller;
 
+use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
+use OCA\Music\AppFramework\Core\Logger;
+use OCA\Music\BusinessLayer\AlbumBusinessLayer;
+use OCA\Music\BusinessLayer\ArtistBusinessLayer;
+use OCA\Music\BusinessLayer\PodcastChannelBusinessLayer;
+use OCA\Music\Db\Album;
+use OCA\Music\Db\Artist;
+use OCA\Music\Db\PodcastChannel;
+use OCA\Music\Http\ErrorResponse;
+use OCA\Music\Http\FileResponse;
+use OCA\Music\Service\CoverService;
+use OCA\Music\Utility\HttpUtil;
+use OCA\Music\Utility\StringUtil;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -21,21 +34,6 @@ use OCP\AppFramework\Http\Response;
 use OCP\Files\IRootFolder;
 use OCP\IRequest;
 use OCP\IURLGenerator;
-
-use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
-use OCA\Music\AppFramework\Core\Logger;
-use OCA\Music\BusinessLayer\AlbumBusinessLayer;
-use OCA\Music\BusinessLayer\ArtistBusinessLayer;
-use OCA\Music\BusinessLayer\PodcastChannelBusinessLayer;
-use OCA\Music\Db\Album;
-use OCA\Music\Db\Artist;
-use OCA\Music\Db\Entity;
-use OCA\Music\Db\PodcastChannel;
-use OCA\Music\Http\ErrorResponse;
-use OCA\Music\Http\FileResponse;
-use OCA\Music\Service\CoverService;
-use OCA\Music\Utility\HttpUtil;
-use OCA\Music\Utility\StringUtil;
 
 class CoverApiController extends Controller {
 
@@ -49,7 +47,7 @@ class CoverApiController extends Controller {
 		private PodcastChannelBusinessLayer $podcastChannelBusinessLayer,
 		private CoverService $coverService,
 		private ?string $userId, // null if this gets called after the user has logged out or on a public page
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -57,7 +55,10 @@ class CoverApiController extends Controller {
 	#[PublicPage]
 	#[NoCSRFRequired]
 	public function externalCover(?string $url) : Response {
-		$allowedDomains = ['lastfm.freetls.fastly.net']; // domain used by Last.fm for the album art
+		$allowedDomains = [
+			'lastfm-img.freetls.fastly.net', // domain used by Last.fm for the album art
+			'lastfm.freetls.fastly.net',     // domain previously used by Last.fm, retained just in case it will be used also in the future
+		];
 
 		if (empty($url)) {
 			return new ErrorResponse(Http::STATUS_BAD_REQUEST, 'Required argument "url" missing');
@@ -82,7 +83,7 @@ class CoverApiController extends Controller {
 			$userId = $this->userId ?? $this->coverService->getUserForAccessToken($coverToken);
 			$album = $this->albumBusinessLayer->find($albumId, $userId);
 			return $this->cover($album, $userId, $originalSize);
-		} catch (BusinessLayerException | \OutOfBoundsException $ex) {
+		} catch (BusinessLayerException|\OutOfBoundsException $ex) {
 			$this->logger->debug("Failed to get the requested cover: $ex");
 			return new ErrorResponse(Http::STATUS_NOT_FOUND);
 		}
@@ -95,7 +96,7 @@ class CoverApiController extends Controller {
 			$userId = $this->userId ?? $this->coverService->getUserForAccessToken($coverToken);
 			$artist = $this->artistBusinessLayer->find($artistId, $userId);
 			return $this->cover($artist, $userId, $originalSize);
-		} catch (BusinessLayerException | \OutOfBoundsException $ex) {
+		} catch (BusinessLayerException|\OutOfBoundsException $ex) {
 			$this->logger->debug("Failed to get the requested cover: $ex");
 			return new ErrorResponse(Http::STATUS_NOT_FOUND);
 		}
@@ -108,7 +109,7 @@ class CoverApiController extends Controller {
 			$userId = $this->userId ?? $this->coverService->getUserForAccessToken($coverToken);
 			$channel = $this->podcastChannelBusinessLayer->find($channelId, $userId);
 			return $this->cover($channel, $userId, $originalSize);
-		} catch (BusinessLayerException | \OutOfBoundsException $ex) {
+		} catch (BusinessLayerException|\OutOfBoundsException $ex) {
 			$this->logger->debug("Failed to get the requested cover: $ex");
 			return new ErrorResponse(Http::STATUS_NOT_FOUND);
 		}
@@ -123,7 +124,7 @@ class CoverApiController extends Controller {
 			if ($coverData === null) {
 				throw new \OutOfBoundsException("Cover with hash $hash not found");
 			}
-			$response =  new FileResponse($coverData);
+			$response = new FileResponse($coverData);
 			// instruct also the client-side to cache the result for one year,
 			// this is safe as the resource URI contains the image hash
 			HttpUtil::setClientCachingDays($response, 365);

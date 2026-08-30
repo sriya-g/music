@@ -23,7 +23,7 @@ class StringUtil {
 	 * the number of bytes may not be the same as the number of characters.
 	 * Also null argument may be safely passed and it remains unaltered.
 	 */
-	public static function truncate(?string $string, int $maxBytes, string $trimMarker="\u{2026}") : ?string {
+	public static function truncate(?string $string, int $maxBytes, string $trimMarker = "\u{2026}") : ?string {
 		if ($string === null) {
 			return null;
 		} elseif (\strlen($string) > $maxBytes) {
@@ -37,7 +37,7 @@ class StringUtil {
 	/**
 	 * Test if given string starts with another given string
 	 */
-	public static function startsWith(string $string, string $potentialStart, bool $ignoreCase=false) : bool {
+	public static function startsWith(string $string, string $potentialStart, bool $ignoreCase = false) : bool {
 		$actualStart = \substr($string, 0, \strlen($potentialStart));
 		if ($ignoreCase) {
 			$actualStart = \mb_strtolower($actualStart);
@@ -49,7 +49,7 @@ class StringUtil {
 	/**
 	 * Test if given string ends with another given string
 	 */
-	public static function endsWith(string $string, string $potentialEnd, bool $ignoreCase=false) : bool {
+	public static function endsWith(string $string, string $potentialEnd, bool $ignoreCase = false) : bool {
 		$actualEnd = \substr($string, -\strlen($potentialEnd));
 		if ($ignoreCase) {
 			$actualEnd = \mb_strtolower($actualEnd);

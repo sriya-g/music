@@ -22,8 +22,8 @@ use OCP\IURLGenerator;
 class MusicWidget implements IWidget {
 
 	public function __construct(
-		private IL10N $l10n, 
-		private IURLGenerator $urlGenerator
+		private IL10N $l10n,
+		private IURLGenerator $urlGenerator,
 	) {
 	}
 

@@ -86,7 +86,7 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		return isset($data['valid']) && $data['valid'] === true;
 	}
 
-	public function recordTrackPlayed(Track $track, ?DateTime $timeOfPlay = null) : void {
+	public function recordTrackPlayed(Track $track, ?DateTime $timeOfPlay = null, ?string $client = null) : void {
 		$timeOfPlay = $timeOfPlay ?? new DateTime();
 		$userId = $track->getUserId();
 		$sessionKey = $this->getApiSession($userId);
@@ -147,7 +147,7 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		$this->submitListen($sessionKey, $payloadData);
 	}
 
-	public function setNowPlaying(Track $track, ?DateTime $timeOfPlay = null) : void {
+	public function setNowPlaying(Track $track, ?DateTime $timeOfPlay = null, ?string $client = null) : void {
 		$userId = $track->getUserId();
 		$sessionKey = $this->getApiSession($userId);
 		if (!$sessionKey) {

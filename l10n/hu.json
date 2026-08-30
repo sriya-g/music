@@ -346,7 +346,7 @@
     "Update" : "Frissítés",
     "Update date" : "Frissítés dátuma",
     "Upload image named \"{{name}}\" to anywhere within your library path to see it here." : "Töltsön fel egy „{{name}}” nevű képet a könyvtárútvonalán belül bárhol, hogy itt láthassa.",
-    "Upload music in the files app to listen to it here" : "Töltse fel zenéit a Fájlok alkalmazásban, hogy itt hallgassa",
+    "Upload music in the Files app to listen to it here" : "Töltse fel zenéit a Fájlok alkalmazásban, hogy itt hallgassa",
     "Use the following credentials to connect to this Ampache/Subsonic instance." : "Használja a következő hitelesítési adatokat ehhez az Ampache/Subsonic kiszolgálóhoz csatlakozáshoz.",
     "Use this address to browse your music collection from a Subsonic compatible player." : "Ezt a címet használva a zenegyűjtemény bármely Subsonic-kompatibilis lejátszóval böngészhető.",
     "Use this address to browse your music collection from an Ampache compatible player." : "Ezt a címet használva a zenegyűjtemény bármely Ampache-kompatibilis lejátszóval böngészhető.",

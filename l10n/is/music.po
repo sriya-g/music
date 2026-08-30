@@ -136,7 +136,7 @@ msgid "Unknown artist"
 msgstr "Óþekktur flytjandi"
 
 #: ../templates/main.php:135
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "Sendu inn tónlist í skráaforritinu til að hlusta á hana hér"
 
 #: ../templates/fake-template.php:12

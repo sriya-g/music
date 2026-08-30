@@ -16,16 +16,15 @@ namespace OCA\Music\BusinessLayer;
 
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\Artist;
 use OCA\Music\Db\ArtistMapper;
 use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\SortBy;
+use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\LocalCacheTrait;
 use OCA\Music\Utility\StringUtil;
-
-use OCP\IL10N;
 use OCP\Files\File;
+use OCP\IL10N;
 
 /**
  * Base class functions with the actually used inherited types to help IDE and Scrutinizer:
@@ -44,7 +43,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 
 	public function __construct(
 		ArtistMapper $artistMapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($artistMapper);
 	}
@@ -59,9 +58,9 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * @param string|null $updatedMax Optional maximum `updated` timestamp.
 	 * @return Artist[] artists
 	 */
-	public function findAllHavingAlbums(string $userId, int $sortBy=SortBy::Name,
-			?int $limit=null, ?int $offset=null, ?string $name=null, int $matchMode=MatchMode::Exact,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+	public function findAllHavingAlbums(string $userId, int $sortBy = SortBy::Name,
+			?int $limit = null, ?int $offset = null, ?string $name = null, int $matchMode = MatchMode::Exact,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		return $this->mapper->findAllHavingAlbums(
 			$userId, $sortBy, $limit, $offset, $name, $matchMode, $createdMin, $createdMax, $updatedMin, $updatedMax);
 	}
@@ -76,9 +75,9 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * @param string|null $updatedMax Optional maximum `updated` timestamp.
 	 * @return Artist[] artists
 	 */
-	public function findAllHavingTracks(string $userId, int $sortBy=SortBy::Name,
-			?int $limit=null, ?int $offset=null, ?string $name=null, int $matchMode=MatchMode::Exact,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+	public function findAllHavingTracks(string $userId, int $sortBy = SortBy::Name,
+			?int $limit = null, ?int $offset = null, ?string $name = null, int $matchMode = MatchMode::Exact,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		return $this->mapper->findAllHavingTracks(
 			$userId, $sortBy, $limit, $offset, $name, $matchMode, $createdMin, $createdMax, $updatedMin, $updatedMax);
 	}
@@ -87,15 +86,23 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * Returns all artists filtered by genre
 	 * @return Artist[] artists
 	 */
-	public function findAllByGenre(int $genreId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByGenre(int $genreId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findAllByGenre($genreId, $userId, $limit, $offset);
+	}
+
+	/**
+	 * Returns all artists filtered by record label
+	 * @return Artist[] artists
+	 */
+	public function findAllByRecordLabel(int $labelId, string $userId, ?int $limit = null, ?int $offset = null) : array {
+		return $this->mapper->findAllByRecordLabel($labelId, $userId, $limit, $offset);
 	}
 
 	/**
 	 * Find most frequently played artists, judged by the total play count of the contained tracks
 	 * @return Artist[]
 	 */
-	public function findFrequentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findFrequentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$countsPerArtist = $this->mapper->getArtistTracksPlayCount($userId, $limit, $offset);
 		$ids = \array_keys($countsPerArtist);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -105,7 +112,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * Find most recently played artists
 	 * @return Artist[]
 	 */
-	public function findRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$playTimePerArtist = $this->mapper->getLatestArtistPlayTimes($userId, $limit, $offset);
 		$ids = \array_keys($playTimePerArtist);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -115,7 +122,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * Find least recently played artists
 	 * @return Artist[]
 	 */
-	public function findNotRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findNotRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$playTimePerArtist = $this->mapper->getFurthestArtistPlayTimes($userId, $limit, $offset);
 		$ids = \array_keys($playTimePerArtist);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -123,17 +130,40 @@ class ArtistBusinessLayer extends BusinessLayer {
 
 	/**
 	 * Adds an artist if it does not exist already or updates an existing artist
-	 * @param string|null $name the name of the artist
+	 * @param ?string $name the name of the artist
+	 * @param ?string $mbid the MusicBrainz Id of the artist (non-null values must be normalized to all lowercase, 1..36 ASCII chars)
 	 * @param string $userId the name of the user
 	 * @return Artist The added/updated artist
 	 */
-	public function addOrUpdateArtist(?string $name, string $userId) : Artist {
-		return $this->cachedGet($userId, $name, function() use ($name, $userId) {
+	public function addOrUpdateArtist(?string $name, ?string $mbid, string $userId) : Artist {
+		$name = StringUtil::truncate($name, 256); // some DB setups can't truncate automatically to column max size
+		$hash = \hash('md5', \mb_strtolower($name ?? ''));
+
+		return $this->cachedGet($userId, $mbid ?? $hash, function () use ($name, $mbid, $hash, $userId) {
 			$artist = new Artist();
-			$artist->setName(StringUtil::truncate($name, 256)); // some DB setups can't truncate automatically to column max size
+			$artist->setName($name);
+			$artist->setMbid($mbid);
 			$artist->setUserId($userId);
-			$artist->setHash(\hash('md5', \mb_strtolower($name ?? '')));
-			return $this->mapper->updateOrInsert($artist);
+			$artist->setHash($hash);
+
+			$existingIdsForName = $this->mapper->findIdsAndMbidsByHash($hash, $userId);
+
+			if ($mbid !== null) {
+				if ($mbidMatch = ArrayUtil::find($existingIdsForName, fn ($row) => $row['mbid'] === $mbid || $row['mbid'] === null)) {
+					// DB already has artist with this MBID or no MBID, update it
+					$artist->setId($mbidMatch['id']);
+					return $this->mapper->update($artist);
+				}
+			} elseif (!empty($existingIdsForName)) {
+				// the input has no MBID but the DB has at least one artist with matching name (which may or may not have MBID),
+				// merge the input with the first such artist
+				$artist->setId($existingIdsForName[0]['id']);
+				return $this->mapper->update($artist);
+			}
+			// TODO: Should we combine artists who have different name but same MBID (likely an artist whose credited name varies between works)
+
+			// no existing artist with the same MBID or name
+			return $this->mapper->insertOrUpdate($artist);
 		});
 	}
 
@@ -143,7 +173,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * @param File $imageFile
 	 * @param string $userId
 	 * @return int[] IDs of the modified artists; usually there should be 0 or 1 of these but
-	 *					in some special occasions there could be more
+	 *               in some special occasions there could be more
 	 */
 	public function updateCover(File $imageFile, string $userId, IL10N $l10n) : array {
 		$name = \pathinfo($imageFile->getName(), PATHINFO_FILENAME);
@@ -210,7 +240,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 	 * @param string[]|null $userIds the users whose music library is targeted; all users are targeted if omitted
 	 * @return Artist[] artists which got modified, empty array if none
 	 */
-	public function removeCovers(array $coverFileIds, ?array $userIds=null) : array {
+	public function removeCovers(array $coverFileIds, ?array $userIds = null) : array {
 		return $this->mapper->removeCovers($coverFileIds, $userIds);
 	}
 
@@ -227,7 +257,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 
 		$potentialMatches = $this->findAllByName($name, $userId, MatchMode::Wildcards);
 
-		$matches = \array_filter($potentialMatches, fn(Artist $artist) => self::filenameMatchesArtist($name, $artist, $l10n));
+		$matches = \array_filter($potentialMatches, fn (Artist $artist) => self::filenameMatchesArtist($name, $artist, $l10n));
 
 		if ($name == Artist::unknownNameString($l10n)) {
 			$matches = \array_merge($matches, $this->findAllByName(null, $userId));

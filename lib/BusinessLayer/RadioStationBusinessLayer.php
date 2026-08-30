@@ -15,10 +15,9 @@ namespace OCA\Music\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\MatchMode;
-use OCA\Music\Db\RadioStationMapper;
 use OCA\Music\Db\RadioStation;
+use OCA\Music\Db\RadioStationMapper;
 use OCA\Music\Db\SortBy;
 use OCA\Music\Utility\StringUtil;
 
@@ -34,7 +33,7 @@ class RadioStationBusinessLayer extends BusinessLayer {
 
 	public function __construct(
 		RadioStationMapper $mapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($mapper);
 	}

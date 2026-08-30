@@ -216,7 +216,7 @@
     "Unknown artist" : "未知艺术家",
     "Unlike the other settings, this switch is stored per browser and not per user account." : "与其他设置不同，这个开关是按浏览器存储的，而不是按用户帐户存储的。",
     "Upload image named \"{{name}}\" to anywhere within your library path to see it here." : "将名为“{{name}}”的图像上传到资料库路径内的任何地方，以便在此处查看。",
-    "Upload music in the files app to listen to it here" : "在文件应用中上传音乐，以便在此欣赏",
+    "Upload music in the Files app to listen to it here" : "在文件应用中上传音乐，以便在此欣赏",
     "Upload the previously obtained PLS file to your cloud using the Files app." : "使用文件应用将已经获得的PLS文件上传到云中。",
     "Use the Community Radio Browser <a href=\"{{url}}\" target=\"_blank\">search</a> to find the radio stations of interest. Instead of using the search, you may also browse the channels in Community Radio Browser by category or popularity." : "使用社区电台浏览器<a href=\"{{url}}\" target=\"_blank\">搜索</a>找到感兴趣的电台。您也可以按类别或受欢迎程度浏览社区无线电浏览器中的频道，而不使用搜索。",
     "Use the following credentials to connect to this Ampache/Subsonic instance." : "使用以下凭据连接到此Ampache/Subsonic实例。",

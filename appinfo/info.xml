@@ -22,7 +22,7 @@
 	<author>Pauli Järvinen (current author)</author>
 	<author>Morris Jobke (original author)</author>
 	<author>Jan-Christoph Borchardt (original design)</author>
-	<version>3.1.1</version>
+	<version>3.2.0-beta2</version>
 	<category>multimedia</category>
 	<screenshot>https://github.com/user-attachments/assets/747ebc2b-0ca2-4ada-a73c-ab4790e6c4b1</screenshot>
 	<screenshot>https://github.com/user-attachments/assets/fb3bb669-c5d2-44f0-8766-5bfba29de439</screenshot>
@@ -36,7 +36,7 @@
 	<repository type="git">https://github.com/nc-music/music.git</repository>
 	<dependencies>
 		<php min-version="8.0" max-version="8.5"/>
-		<nextcloud min-version="28" max-version="34" />
+		<nextcloud min-version="28" max-version="35" />
 	</dependencies>
 	<types>
 		<!-- update metadata cache when create/update/delete a file -->
@@ -48,7 +48,6 @@
 		</pre-migration>
 		<post-migration>
 			<step>OCA\Music\Migration\BogusTrackRemoval</step>
-			<step>OCA\Music\Migration\DiskNumberMigration</step>
 			<step>OCA\Music\Migration\RegisterBackgroundJobs</step>
 			<step>OCA\Music\Migration\TimestampInit</step>
 		</post-migration>

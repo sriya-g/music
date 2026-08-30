@@ -28,7 +28,7 @@ class BookmarkMapper extends BaseMapper {
 	}
 
 	public function findByEntry(int $type, int $entryId, string $userId) : Bookmark {
-		$sql = $this->selectUserEntities("`type` = ? AND `entry_id` = ?");
+		$sql = $this->selectUserEntities('`type` = ? AND `entry_id` = ?');
 		return $this->findEntity($sql, [$userId, $type, $entryId]);
 	}
 }

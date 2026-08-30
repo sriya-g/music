@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Nextcloud Music app
  *
@@ -29,6 +30,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
+
 namespace OCA\Music\AppFramework\Db;
 
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -54,7 +56,7 @@ abstract class Mapper {
 	public function __construct(
 		protected IDBConnection $db,
 		protected string $tableName,
-		protected ?string $entityClass=null
+		protected ?string $entityClass = null,
 	) {
 		$this->tableName = '*PREFIX*' . $tableName;
 
@@ -116,7 +118,7 @@ abstract class Mapper {
 			$values .= '?';
 
 			// only append colon if there are more entries
-			if ($i < \count($properties)-1) {
+			if ($i < \count($properties) - 1) {
 				$columns .= ',';
 				$values .= ',';
 			}
@@ -125,12 +127,12 @@ abstract class Mapper {
 			$i++;
 		}
 
-		$sql = 'INSERT INTO `' . $this->tableName . '`(' .
-				$columns . ') VALUES(' . $values . ')';
+		$sql = 'INSERT INTO `' . $this->tableName . '`('
+				. $columns . ') VALUES(' . $values . ')';
 
 		$stmt = $this->execute($sql, $params);
 
-		$entity->setId((int) $this->db->lastInsertId($this->tableName));
+		$entity->setId((int)$this->db->lastInsertId($this->tableName));
 
 		$stmt->closeCursor();
 
@@ -178,7 +180,7 @@ abstract class Mapper {
 			$columns .= '`' . $column . '` = ?';
 
 			// only append colon if there are more entries
-			if ($i < \count($properties)-1) {
+			if ($i < \count($properties) - 1) {
 				$columns .= ',';
 			}
 
@@ -186,8 +188,8 @@ abstract class Mapper {
 			$i++;
 		}
 
-		$sql = 'UPDATE `' . $this->tableName . '` SET ' .
-				$columns . ' WHERE `id` = ?';
+		$sql = 'UPDATE `' . $this->tableName . '` SET '
+				. $columns . ' WHERE `id` = ?';
 		$params[] = $id;
 
 		$stmt = $this->execute($sql, $params);
@@ -232,7 +234,7 @@ abstract class Mapper {
 	 * @return \OCP\DB\IResult the database query result
 	 * @since 7.0.0
 	 */
-	protected function execute($sql, array $params=[], $limit=null, $offset=null) : \OCP\DB\IResult {
+	protected function execute($sql, array $params = [], $limit = null, $offset = null) : \OCP\DB\IResult {
 		$query = $this->db->prepare($sql, $limit, $offset);
 
 		if ($this->isAssocArray($params)) {
@@ -265,7 +267,7 @@ abstract class Mapper {
 	 * @return array the result as row
 	 * @since 7.0.0
 	 */
-	protected function findOneQuery($sql, array $params=[], $limit=null, $offset=null) {
+	protected function findOneQuery($sql, array $params = [], $limit = null, $offset = null) {
 		$stmt = $this->execute($sql, $params, $limit, $offset);
 		$row = $stmt->fetch();
 
@@ -309,12 +311,12 @@ abstract class Mapper {
 	 * @return string formatted error message string
 	 * @since 9.1.0
 	 */
-	private function buildDebugMessage($msg, $sql, array $params=[], $limit=null, $offset=null) {
-		return $msg .
-					': query "' .	$sql . '"; ' .
-					'parameters ' . \print_r($params, true) . '; ' .
-					'limit "' . $limit . '"; '.
-					'offset "' . $offset . '"';
+	private function buildDebugMessage($msg, $sql, array $params = [], $limit = null, $offset = null) {
+		return $msg
+					. ': query "' . $sql . '"; '
+					. 'parameters ' . \print_r($params, true) . '; '
+					. 'limit "' . $limit . '"; '
+					. 'offset "' . $offset . '"';
 	}
 
 	/**
@@ -326,7 +328,7 @@ abstract class Mapper {
 	 * @since 7.0.0
 	 */
 	protected function mapRowToEntity($row) {
-		return \call_user_func($this->entityClass .'::fromRow', $row);
+		return \call_user_func($this->entityClass . '::fromRow', $row);
 	}
 
 	/**
@@ -339,7 +341,7 @@ abstract class Mapper {
 	 * @phpstan-return EntityType[]
 	 * @since 7.0.0
 	 */
-	protected function findEntities($sql, array $params=[], $limit=null, $offset=null) {
+	protected function findEntities($sql, array $params = [], $limit = null, $offset = null) {
 		$stmt = $this->execute($sql, $params, $limit, $offset);
 
 		$entities = [];
@@ -366,7 +368,7 @@ abstract class Mapper {
 	 * @phpstan-return EntityType
 	 * @since 7.0.0
 	 */
-	protected function findEntity($sql, array $params=[], $limit=null, $offset=null) {
+	protected function findEntity($sql, array $params = [], $limit = null, $offset = null) {
 		return $this->mapRowToEntity($this->findOneQuery($sql, $params, $limit, $offset));
 	}
 }

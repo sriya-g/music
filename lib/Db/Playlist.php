@@ -90,55 +90,55 @@ class Playlist extends Entity {
 
 	public function toApi(IURLGenerator $urlGenerator) : array {
 		return [
-			'name' => $this->getName(),
+			'name'     => $this->getName(),
 			'trackIds' => $this->getTrackIdsAsArray(),
-			'id' => $this->getId(),
-			'created' => $this->getCreated(),
-			'updated' => $this->getUpdated(),
-			'comment' => $this->getComment(),
-			'cover' => $this->getCoverUrl($urlGenerator)
+			'id'       => $this->getId(),
+			'created'  => $this->getCreated(),
+			'updated'  => $this->getUpdated(),
+			'comment'  => $this->getComment(),
+			'cover'    => $this->getCoverUrl($urlGenerator)
 		];
 	}
 
 	public function toShivaApi(IURLGenerator $urlGenerator) : array {
 		$trackIds = $this->getTrackIdsAsArray();
 		return [
-			'name' => $this->getName(),
+			'name'   => $this->getName(),
 			'length' => \count($trackIds),
-			'tracks' => \array_map(fn($id, $index) => [
-				'id' => $id,
+			'tracks' => \array_map(fn ($id, $index) => [
+				'id'    => $id,
 				'index' => $index,
-				'uri' => $urlGenerator->linkToRoute('music.shivaApi.track', ['id' => $id])
+				'uri'   => $urlGenerator->linkToRoute('music.shivaApi.track', ['id' => $id])
 			], $trackIds, \array_keys($trackIds)),
-			'id' => $this->getId(),
+			'id'            => $this->getId(),
 			'creation_date' => $this->getCreated()
 		];
 	}
 
 	public function toAmpacheApi(callable $createImageUrl, bool $includeTracks) : array {
 		$result = [
-			'id' => (string)$this->getId(),
-			'name' => $this->getName(),
+			'id'    => (string)$this->getId(),
+			'name'  => $this->getName(),
 			'owner' => $this->getUserId(),
-			'user' => [
-				'id' => $this->getUserId(),
+			'user'  => [
+				'id'       => $this->getUserId(),
 				'username' => $this->getUserId()
 			],
-			'art' => $createImageUrl($this),
-			'flag' => !empty($this->getStarred()),
-			'rating' => $this->getRating(),
-			'type' => 'Private',
-			'has_access' => !$this->getReadOnly(),
+			'art'             => $createImageUrl($this),
+			'flag'            => !empty($this->getStarred()),
+			'rating'          => $this->getRating(),
+			'type'            => 'Private',
+			'has_access'      => !$this->getReadOnly(),
 			'has_collaborate' => !$this->getReadOnly(),
-			'last_update' => \strtotime($this->getUpdated() ?? ''),
-			'md5' => $this->getTrackIdsHash()
+			'last_update'     => \strtotime($this->getUpdated() ?? ''),
+			'md5'             => $this->getTrackIdsHash()
 		];
 		$result['has_art'] = !empty($result['art']);
 
 		if ($includeTracks) {
 			$ids = $this->getTrackIdsAsArray();
-			$result['items'] = ['playlisttrack' => \array_map(fn(int $trackId, int $index) => [
-				'id' => (string)$trackId,
+			$result['items'] = ['playlisttrack' => \array_map(fn (int $trackId, int $index) => [
+				'id'   => (string)$trackId,
 				'text' => $index + 1
 			], $ids, \array_keys($ids))];
 		} else {
@@ -150,16 +150,16 @@ class Playlist extends Entity {
 
 	public function toSubsonicApi() : array {
 		return [
-			'id' => (string)$this->getId(),
-			'name' => $this->getName(),
-			'owner' => $this->userId,
-			'public' => false,
+			'id'        => (string)$this->getId(),
+			'name'      => $this->getName(),
+			'owner'     => $this->userId,
+			'public'    => false,
 			'songCount' => $this->getTrackCount(),
-			'duration' => $this->getDuration(),
-			'comment' => $this->getComment() ?: '',
-			'created' => Util::formatZuluDateTime($this->getCreated()),
-			'changed' => Util::formatZuluDateTime($this->getUpdated()),
-			'coverArt' => 'pl-' . $this->getId() // work around: DSub always fetches the art using ID like "pl-NNN" even if we would use some other format here
+			'duration'  => $this->getDuration(),
+			'comment'   => $this->getComment() ?: '',
+			'created'   => Util::formatZuluDateTime($this->getCreated()),
+			'changed'   => Util::formatZuluDateTime($this->getUpdated()),
+			'coverArt'  => 'pl-' . $this->getId() // work around: DSub always fetches the art using ID like "pl-NNN" even if we would use some other format here
 		];
 	}
 

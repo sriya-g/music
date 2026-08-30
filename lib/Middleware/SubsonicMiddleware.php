@@ -12,16 +12,16 @@
 
 namespace OCA\Music\Middleware;
 
-use OCP\IRequest;
-use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http\Response;
-use OCP\AppFramework\Middleware;
-
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\Controller\SubsonicController;
 use OCA\Music\Db\AmpacheUserMapper;
+use OCA\Music\Service\LibraryFolderException;
 use OCA\Music\Utility\StringUtil;
+use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Response;
+use OCP\AppFramework\Middleware;
+use OCP\IRequest;
 
 /**
  * Checks the authentication on each Subsonic API call before the
@@ -170,6 +170,8 @@ class SubsonicMiddleware extends Middleware {
 				);
 			} elseif ($exception instanceof BusinessLayerException) {
 				return $controller->subsonicErrorResponse(70, 'Entity not found');
+			} elseif ($exception instanceof LibraryFolderException) {
+				return $controller->subsonicErrorResponse(70, $exception->getMessage());
 			}
 		}
 		throw $exception;

@@ -69,7 +69,7 @@ class FilesUtil {
 		$relativeParts = \explode('/', $relativePath);
 
 		// get rid of the trailing empty part of CWD which appears when CWD has a trailing '/'
-		if ($cwdParts[\count($cwdParts)-1] === '') {
+		if ($cwdParts[\count($cwdParts) - 1] === '') {
 			\array_pop($cwdParts);
 		}
 
@@ -86,11 +86,11 @@ class FilesUtil {
 
 	/**
 	 * @param ?string[] $validExtensions If defined, the output file is checked to have one of these extensions.
-	 * 									If the extension is not already present, the first extension of the array
-	 * 									is appended to the filename.
+	 *                                   If the extension is not already present, the first extension of the array
+	 *                                   is appended to the filename.
 	 * @return string Sanitized file name
 	 */
-	public static function sanitizeFileName(string $filename, ?array $validExtensions=null) : string {
+	public static function sanitizeFileName(string $filename, ?array $validExtensions = null) : string {
 		// File names cannot contain the '/' character on Linux
 		$filename = \str_replace('/', '-', $filename);
 
@@ -128,10 +128,10 @@ class FilesUtil {
 	 * @param Folder $targetFolder target parent folder
 	 * @param string $filename target file name
 	 * @param string $collisionMode action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                              supported values:
+	 *                              - 'overwrite' The existing file will be overwritten
+	 *                              - 'keepboth' The new file is named with a suffix to make it unique
+	 *                              - 'abort' (default) The operation will fail
 	 * @return File the newly created file
 	 * @throws FileExistsException on name conflict if $collisionMode == 'abort'
 	 * @throws \OCP\Files\NotPermittedException if the user is not allowed to write to the given folder

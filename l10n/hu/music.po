@@ -1770,7 +1770,7 @@ msgstr ""
 "itt láthassa."
 
 #: templates/main.php:47
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "Töltse fel zenéit a Fájlok alkalmazásban, hogy itt hallgassa"
 
 #: templates/partials/views/settingsview.php:172

@@ -1,4 +1,4 @@
-<li class="music-navigation-item" ng-class="{ 'active': $parent.currentView == destination }">
+<li class="music-navigation-item" ng-class="{ 'active': $parent.getCurrentViewId() == destination }">
 	<div class="music-navigation-item-content" ng-click="$parent.navigateTo(destination)"
 		ng-class="{current: $parent.playingView == destination, playing: $parent.playing}"
 	>

@@ -135,7 +135,7 @@ msgid "Unknown artist"
 msgstr "အမည်မသိ အဆိုတော်"
 
 #: ../templates/main.php:135
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr ""
 
 #: ../templates/fake-template.php:12

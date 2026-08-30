@@ -14,11 +14,10 @@
 
 namespace OCA\Music\Controller;
 
+use OCA\Music\DB\Track;
 use OCA\Music\Service\Scrobbling\IScrobbler;
 use OCA\Music\Tests\Utility\ControllerTestUtility;
 use OCP\AppFramework\Http\JSONResponse;
-
-use OCA\Music\DB\Track;
 
 class MusicApiControllerTest extends ControllerTestUtility {
 	private $trackBusinessLayer;
@@ -29,7 +28,6 @@ class MusicApiControllerTest extends ControllerTestUtility {
 	private $userId = 'john';
 	private $appname = 'music';
 	private $scanner;
-	private $coverService;
 	private $fileSystemService;
 	private $detailsService;
 	private $lastfmService;
@@ -51,9 +49,6 @@ class MusicApiControllerTest extends ControllerTestUtility {
 			->disableOriginalConstructor()
 			->getMock();
 		$this->collectionService = $this->getMockBuilder('\OCA\Music\Service\CollectionService')
-			->disableOriginalConstructor()
-			->getMock();
-		$this->coverService = $this->getMockBuilder('\OCA\Music\Service\CoverService')
 			->disableOriginalConstructor()
 			->getMock();
 		$this->detailsService = $this->getMockBuilder('\OCA\Music\Service\DetailsService')
@@ -81,7 +76,6 @@ class MusicApiControllerTest extends ControllerTestUtility {
 			$this->genreBusinessLayer,
 			$this->scanner,
 			$this->collectionService,
-			$this->coverService,
 			$this->detailsService,
 			$this->fileSystemService,
 			$this->lastfmService,
@@ -117,14 +111,14 @@ class MusicApiControllerTest extends ControllerTestUtility {
 			->will($this->returnValue($track));
 
 		$result = [
-			'title' => 'The title',
-			'id' => 1,
-			'number' => 4,
-			'disk' => 1,
-			'artistId' => 3,
+			'title'      => 'The title',
+			'id'         => 1,
+			'number'     => 4,
+			'disk'       => 1,
+			'artistId'   => 3,
 			'composerId' => 55,
-			'length' => 123,
-			'files' => [
+			'length'     => 123,
+			'files'      => [
 				'audio/mp3' => $fileId
 			]
 		];

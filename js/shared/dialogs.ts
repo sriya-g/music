@@ -74,10 +74,8 @@ OCA.Music.Dialogs = class {
 
 		// Setting the default value requires major hacking because the spawning is an asynchronous operation,
 		// involving loading a new JS file at least on newer NC versions.
-		OCA.Music.Utils.executeOnceRefAvailable(
-			getInputEl,
-			(inputElem : HTMLInputElement) => $(inputElem).val(defaultValue),
-			100
+		OCA.Music.Utils.getValueOnceAvailable(getInputEl, 100).then(
+			(inputElem : HTMLInputElement) => $(inputElem).val(defaultValue)
 		);
 	}
 

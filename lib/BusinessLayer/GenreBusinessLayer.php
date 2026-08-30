@@ -14,7 +14,6 @@ namespace OCA\Music\BusinessLayer;
 
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\Genre;
 use OCA\Music\Db\GenreMapper;
 use OCA\Music\Db\MatchMode;
@@ -38,7 +37,7 @@ class GenreBusinessLayer extends BusinessLayer {
 	public function __construct(
 		GenreMapper $genreMapper,
 		private TrackMapper $trackMapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($genreMapper);
 	}
@@ -63,7 +62,7 @@ class GenreBusinessLayer extends BusinessLayer {
 	 * Returns all genres of the user, along with the contained track IDs
 	 * @return Genre[] where each instance has also the trackIds property set
 	 */
-	public function findAllWithTrackIds(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllWithTrackIds(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$genres = $this->findAll($userId, SortBy::Name, $limit, $offset);
 		$tracksByGenre = $this->trackMapper->mapGenreIdsToTrackIds($userId);
 

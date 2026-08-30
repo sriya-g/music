@@ -19,7 +19,7 @@ class Random {
 
 	public function __construct(
 		private Cache $cache,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 

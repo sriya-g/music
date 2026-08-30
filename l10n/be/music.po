@@ -1819,7 +1819,7 @@ msgstr ""
 "бібліятэкі, каб убачыць яго тут."
 
 #: templates/main.php:47
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "Запампуйце музыку ў праграму Файлы, каб слухаць яе тут"
 
 #: templates/partials/views/settingsview.php:172

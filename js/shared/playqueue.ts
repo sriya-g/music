@@ -93,6 +93,10 @@ export class PlayQueue {
 	 * -------------------------------
 	 */
 
+	isEmpty() : boolean {
+		return (this.#list === null);
+	}
+
 	getShuffle() : boolean {
 		return this.#shuffle;
 	}
@@ -247,12 +251,11 @@ export class PlayQueue {
 		this.#eventDispatcher.trigger(name, ...args);
 	}
 
-	subscribe(name : string, listener : (...args: any[]) => any, context : any = null) : void {
-		// the context must be supplied if there is ever a need to unsubscribe
+	subscribe(name : string, context : any, listener : (...args: any[]) => any) : void {
 		this.#eventDispatcher.on(name, listener, context);
 	}
 
-	unsubscribeAll(context : any) {
-		this.#eventDispatcher.off(null, null, context);
+	unsubscribe(name : string, context : any) {
+		this.#eventDispatcher.off(name, null, context);
 	}
 }

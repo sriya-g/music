@@ -5,15 +5,32 @@
  * later. See the COPYING file.
  *
  * @author Matthew Wells
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright Matthew Wells 2026
+ * @copyright Pauli Järvinen 2026
  */
 
 #admin-music {
-	margin-top: 40px;
+	margin: 40px;
 }
 
-#admin-music .scrobblers > div {
-	padding: 0 30px 30px;
+/** Normalize the heading style across the NC versions. These rules are copied from NC34. */
+#admin-music h1,
+#admin-music h2,
+#admin-music h3,
+#admin-music h4 {
+	font-weight: 600;
+	line-height: 1.5;
+	margin-top: 24px;
+	margin-bottom: 12px;
+}
+
+#admin-music h2 {
+	font-size: 20px;
+}
+
+#admin-music h3 {
+	font-size: 18px;
 }
 
 #admin-music .settings-section:not(:last-child) {

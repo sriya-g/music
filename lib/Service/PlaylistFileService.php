@@ -22,7 +22,6 @@ use OCA\Music\Db\SortBy;
 use OCA\Music\Db\Track;
 use OCA\Music\Utility\FilesUtil;
 use OCA\Music\Utility\StringUtil;
-
 use OCP\Files\File;
 use OCP\Files\Folder;
 
@@ -41,7 +40,7 @@ class PlaylistFileService {
 		private RadioStationBusinessLayer $radioStationBusinessLayer,
 		private TrackBusinessLayer $trackBusinessLayer,
 		private StreamTokenService $tokenService,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -53,10 +52,10 @@ class PlaylistFileService {
 	 * @param string $folderPath target parent folder path
 	 * @param ?string $filename target file name, omit to use the list name
 	 * @param string $collisionMode action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                              supported values:
+	 *                              - 'overwrite' The existing file will be overwritten
+	 *                              - 'keepboth' The new file is named with a suffix to make it unique
+	 *                              - 'abort' (default) The operation will fail
 	 * @return string path of the written file
 	 * @throws BusinessLayerException if playlist with ID not found
 	 * @throws \OCP\Files\NotFoundException if the $folderPath is not a valid folder
@@ -64,7 +63,7 @@ class PlaylistFileService {
 	 * @throws \OCP\Files\NotPermittedException if the user is not allowed to write to the given folder
 	 */
 	public function exportToFile(
-			int $id, string $userId, Folder $userFolder, string $folderPath, ?string $filename=null, string $collisionMode='abort') : string {
+			int $id, string $userId, Folder $userFolder, string $folderPath, ?string $filename = null, string $collisionMode = 'abort') : string {
 		$playlist = $this->playlistBusinessLayer->find($id, $userId);
 		$tracks = $this->playlistBusinessLayer->getPlaylistTracks($id, $userId);
 		$targetFolder = FilesUtil::getFolderFromRelativePath($userFolder, $folderPath);
@@ -95,17 +94,17 @@ class PlaylistFileService {
 	 * @param string $folderPath target parent folder path
 	 * @param string $filename target file name
 	 * @param string $collisionMode action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                              supported values:
+	 *                              - 'overwrite' The existing file will be overwritten
+	 *                              - 'keepboth' The new file is named with a suffix to make it unique
+	 *                              - 'abort' (default) The operation will fail
 	 * @return string path of the written file
 	 * @throws \OCP\Files\NotFoundException if the $folderPath is not a valid folder
 	 * @throws FileExistsException on name conflict if $collisionMode == 'abort'
 	 * @throws \OCP\Files\NotPermittedException if the user is not allowed to write to the given folder
 	 */
 	public function exportRadioStationsToFile(
-			string $userId, Folder $userFolder, string $folderPath, string $filename, string $collisionMode='abort') : string {
+			string $userId, Folder $userFolder, string $folderPath, string $filename, string $collisionMode = 'abort') : string {
 		$targetFolder = FilesUtil::getFolderFromRelativePath($userFolder, $folderPath);
 
 		$filename = FilesUtil::sanitizeFileName($filename, ['m3u8', 'm3u']);
@@ -134,14 +133,14 @@ class PlaylistFileService {
 	 * 						- 'append' (default) Append the imported tracks after the existing tracks on the list
 	 * 						- 'overwrite' Replace any previous tracks on the list with the imported tracks
 	 * @return array with three keys:
-	 * 			- 'playlist': The Playlist entity after the modification
-	 * 			- 'imported_count': An integer showing the number of tracks imported
-	 * 			- 'failed_count': An integer showing the number of tracks in the file which could not be imported
+	 *               - 'playlist': The Playlist entity after the modification
+	 *               - 'imported_count': An integer showing the number of tracks imported
+	 *               - 'failed_count': An integer showing the number of tracks in the file which could not be imported
 	 * @throws BusinessLayerException if playlist with ID not found
 	 * @throws \OCP\Files\NotFoundException if the $filePath is not a valid file
 	 * @throws \UnexpectedValueException if the $filePath points to a file of unsupported type
 	 */
-	public function importFromFile(int $id, string $userId, Folder $userFolder, string $filePath, string $mode='append') : array {
+	public function importFromFile(int $id, string $userId, Folder $userFolder, string $filePath, string $mode = 'append') : array {
 		$parsed = self::doParseFile(self::getFile($userFolder, $filePath), $userFolder, self::PARSE_LOCAL_FILES_ONLY);
 		$trackFilesAndCaptions = $parsed['files'];
 		$invalidPaths = $parsed['invalid_paths'];
@@ -167,9 +166,9 @@ class PlaylistFileService {
 		}
 
 		return [
-			'playlist' => $playlist,
+			'playlist'       => $playlist,
 			'imported_count' => \count($trackIds),
-			'failed_count' => \count($invalidPaths)
+			'failed_count'   => \count($invalidPaths)
 		];
 	}
 
@@ -179,8 +178,8 @@ class PlaylistFileService {
 	 * @param Folder $userFolder user home dir
 	 * @param string $filePath path of the file to import
 	 * @return array with two keys:
-	 * 			- 'stations': Array of RadioStation objects imported from the file
-	 * 			- 'failed_count': An integer showing the number of entries in the file which were not valid URLs
+	 *               - 'stations': Array of RadioStation objects imported from the file
+	 *               - 'failed_count': An integer showing the number of entries in the file which were not valid URLs
 	 * @throws \OCP\Files\NotFoundException if the $filePath is not a valid file
 	 * @throws \UnexpectedValueException if the $filePath points to a file of unsupported type
 	 */
@@ -201,7 +200,7 @@ class PlaylistFileService {
 		}
 
 		return [
-			'stations' => $stations,
+			'stations'     => $stations,
 			'failed_count' => \count($invalidPaths)
 		];
 	}
@@ -261,7 +260,7 @@ class PlaylistFileService {
 			if (StringUtil::startsWith($path, 'http', /*ignoreCase=*/true)) {
 				if ($mode !== self::PARSE_LOCAL_FILES_ONLY) {
 					$trackFiles[] = [
-						'url' => $path,
+						'url'     => $path,
 						'caption' => $entry['caption']
 					];
 				} else {
@@ -273,7 +272,7 @@ class PlaylistFileService {
 
 					if ($entryFile !== null) {
 						$trackFiles[] = [
-							'file' => $entryFile,
+							'file'    => $entryFile,
 							'caption' => $entry['caption']
 						];
 					} else {
@@ -286,7 +285,7 @@ class PlaylistFileService {
 		}
 
 		return [
-			'files' => $trackFiles,
+			'files'         => $trackFiles,
 			'invalid_paths' => $invalidPaths
 		];
 	}
@@ -309,7 +308,7 @@ class PlaylistFileService {
 	}
 
 	public static function parseM3uContent(string $content) : array {
-		$fp = \fopen("php://temp", 'r+');
+		$fp = \fopen('php://temp', 'r+');
 		\assert($fp !== false, 'Unexpected error: opening temporary stream failed');
 
 		\fputs($fp, /** @scrutinizer ignore-type */ $content);
@@ -353,7 +352,7 @@ class PlaylistFileService {
 				}
 			} else {
 				$entries[] = [
-					'path' => $line,
+					'path'    => $line,
 					'caption' => $caption
 				];
 				$caption = null; // the caption has been used up
@@ -376,7 +375,7 @@ class PlaylistFileService {
 			$content = \mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
 		}
 
-		$fp = \fopen("php://temp", 'r+');
+		$fp = \fopen('php://temp', 'r+');
 		\assert($fp !== false, 'Unexpected error: opening temporary stream failed');
 
 		\fputs($fp, /** @scrutinizer ignore-type */ $content);
@@ -391,7 +390,7 @@ class PlaylistFileService {
 		while ($line = \fgets($fp)) {
 			// ignore empty and malformed lines
 			if (\strpos($line, '=') !== false) {
-				list($key, $value) = \explode('=', $line, 2);
+				[$key, $value] = \explode('=', $line, 2);
 				$key = \trim($key);
 				$value = \trim($value);
 				// we are interested only on the File# and Title# lines
@@ -409,7 +408,7 @@ class PlaylistFileService {
 		$entries = [];
 		foreach ($files as $idx => $filePath) {
 			$entries[] = [
-				'path' => $filePath,
+				'path'    => $filePath,
 				'caption' => $titles[$idx] ?? null
 			];
 		}
@@ -431,7 +430,7 @@ class PlaylistFileService {
 			$path = (string)$node->attributes()['src'];
 			$path = \str_replace('\\', '/', $path); // WPL is a Windows format and uses backslashes as directory separators
 			$entries[] = [
-				'path' => $path,
+				'path'    => $path,
 				'caption' => null
 			];
 		}
@@ -465,7 +464,7 @@ class PlaylistFileService {
 			} else {
 				return null;
 			}
-		} catch (\OCP\Files\NotFoundException | \OCP\Files\NotPermittedException $ex) {
+		} catch (\OCP\Files\NotFoundException|\OCP\Files\NotPermittedException $ex) {
 			/* In case the file is not found and the path contains any backslashes, consider the possibility
 			 * that the path follows the Windows convention of using backslashes as path separators.
 			 */

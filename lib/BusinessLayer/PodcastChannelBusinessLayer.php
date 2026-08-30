@@ -14,11 +14,10 @@ namespace OCA\Music\BusinessLayer;
 
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\BaseMapper;
 use OCA\Music\Db\MatchMode;
-use OCA\Music\Db\PodcastChannelMapper;
 use OCA\Music\Db\PodcastChannel;
+use OCA\Music\Db\PodcastChannelMapper;
 use OCA\Music\Db\SortBy;
 use OCA\Music\Utility\StringUtil;
 
@@ -34,7 +33,7 @@ class PodcastChannelBusinessLayer extends BusinessLayer {
 
 	public function __construct(
 		PodcastChannelMapper $mapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($mapper);
 	}
@@ -68,7 +67,7 @@ class PodcastChannelBusinessLayer extends BusinessLayer {
 	 * @param string $rssContent Raw content of the RSS feed
 	 * @param \SimpleXMLElement $xmlNode <channel> node parsed from the RSS feed
 	 * @param boolean $force Value true will cause the channel to be updated to the DB even
-	 * 						if there appears to be no changes since the previous update
+	 *                       if there appears to be no changes since the previous update
 	 * @return boolean true if the new content differed from the previously cached content or update was forced
 	 */
 	public function updateChannel(PodcastChannel $channel, string $rssContent, \SimpleXMLElement $xmlNode, bool $force = false) {
@@ -133,7 +132,7 @@ class PodcastChannelBusinessLayer extends BusinessLayer {
 		$channel->setDescription( (string)($xmlNode->description ?: $itunesNodes->summary) );
 		$channel->setImageUrl( (string)($xmlNode->image->url ?: $itunesNodes->image->attributes()?->href) );
 		$channel->setCategory( \implode(', ', \array_map(
-			fn($category) => $category->attributes()['text'],
+			fn ($category) => $category->attributes()['text'],
 			\iterator_to_array($itunesNodes->category, false)
 		)) );
 	}

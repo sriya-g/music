@@ -19,27 +19,30 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class Cleanup extends Command {
 
-	public function __construct(private Maintenance $maintenance) {
+	public function __construct(
+		private Maintenance $maintenance,
+	) {
 		parent::__construct();
 	}
 
-	/**
-	 * @return void
-	 */
-	protected function configure() {
+	protected function configure() : void {
 		$this
 			->setName('music:cleanup')
 			->setDescription('clean up orphaned DB entries (this happens also periodically on the background)')
 		;
 	}
 
-	/**
-	 * @return int
-	 */
-	protected function execute(InputInterface $input, OutputInterface $output) {
+	protected function execute(InputInterface $input, OutputInterface $output) : int {
 		$output->writeln('Running cleanup task...');
-		$removedEntries = $this->maintenance->cleanUp();
-		$output->writeln("Removed entries: " . \json_encode($removedEntries));
+		$result = $this->maintenance->cleanUp();
+
+		if ($result === null) {
+			$output->writeln('Cleanup was skipped because of an ongoing scan job');
+		} else {
+			foreach ($result as $entityType => $entityStats) {
+				$output->writeln("Cleaned {$entityStats['count']} $entityType in {$entityStats['time_ms']} ms");
+			}
+		}
 		return 0;
 	}
 }

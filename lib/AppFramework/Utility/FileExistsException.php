@@ -16,7 +16,7 @@ class FileExistsException extends \RuntimeException {
 
 	public function __construct(
 		private string $path,
-		private string $altName
+		private string $altName,
 	) {
 	}
 

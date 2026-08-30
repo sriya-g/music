@@ -34,7 +34,7 @@ class ExternalScrobbler implements IScrobbler {
 		private string $identifier,
 		private string $endpoint,
 		private string $tokenRequestUrl,
-		private string $appName
+		private string $appName,
 	) {
 	}
 
@@ -114,7 +114,7 @@ class ExternalScrobbler implements IScrobbler {
 		$this->config->setSystemValue("music.{$this->identifier}_api_secret", $apiSecret);
 	}
 
-	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null) : void {
+	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null) : void {
 		$timeOfPlay = $timeOfPlay ?? new \DateTime();
 		$userId = $track->getUserId();
 		$sessionKey = $this->getApiSession($userId);
@@ -137,7 +137,7 @@ class ExternalScrobbler implements IScrobbler {
 
 		$this->albumBusinessLayer->injectAlbumsToTracks([$track], $userId);
 		$scrobbleData = \array_merge([
-			'sk' => $sessionKey,
+			'sk'        => $sessionKey,
 			'timestamp' => $timeOfPlay->getTimestamp()
 		], $this->generateTrackData($track));
 
@@ -148,8 +148,7 @@ class ExternalScrobbler implements IScrobbler {
 		}
 	}
 
-	public function setNowPlaying(Track $track, ?DateTime $timeOfPlay = null): void
-	{
+	public function setNowPlaying(Track $track, ?DateTime $timeOfPlay = null, ?string $client = null): void {
 		$userId = $track->getUserId();
 		$sessionKey = $this->getApiSession($userId);
 		if (!$sessionKey) {
@@ -165,7 +164,8 @@ class ExternalScrobbler implements IScrobbler {
 		$nowPlayingData = \array_merge([
 			'sk' => $sessionKey
 		], $this->generateTrackData($track));
-		// Unlike `scrobble`, `updateNowPlaying` does not take a timestamp. The parameter $timeOfPlay inherited from IScrobbler is ignored here.
+		// Unlike `scrobble`, `updateNowPlaying` does not take a timestamp. The parameters $timeOfPlay and $client
+		// inherited from IScrobbler are ignored here.
 
 		$xml = $this->execRequest($this->generateMethodParams('track.updateNowPlaying', $nowPlayingData));
 
@@ -225,7 +225,7 @@ class ExternalScrobbler implements IScrobbler {
 	 */
 	private function generateMethodParams(string $method, array $moreParams = [], bool $sign = true) : array {
 		$params = \array_merge($moreParams, [
-			'method' => $method,
+			'method'  => $method,
 			'api_key' => $this->getApiKey()
 		]);
 
@@ -269,7 +269,7 @@ class ExternalScrobbler implements IScrobbler {
 	private function generateTrackData(Track $track) : array {
 		$trackData = [
 			'artist' => $track->getArtistName(),
-			'track' => $track->getTitle(),
+			'track'  => $track->getTitle(),
 		];
 
 		if (!empty($track->getAlbumName())) {
@@ -278,6 +278,10 @@ class ExternalScrobbler implements IScrobbler {
 
 		if (!empty($track->getNumber())) {
 			$trackData['trackNumber'] = $track->getNumber();
+		}
+
+		if (!empty($track->getMbidRelTrack())) {
+			$trackData['mbid'] = $track->getMbidRelTrack();
 		}
 
 		$albumArtistName = $track->getAlbum()?->getAlbumArtistName();

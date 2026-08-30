@@ -11,33 +11,20 @@
  */
 
 angular.module('Music').controller('AlbumsViewController', [
-	'$scope', '$rootScope', 'playQueueService', 'libraryService',
-	'Restangular', '$document', '$route', '$location', '$timeout', 'gettextCatalog',
-	function ($scope, $rootScope, playQueueService, libraryService,
-			Restangular, $document, $route, $location, $timeout, gettextCatalog) {
+	'$scope', '$rootScope', 'playQueueService', 'libraryService', 'libraryFactory',
+	'Restangular', '$route', '$location', '$timeout', 'gettextCatalog',
+	function ($scope, $rootScope, playQueueService, libraryService, libraryFactory,
+			Restangular, $route, $location, $timeout, gettextCatalog) {
 
-		$rootScope.currentView = '#';
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
-		// apply the layout mode stored by the MainController
-		$('#albums').toggleClass('compact', $scope.albumsCompactLayout);
+		$scope.artists = null;
 
 		// When making the view visible, the artists are added incrementally step-by-step.
 		// The purpose of this is to keep the browser responsive even in case the view contains
 		// an enormous amount of albums (like several thousands).
-		const INCREMENTAL_LOAD_STEP = 20;
+		const INCREMENTAL_LOAD_STEP = 100;
 		$scope.incrementalLoadLimit = 0;
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', () => {
-			_.each(unsubFuncs, function(func) { func(); });
-			playQueueService.unsubscribeAll(this);
-		});
 
 		// Prevent controller reload when the URL is updated with window.location.hash,
 		// unless the new location actually requires another controller.
@@ -175,24 +162,24 @@ angular.module('Music').controller('AlbumsViewController', [
 			return att;
 		}
 
-		playQueueService.subscribe('playlistEnded', function() {
+		playQueueService.subscribe('playlistEnded', $scope, () => {
 			window.location.hash = '#/';
 			updateHighlight(null);
-		}, this);
+		});
 
-		playQueueService.subscribe('playlistChanged', function(playlistId) {
+		playQueueService.subscribe('playlistChanged', $scope, (playlistId) => {
 			updateHighlight(playlistId);
-		}, this);
+		});
 
-		subscribe('scrollToTrack', function(_event, trackId, animationTime /* optional */) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId, animationTime /* optional */) => {
 			scrollToAlbumOfTrack(trackId, animationTime);
 		});
 
-		subscribe('scrollToAlbum', function(_event, albumId, animationTime /* optional */) {
+		$rootScope.subscribe('scrollToAlbum', $scope, (_event, albumId, animationTime /* optional */) => {
 			$scope.$parent.scrollToItem('album-' + albumId, animationTime);
 		});
 
-		subscribe('scrollToArtist', function(_event, artistId, animationTime /* optional */) {
+		$rootScope.subscribe('scrollToArtist', $scope, (_event, artistId, animationTime /* optional */) => {
 			const elemId = 'artist-' + artistId;
 			if ($('#' + elemId).length) {
 				$scope.$parent.scrollToItem(elemId, animationTime);
@@ -231,17 +218,17 @@ angular.module('Music').controller('AlbumsViewController', [
 			if (containerWidth === 0) {
 				// During page load, the view container may not yet have a valid width. On Firefox on Ubuntu,
 				// the resize event with the valid width doesn't fire at all after the page load. Retry until
-				// a valid width is present. See https://github.com/owncloud/music/issues/1029.
+				// a valid width is present. See https://github.com/nc-music/oc-music/issues/1029.
 				$timeout(updateColumnLayout, 500);
 			} else {
 				// Use the single-column layout if there's not enough room for two columns or more
-				let colWidth = $scope.albumsCompactLayout ? 383 : 480;
+				let colWidth = $scope.albumsCompactLayout ? 380 : 480;
 				$('#albums').toggleClass('single-col', containerWidth < 2 * colWidth);
 			}
 		}
 
-		subscribe('resize', updateColumnLayout);
-		subscribe('albumsLayoutChanged', updateColumnLayout);
+		$rootScope.subscribe('resize', $scope, updateColumnLayout);
+		$rootScope.subscribe('albumsLayoutChanged', $scope, updateColumnLayout);
 
 		function initializePlayerStateFromURL() {
 			let hashParts = window.location.hash.slice(1).split('/');
@@ -288,13 +275,11 @@ angular.module('Music').controller('AlbumsViewController', [
 		 */
 		function showMore() {
 			// show more entries only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
+			if ($scope.$parent) {
 				$scope.incrementalLoadLimit += INCREMENTAL_LOAD_STEP;
-				if ($scope.incrementalLoadLimit < $scope.$parent.artists.length) {
+				if ($scope.incrementalLoadLimit < libraryService.getCollection().length) {
 					$timeout(showMore);
 				} else {
-					$rootScope.loading = false;
-
 					// Do not reinitialize the player state if it is already playing.
 					// This is the case when the user has started playing music while scanning is ongoing,
 					// and then hits the 'update' button. Reinitializing would stop and restart the playback.
@@ -304,25 +289,21 @@ angular.module('Music').controller('AlbumsViewController', [
 						updateHighlight(playQueueService.getCurrentPlaylistId());
 					}
 
-					$timeout(() => $rootScope.$emit('viewActivated'));
+					$timeout(() => $rootScope.$emit('viewActivated', THIS_VIEW_ID));
 				}
 			}
 		}
 
-		// Start making artists visible immediately if the artists are already loaded.
-		// Otherwise it happens on the 'collectionLoaded' event handler.
-		if ($scope.$parent.artists) {
-			showMore();
-		}
-
-		subscribe('collectionLoaded', function() {
-			// Start the asynchronous process of making artists visible
+		// Start making artists visible as soon as we get the collection
+		function initView() {
 			$scope.incrementalLoadLimit = 0;
-			showMore();
-		});
+			libraryFactory.getCollection().then((collection) => {
+				$scope.artists = collection;
+				showMore();
+			});
+		}
+		initView();
 
-		subscribe('deactivateView', function() {
-			$timeout(() => $rootScope.$emit('viewDeactivated'));
-		});
+		libraryFactory.subscribe('collectionUpdating', $scope, initView);
 	}
 ]);

@@ -21,7 +21,8 @@ class TimestampInit implements IRepairStep {
 
 	public function __construct(
 		private IDBConnection $db,
-		private IConfig $config) {
+		private IConfig $config,
+	) {
 	}
 
 	public function getName() : string {

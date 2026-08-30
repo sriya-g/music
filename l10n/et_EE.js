@@ -30,7 +30,7 @@ OC.L10N.register(
     "Tracks" : "Lood",
     "Unknown album" : "Tundmatu album",
     "Unknown artist" : "Tundmatu esitaja",
-    "Upload music in the files app to listen to it here" : "Laadi muusika üles failide rakenduses, et seda siin kuulata",
+    "Upload music in the Files app to listen to it here" : "Laadi muusika üles failide rakenduses, et seda siin kuulata",
     "Use this address to browse your music collection from any Ampache compatible player." : "Kasuta seda aadressi sirvimaks oma muusikakogu suvalisest Ampache-ga ühilduvast muusikapleierist.",
     "Use your username and following password to connect to this Ampache instance:" : "Kasuta oma kasutajatunnust ja järgmist parooli ühendumaks selle Ampache instantsiga:",
     "Volume" : "Helitugevus",

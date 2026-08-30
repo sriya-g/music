@@ -21,7 +21,7 @@ class ResetCache extends BaseCommand {
 	public function __construct(
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
-		private Cache $cache
+		private Cache $cache,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -34,7 +34,7 @@ class ResetCache extends BaseCommand {
 
 	protected function doExecute(InputInterface $input, OutputInterface $output, array $users) : void {
 		if ($input->getOption('all')) {
-			$output->writeln("Drop cache for <info>all users</info>");
+			$output->writeln('Drop cache for <info>all users</info>');
 			$this->cache->remove();
 		} else {
 			foreach ($users as $user) {

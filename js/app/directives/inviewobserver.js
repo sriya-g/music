@@ -25,7 +25,7 @@ function($rootScope, $timeout, inViewService) {
 
 	// Drop all instances when view switching or artists reloading begins
 	$rootScope.$on('deactivateView', eraseInstances);
-	$rootScope.$on('collectionUpdating', eraseInstances);
+	$rootScope.$on('libraryFactory:collectionUpdating', eraseInstances);
 
 	function invalidateInViewRange() {
 		_firstIndexInView = 0;
@@ -49,7 +49,7 @@ function($rootScope, $timeout, inViewService) {
 	OCA.Music.Utils.getScrollContainer()[0].addEventListener('scroll', throttledOnScroll);
 	$rootScope.$on('resize', throttledOnScroll);
 	$rootScope.$on('trackListCollapsed', throttledOnScroll);
-	$rootScope.$on('collectionLoaded', throttledOnScroll);
+	$rootScope.$on('libraryFactory:collectionLoaded', throttledOnScroll);
 	$rootScope.$on('albumsLayoutChanged', throttledOnScroll);
 	$rootScope.$on('viewContentChanged', throttledOnScroll);
 	$rootScope.$watch('loading', throttledOnScroll);

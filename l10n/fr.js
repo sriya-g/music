@@ -357,7 +357,7 @@ OC.L10N.register(
     "Update" : "Mettre à jour",
     "Update date" : "Date de mise à jour",
     "Upload image named \"{{name}}\" to anywhere within your library path to see it here." : "Téléversez une image nommée « {{name}} » n'importe où dans le dossier de votre bibliothèque musicale pour qu'elle apparaisse ici.",
-    "Upload music in the files app to listen to it here" : "Téléversez de la musique dans l'application Fichiers pour l'écouter ici",
+    "Upload music in the Files app to listen to it here" : "Téléversez de la musique dans l'application Fichiers pour l'écouter ici",
     "Upload the previously obtained PLS file to your cloud using the Files app." : "Téléversez le fichier PLS précédemment obtenu sur votre cloud à l'aide de l'application Fichiers.",
     "Use the Community Radio Browser <a href=\"{{url}}\" target=\"_blank\">search</a> to find the radio stations of interest. Instead of using the search, you may also browse the channels in Community Radio Browser by category or popularity." : "Utilisez la <a href=\"{{url}}\" target=\"_blank\">recherche</a> de Community Radio Browser pour trouver des stations de radio qui vous intéressent. Vous pouvez également parcourir les chaînes par catégorie ou par popularité.",
     "Use the following credentials to connect to this Ampache/Subsonic instance." : "Utilisez les informations d'identification suivantes pour vous connecter à cette instance Ampache/Subsonic.",

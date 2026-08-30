@@ -146,7 +146,6 @@ angular.module('Music').controller('RadioStationDetailsController', [
 						function (result) {
 							libraryService.addRadioStation(result);
 							$scope.$parent.$parent.contentId = result.id;
-							$rootScope.$emit('playlistUpdated', 'radio', /*onlyReorder=*/false);
 						}
 					);
 				}
@@ -162,7 +161,6 @@ angular.module('Music').controller('RadioStationDetailsController', [
 						);
 					}
 					libraryService.sortRadioStations();
-					$rootScope.$emit('playlistUpdated', 'radio', /*onlyReorder=*/true);
 				}
 				$scope.editing = false;
 			}

@@ -8,7 +8,7 @@
 
 ## Overview
 
-Music player and server for Nextcloud. Previously also ownCloud was a supported platform but as of January 2026 the development focuses only on Nextcloud. The old version with OC support can be found from https://github.com/owncloud/music.
+Music player and server for Nextcloud. Previously also ownCloud was a supported platform but as of January 2026 the development focuses only on Nextcloud. The old version with OC support can be found from https://github.com/nc-music/oc-music.
 
 The app shows audio files stored in your cloud categorized by artists and albums. Alternatively, the files can be viewed according the directory hierarchy. The app can play any audio file type supported on your browser and a few types even without native browser-support. Also podcasts and internet radio can be listened to. There's possibility for shuffle play, playlists, automatic playlist generation, and search by freely combining various criteria. The Music app also allows serving audio files from your cloud to external players which are compatible with either Ampache or Subsonic. In addition to the stand-alone application, the Music app comes with a minimal player embedded in the Files app and a widget for the Nextcloud Dashboard.
 
@@ -102,7 +102,7 @@ The application's scalability for large music collections has gradually improved
 
 #### Translations
 
-There exist partial translations for the Music app for many languages, but most of them are very much incomplete. In the past, the application was translated at https://www.transifex.com/owncloud-org/owncloud/ and the resource still exists there. However, large majority of the strings used in the app have not been picked by Transifex for many years now, and hence the translations from Transifex cannot be actually used. The root cause is disparity in the localization mechanisms used in the Music app and on ownCloud in general, and bridging the gap would require some support from ownCloud core team. This is probably never going to happen, see https://central.owncloud.org/t/owncloud-music-app-translations/14881. For now, you may contribute translations as normal pull requests, by following the instructions from https://github.com/owncloud/music/issues/671#issuecomment-782746463.
+There exist partial translations for the Music app for many languages, but most of them are very much incomplete. In the past, the application was translated at https://www.transifex.com/owncloud-org/owncloud/ and the resource still exists there. However, large majority of the strings used in the app have not been picked by Transifex for many years now, and hence the translations from Transifex cannot be actually used. The root cause is disparity in the localization mechanisms used in the Music app and on ownCloud in general, and bridging the gap would require some support from ownCloud core team. This is probably never going to happen, see https://central.owncloud.org/t/owncloud-music-app-translations/14881. For now, you may contribute translations as normal pull requests, by following the instructions from https://github.com/nc-music/oc-music/issues/671#issuecomment-782746463.
 
 #### SMB storage
 
@@ -164,7 +164,7 @@ The integration tests require the music app to be installed under the `apps` fol
 	# add cloud URL and credentials for Ampache and Subsonic APIs to behat.yml
 	../vendor/bin/behat
 
-For the acceptance tests, you need to upload all the tracks from the following zip file to your cloud instance: https://github.com/paulijar/music/files/2364060/testcontent.zip
+For the acceptance tests, you need to upload all the tracks from the following zip file to your cloud instance: https://github.com/user-attachments/files/30780531/testcontent.zip
 
 ### Translation scripts
 
@@ -177,7 +177,7 @@ When the tools are setup correctly, all the strings can be extracted from the so
 	cd build
 	make l10n-extract
 
-The music.pot file can then be used to update the language-specific translation file (l10n/*/music.po) as described in https://github.com/owncloud/music/issues/671#issuecomment-782746463.
+The music.pot file can then be used to update the language-specific translation file (l10n/*/music.po) as described in https://github.com/nc-music/oc-music/issues/671#issuecomment-782746463.
 
 Once the translations have been updated in the .po files, we need to generate the final source files used to build the Music application. This, again, uses both `angular-gettext` and `l10n/l10n.pl`. For this, execute
 
@@ -197,7 +197,7 @@ To connect external client applications, partial implementations of the followin
 * [Ampache JSON API](https://github.com/ampache/ampache/wiki/JSON-methods) at `/ampache/server/json.server.php`
 * [Subsonic API](http://www.subsonic.org/pages/api.jsp) at `/subsonic/rest/{method}`
 
-The web interface of the Music app uses a proprietary REST API. Note that this API may change between the application versions without prior notice. For list of all available endpoints, see [appinfo/routes.php](https://github.com/nc-music/music/blob/master/appinfo/routes.php). As this API is not documented anywhere, the details of each endpoint have to be checked from the implementation. See [here](https://github.com/owncloud/music/issues/1012#issuecomment-1256943457) for some hints.
+The web interface of the Music app uses a proprietary REST API. Note that this API may change between the application versions without prior notice. For list of all available endpoints, see [appinfo/routes.php](https://github.com/nc-music/music/blob/master/appinfo/routes.php). As this API is not documented anywhere, the details of each endpoint have to be checked from the implementation. See [here](https://github.com/nc-music/oc-music/issues/1012#issuecomment-1256943457) for some hints.
 
 
 ### `/api/log`

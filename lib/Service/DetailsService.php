@@ -12,17 +12,16 @@
 
 namespace OCA\Music\Service;
 
-use OCP\Files\File;
-use OCP\Files\Folder;
-
 use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\Utility\StringUtil;
+use OCP\Files\File;
+use OCP\Files\Folder;
 
 class DetailsService {
 
 	public function __construct(
 		private ExtractorGetID3 $extractor,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -36,13 +35,13 @@ class DetailsService {
 			unset($comments['picture']);
 
 			// cleanup strings from invalid characters
-			\array_walk($audio, [$this, 'sanitizeString']);
-			\array_walk($comments, [$this, 'sanitizeString']);
+			\array_walk_recursive($audio, [$this, 'sanitizeString']);
+			\array_walk_recursive($comments, [$this, 'sanitizeString']);
 
 			$result = [
 				'fileinfo' => $audio,
-				'tags' => $comments,
-				'picture' => $picture
+				'tags'     => $comments,
+				'picture'  => $picture
 			];
 
 			// 'streams' contains duplicate data
@@ -158,12 +157,12 @@ class DetailsService {
 				if ($syncedLyrics) {
 					$result[] = [
 						'synced' => true,
-						'lines' => $syncedLyrics
+						'lines'  => $syncedLyrics
 					];
 				} else {
 					$result[] = [
 						'synced' => false,
-						'lines' => \explode("\n", $tagValue)
+						'lines'  => \explode("\n", $tagValue)
 					];
 				}
 			}
@@ -195,7 +194,7 @@ class DetailsService {
 			$result = ['unsynced' => $unsyncedLyrics];
 
 			if ($syncedLyrics !== null) {
-				$result['synced'] = \array_map(fn($timestamp, $text) => [
+				$result['synced'] = \array_map(fn ($timestamp, $text) => [
 					'time' => \max(0, $timestamp), 'text' => $text
 				], \array_keys($syncedLyrics), $syncedLyrics);
 			}

@@ -15,7 +15,6 @@
 namespace OCA\Music\Db;
 
 use OCA\Music\Utility\Util;
-
 use OCP\IL10N;
 
 /**
@@ -51,23 +50,23 @@ class Bookmark extends Entity {
 		return [
 			'position' => $this->getPosition(),
 			'username' => $this->getUserId(),
-			'comment' => $this->getComment() ?: '',
-			'created' => Util::formatZuluDateTime($this->getCreated()),
-			'changed' => Util::formatZuluDateTime($this->getUpdated())
+			'comment'  => $this->getComment() ?: '',
+			'created'  => Util::formatZuluDateTime($this->getCreated()),
+			'changed'  => Util::formatZuluDateTime($this->getUpdated())
 		];
 	}
 
 	public function toAmpacheApi(?callable $renderEntry = null) : array {
 		$objectType = ($this->getType() == self::TYPE_TRACK) ? 'song' : 'podcast_episode';
 		$result = [
-			'id' => (string)$this->getId(),
-			'owner' => $this->getUserId(),
-			'object_type' => $objectType,
-			'object_id' => (string)$this->getEntryId(),
-			'position' => (int)($this->getPosition() / 1000), // milliseconds to seconds
-			'client' => $this->getComment(),
+			'id'            => (string)$this->getId(),
+			'owner'         => $this->getUserId(),
+			'object_type'   => $objectType,
+			'object_id'     => (string)$this->getEntryId(),
+			'position'      => (int)($this->getPosition() / 1000), // milliseconds to seconds
+			'client'        => $this->getComment(),
 			'creation_date' => Util::formatDateTimeUtcOffset($this->getCreated()),
-			'update_date' => Util::formatDateTimeUtcOffset($this->getUpdated())
+			'update_date'   => Util::formatDateTimeUtcOffset($this->getUpdated())
 		];
 
 		if ($renderEntry !== null) {

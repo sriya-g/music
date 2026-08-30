@@ -15,9 +15,8 @@
 namespace OCA\Music\Service;
 
 use OCA\Music\AppFramework\Core\Logger;
-use OCP\IConfig;
-
 use OCP\Files\File;
+use OCP\IConfig;
 
 /**
  * an extractor class for getID3
@@ -26,7 +25,10 @@ class ExtractorGetID3 {
 
 	private ?\getID3 $getID3 = null; // lazy-loaded
 
-	public function __construct(private IConfig $config, private Logger $logger) {
+	public function __construct(
+		private IConfig $config,
+		private Logger $logger,
+	) {
 	}
 
 	/**
@@ -47,12 +49,13 @@ class ExtractorGetID3 {
 			// (for files over ~2 GB) but this isn't used in any way.
 			$this->getID3->option_max_2gb_check = false;
 
-			// Supported tag types may be configured in config.php. ID3v1 is disabled by default because it's
-			// ancient and often produces incorrect results, especially with non-Latin scripts (because ID3v1
-			// is supposed to be always in ISO-8859-1 but it has often been abused).
+			// Supported tag types may be configured in config.php. ID3v1 and Lyrics3 are disabled by default because
+			// they are ancient and often produces incorrect results, especially with non-Latin scripts (because these
+			// tags are supposed to be always in ISO-8859-1 but they have often been abused). Also, it may be cumbersome
+			// to remove incorrect Lyrics3 tags from files because they are not supported by most tag editors.
 			$this->getID3->option_tag_id3v1 = $this->getBooleanConfig('music.tag_enabled_id3v1', false);
 			$this->getID3->option_tag_id3v2 = $this->getBooleanConfig('music.tag_enabled_id3v2', true);
-			$this->getID3->option_tag_lyrics3 = $this->getBooleanConfig('music.tag_enabled_lyrics3', true);
+			$this->getID3->option_tag_lyrics3 = $this->getBooleanConfig('music.tag_enabled_lyrics3', false);
 			$this->getID3->option_tag_apetag = $this->getBooleanConfig('music.tag_enabled_ape', true);
 		}
 	}
@@ -77,7 +80,7 @@ class ExtractorGetID3 {
 
 		try {
 			// It would be pointless to try to analyze 0-byte files and it may cause problems when
-			// the file is stored on a SMB share, see https://github.com/owncloud/music/issues/600
+			// the file is stored on a SMB share, see https://github.com/nc-music/oc-music/issues/600
 			if ($file->getSize() > 0) {
 				$metadata = $this->doExtract($file);
 			}
@@ -138,7 +141,7 @@ class ExtractorGetID3 {
 				foreach ($metadata['error'] as $error) {
 					$this->logger->debug('getID3 error occurred');
 					// sometimes $error is string but can't be concatenated to another string and weirdly just hide the log message
-					$this->logger->debug('getID3 error message: '. $error);
+					$this->logger->debug('getID3 error message: ' . $error);
 				}
 			}
 		}

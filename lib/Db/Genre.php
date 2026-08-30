@@ -62,26 +62,26 @@ class Genre extends Entity {
 
 	public function toApi() : array {
 		return  [
-			'id' => $this->getId(),
-			'name' => $this->getName(),
+			'id'       => $this->getId(),
+			'name'     => $this->getName(),
 			'trackIds' => $this->trackIds ? \array_map('\intval', $this->trackIds) : []
 		];
 	}
 
 	public function toAmpacheApi(IL10N $l10n) : array {
 		return [
-			'id' => (string)$this->getId(),
-			'name' => $this->getNameString($l10n),
-			'albums' => $this->getAlbumCount(),
-			'artists' => $this->getArtistCount(),
-			'songs' => $this->getTrackCount(),
-			'videos' => 0,
-			'playlists' => 0,
+			'id'           => (string)$this->getId(),
+			'name'         => $this->getNameString($l10n),
+			'albums'       => $this->getAlbumCount(),
+			'artists'      => $this->getArtistCount(),
+			'songs'        => $this->getTrackCount(),
+			'videos'       => 0,
+			'playlists'    => 0,
 			'live_streams' => 0
 		];
 	}
 
 	public static function unknownNameString(IL10N $l10n) : string {
-		return (string) $l10n->t('(Unknown genre)');
+		return (string)$l10n->t('(Unknown genre)');
 	}
 }

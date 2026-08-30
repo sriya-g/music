@@ -1,4 +1,4 @@
-<div class="view-container" id="folders-area" ng-show="!loading && !loadingCollection">
+<div class="view-container" id="folders-area" ng-show="!loading">
 
 	<!-- Hierarchical tree layout -->
 	<div class="folder-tree" ng-if="!foldersFlatLayout && rootFolder" ng-init="folder = rootFolder" ng-include="'foldertreenode.html'"></div>

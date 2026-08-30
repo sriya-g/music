@@ -5,34 +5,23 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2020 - 2024
+ * @copyright Pauli Järvinen 2020 - 2026
  */
 
 
 angular.module('Music').controller('GenresViewController', [
-	'$rootScope', '$scope', 'playQueueService', 'libraryService', '$timeout',
-	function ($rootScope, $scope, playQueueService, libraryService, $timeout) {
+	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'libraryFactory', '$timeout',
+	function ($rootScope, $scope, playQueueService, libraryService, libraryFactory, $timeout) {
+
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		$scope.genres = null;
-		$rootScope.currentView = $scope.getViewIdFromUrl();
 
 		// When making the view visible, the genres are added incrementally step-by-step.
 		// The purpose of this is to keep the browser responsive even in case the view contains
 		// an enormous amount of genres (like several thousands).
-		const INCREMENTAL_LOAD_STEP = 100;
+		const INCREMENTAL_LOAD_STEP = 1000;
 		$scope.incrementalLoadLimit = 0;
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.startScanning = function() {
-			$scope.$parent.startScanning($scope.$parent.filesWithUnscannedGenre);
-			$scope.$parent.filesWithUnscannedGenre = null;
-		};
 
 		function playPlaylist(listId, tracks, startFromTrackId = undefined) {
 			let startIndex = null;
@@ -123,15 +112,11 @@ angular.module('Music').controller('GenresViewController', [
 			return 'genre-' + $scope.genres[index].id;
 		};
 
-		playQueueService.subscribe('playlistEnded', function() {
-			updateHighlight(null);
-		}, this);
+		playQueueService.subscribe('playlistEnded', $scope, () => updateHighlight(null));
 
-		playQueueService.subscribe('playlistChanged', function(playlistId) {
-			updateHighlight(playlistId);
-		}, this);
+		playQueueService.subscribe('playlistChanged', $scope, (playlistId) => updateHighlight(playlistId));
 
-		subscribe('scrollToTrack', function(_event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
 				let elementId = 'track-' + trackId;
 				// If the track element is hidden (collapsed), scroll to the genre
@@ -145,34 +130,17 @@ angular.module('Music').controller('GenresViewController', [
 			}
 		});
 
-		$scope.$on('$destroy', () => {
-			_.each(unsubFuncs, function(func) { func(); });
-			playQueueService.unsubscribeAll(this);
-		});
-
-		// Init happens either immediately (after making the loading animation visible)
-		// or once collection has been loaded
-		if (libraryService.genresLoaded()) {
-			$timeout(initView);
-		}
-
-		subscribe('genresLoaded', function () {
-			$timeout(initView);
-		});
-
 		function initView() {
-			$scope.incrementalLoadLimit = 0;
-			$scope.genres = libraryService.getAllGenres();
-			$timeout(showMore);
-
-			// The "rescan needed" banner uses "collapsed" layout if there are any genres already available
-			let rescanPopup = $('#toRescan');
-			if ($scope.genres.length > 0) {
-				rescanPopup.addClass('collapsed');
-			} else {
-				rescanPopup.removeClass('collapsed');
-			}
+			$scope.genres = null;
+			libraryFactory.getGenres().then((genres) => {
+				$scope.genres = genres;
+				$scope.incrementalLoadLimit = 0;
+				$timeout(showMore);
+			});
 		}
+		initView();
+
+		libraryFactory.subscribe('collectionUpdating', $scope, initView);
 
 		/**
 		 * Increase number of shown genres asynchronously step-by-step until
@@ -181,22 +149,15 @@ angular.module('Music').controller('GenresViewController', [
 		 */
 		function showMore() {
 			// show more entries only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
+			if ($scope.$parent) {
 				$scope.incrementalLoadLimit += INCREMENTAL_LOAD_STEP;
 				if ($scope.incrementalLoadLimit < $scope.genres.length) {
 					$timeout(showMore);
 				} else {
-					$rootScope.loading = false;
 					updateHighlight(playQueueService.getCurrentPlaylistId());
-					$rootScope.$emit('viewActivated');
+					$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 				}
 			}
 		}
-
-		subscribe('deactivateView', function() {
-			$timeout(function() {
-				$rootScope.$emit('viewDeactivated');
-			});
-		});
 	}
 ]);

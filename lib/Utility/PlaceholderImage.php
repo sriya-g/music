@@ -38,6 +38,7 @@ declare(strict_types=1);
  * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
+
 namespace OCA\Music\Utility;
 
 use OCA\Music\Utility\PlaceholderImage\Color;
@@ -86,7 +87,7 @@ class PlaceholderImage {
 	 */
 	public static function generateForResponse(string $name, string $seed, int $size) : array {
 		return [
-			'content' => self::generate($name, $seed, $size),
+			'content'  => self::generate($name, $seed, $size),
 			'mimetype' => 'image/png'
 		];
 	}
@@ -108,7 +109,7 @@ class PlaceholderImage {
 			return '?';
 		}
 		$firstTwoLetters = array_map(
-			fn($namePart) => \mb_strtoupper(\mb_substr($namePart, 0, 1), 'UTF-8'),
+			fn ($namePart) => \mb_strtoupper(\mb_substr($namePart, 0, 1), 'UTF-8'),
 			\explode(' ', $displayName, 2)
 		);
 		return \implode('', $firstTwoLetters);

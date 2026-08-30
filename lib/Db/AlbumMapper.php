@@ -9,14 +9,13 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright Morris Jobke 2013, 2014
- * @copyright Pauli Järvinen 2016 - 2025
+ * @copyright Pauli Järvinen 2016 - 2026
  */
 
 namespace OCA\Music\Db;
 
 use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\StringUtil;
-
 use OCP\IConfig;
 use OCP\IDBConnection;
 
@@ -27,7 +26,7 @@ use OCP\IDBConnection;
  */
 class AlbumMapper extends BaseMapper {
 	public function __construct(IDBConnection $db, IConfig $config) {
-		parent::__construct($db, $config, 'music_albums', Album::class, 'name', ['user_id', 'hash'], 'album_artist_id');
+		parent::__construct($db, $config, 'music_albums', Album::class, 'name', ['user_id', 'hash', 'album_artist_id', 'mbid'], 'album_artist_id');
 	}
 
 	/**
@@ -36,7 +35,7 @@ class AlbumMapper extends BaseMapper {
 	 * {@inheritdoc}
 	 * @see BaseMapper::selectEntities()
 	 */
-	protected function selectEntities(string $condition, ?string $extension=null) : string {
+	protected function selectEntities(string $condition, ?string $extension = null) : string {
 		return "SELECT `*PREFIX*music_albums`.*, `artist`.`name` AS `album_artist_name`
 				FROM `*PREFIX*music_albums`
 				INNER JOIN `*PREFIX*music_artists` `artist`
@@ -52,7 +51,7 @@ class AlbumMapper extends BaseMapper {
 	 */
 	protected function formatSortingClause(int $sortBy, bool $invertSort = false) : ?string {
 		if ($sortBy === SortBy::Parent) {
-			// Note: the alternative form "LOWER(`album_artist_name`) wouldn't work on PostgreSQL, see https://github.com/owncloud/music/issues/1046
+			// Note: the alternative form "LOWER(`album_artist_name`) wouldn't work on PostgreSQL, see https://github.com/nc-music/oc-music/issues/1046
 			$dir = $invertSort ? 'DESC' : 'ASC';
 			return "ORDER BY LOWER(`artist`.`name`) $dir, LOWER(`*PREFIX*music_albums`.`name`) $dir";
 		} else {
@@ -151,6 +150,40 @@ class AlbumMapper extends BaseMapper {
 	}
 
 	/**
+	 * returns record labels mapped to album IDs
+	 *
+	 * @param integer[]|null $albumIds IDs of the albums; get all albums of the user if null given
+	 * @param string $userId the user ID
+	 * @return array<int, RecordLabel[]> keys are albums IDs and values are arrays of *partial* RecordLabel objects (only id and name properties set)
+	 */
+	public function getRecordLabelsByAlbumId(?array $albumIds, string $userId) : array {
+		$sql = 'SELECT DISTINCT `album_id`, `record_label_id`, `*PREFIX*music_record_labels`.`name` AS `record_label_name`
+				FROM `*PREFIX*music_tracks`
+				LEFT JOIN `*PREFIX*music_record_labels`
+				ON `record_label_id` = `*PREFIX*music_record_labels`.`id`
+				WHERE `*PREFIX*music_tracks`.`user_id` = ?
+				AND `record_label_id` IS NOT NULL ';
+		$params = [$userId];
+
+		if ($albumIds !== null) {
+			$sql .= 'AND `album_id` IN ' . $this->questionMarks(\count($albumIds));
+			$params = \array_merge($params, $albumIds);
+		}
+
+		$result = $this->execute($sql, $params);
+		$labels = [];
+		while ($row = $result->fetch()) {
+			$label = new RecordLabel();
+			$label->setUserId($userId);
+			$label->setId((int)$row['record_label_id']);
+			$label->setName($row['record_label_name']);
+			$labels[$row['album_id']][] = $label;
+		}
+		$result->closeCursor();
+		return $labels;
+	}
+
+	/**
 	 * returns number of disks per album ID
 	 *
 	 * @param integer[]|null $albumIds IDs of the albums; get all albums of the user if null given
@@ -183,7 +216,7 @@ class AlbumMapper extends BaseMapper {
 	 *
 	 * @return array<int, int> keys are album IDs and values are play count sums; ordered largest counts first
 	 */
-	public function getAlbumTracksPlayCount(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function getAlbumTracksPlayCount(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$sql = 'SELECT `album_id`, SUM(`play_count`) AS `sum_count`
 				FROM `*PREFIX*music_tracks`
 				WHERE `user_id` = ? AND `play_count` > 0
@@ -204,7 +237,7 @@ class AlbumMapper extends BaseMapper {
 	 *
 	 * @return array<int, string> keys are album IDs and values are date-times; ordered latest times first
 	 */
-	public function getLatestAlbumPlayTimes(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function getLatestAlbumPlayTimes(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$sql = 'SELECT `album_id`, MAX(`last_played`) AS `latest_time`
 				FROM `*PREFIX*music_tracks`
 				WHERE `user_id` = ? AND `last_played` IS NOT NULL
@@ -224,9 +257,9 @@ class AlbumMapper extends BaseMapper {
 	 * returns the latest play time of each album of the user, including albums which have never been played
 	 *
 	 * @return array<int, ?string> keys are album IDs and values are date-times (or null for never played);
-	 *								ordered furthest times first
+	 *                             ordered furthest times first
 	 */
-	public function getFurthestAlbumPlayTimes(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function getFurthestAlbumPlayTimes(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$sql = 'SELECT `album_id`, MAX(`last_played`) AS `latest_time`
 				FROM `*PREFIX*music_tracks`
 				WHERE `user_id` = ?
@@ -245,7 +278,7 @@ class AlbumMapper extends BaseMapper {
 	/**
 	 * @return Album[]
 	 */
-	public function findAllByNameRecursive(string $name, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByNameRecursive(string $name, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$condition = '( LOWER(`artist`.`name`) LIKE LOWER(?) OR
 						LOWER(`*PREFIX*music_albums`.`name`) LIKE LOWER(?) )';
 		$sql = $this->selectUserEntities($condition, 'ORDER BY LOWER(`*PREFIX*music_albums`.`name`)');
@@ -261,7 +294,7 @@ class AlbumMapper extends BaseMapper {
 	 * @param integer $artistId
 	 * @return Album[]
 	 */
-	public function findAllByArtist(int $artistId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByArtist(int $artistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$sql = $this->selectEntities(
 				'`*PREFIX*music_albums`.`id` IN (
 					SELECT DISTINCT `album`.`id`
@@ -284,7 +317,7 @@ class AlbumMapper extends BaseMapper {
 	 * @param int[] $artistIds
 	 * @return Album[]
 	 */
-	public function findAllByAlbumArtist(array $artistIds, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByAlbumArtist(array $artistIds, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$sql = $this->selectUserEntities('`album_artist_id` IN ' . $this->questionMarks(\count($artistIds)));
 		$params = \array_merge([$userId], $artistIds);
 		return $this->findEntities($sql, $params, $limit, $offset);
@@ -293,9 +326,9 @@ class AlbumMapper extends BaseMapper {
 	/**
 	 * @return Album[]
 	 */
-	public function findAllByGenre(int $genreId, string $userId, ?int $limit=null, ?int $offset=null) : array {
-		$sql = $this->selectUserEntities('EXISTS '.
-				'(SELECT 1 FROM `*PREFIX*music_tracks` `track`
+	public function findAllByGenre(int $genreId, string $userId, ?int $limit = null, ?int $offset = null) : array {
+		$sql = $this->selectUserEntities('EXISTS '
+				. '(SELECT 1 FROM `*PREFIX*music_tracks` `track`
 				  WHERE `*PREFIX*music_albums`.`id` = `track`.`album_id`
 				  AND `track`.`genre_id` = ?)');
 
@@ -320,7 +353,7 @@ class AlbumMapper extends BaseMapper {
 		if (\count($albumIds) > 0) {
 			$sql = 'UPDATE `*PREFIX*music_albums`
 					SET `cover_file_id` = ?
-					WHERE `cover_file_id` IS NULL AND `id` IN '. $this->questionMarks(\count($albumIds));
+					WHERE `cover_file_id` IS NULL AND `id` IN ' . $this->questionMarks(\count($albumIds));
 			$params = \array_merge([$coverFileId], $albumIds);
 			$result = $this->execute($sql, $params);
 			$updated = $result->rowCount() > 0;
@@ -346,12 +379,12 @@ class AlbumMapper extends BaseMapper {
 	 * @param integer[] $coverFileIds
 	 * @param string[]|null $userIds the users whose music library is targeted; all users are targeted if omitted
 	 * @return Album[] albums which got modified (with incomplete data, only id and user are valid),
-	 *         empty array if none
+	 *                 empty array if none
 	 */
-	public function removeCovers(array $coverFileIds, ?array $userIds=null) : array {
+	public function removeCovers(array $coverFileIds, ?array $userIds = null) : array {
 		// find albums using the given file as cover
-		$sql = 'SELECT `id`, `user_id` FROM `*PREFIX*music_albums` WHERE `cover_file_id` IN ' .
-			$this->questionMarks(\count($coverFileIds));
+		$sql = 'SELECT `id`, `user_id` FROM `*PREFIX*music_albums` WHERE `cover_file_id` IN '
+			. $this->questionMarks(\count($coverFileIds));
 		$params = $coverFileIds;
 		if ($userIds !== null) {
 			$sql .= ' AND `user_id` IN ' . $this->questionMarks(\count($userIds));
@@ -398,8 +431,8 @@ class AlbumMapper extends BaseMapper {
 		$return = [];
 		while ($row = $result->fetch()) {
 			$return[] = [
-				'albumId' => (int)$row['id'],
-				'userId' => $row['user_id'],
+				'albumId'        => (int)$row['id'],
+				'userId'         => $row['user_id'],
 				'parentFolderId' => (int)$row['parent']
 			];
 		}
@@ -422,7 +455,7 @@ class AlbumMapper extends BaseMapper {
 		$images = $result->fetchAll();
 		$result->closeCursor();
 		if (\count($images) > 0) {
-			$getImageRank = function($imageName) {
+			$getImageRank = function ($imageName) {
 				$coverNames = ['cover', 'albumart', 'album', 'front', 'folder'];
 				foreach ($coverNames as $i => $coverName) {
 					if (StringUtil::startsWith($imageName, $coverName, /*$ignoreCase=*/true)) {
@@ -432,8 +465,8 @@ class AlbumMapper extends BaseMapper {
 				return \count($coverNames);
 			};
 
-			\usort($images, fn($imageA, $imageB) =>
-				$getImageRank($imageA['name']) <=> $getImageRank($imageB['name'])
+			\usort($images, fn ($imageA, $imageB)
+				=> $getImageRank($imageA['name']) <=> $getImageRank($imageB['name'])
 			);
 			$imageId = (int)$images[0]['fileid'];
 			$this->setCover($imageId, $albumId);
@@ -508,29 +541,32 @@ class AlbumMapper extends BaseMapper {
 		// The extra subquery "mysqlhack" seen around some nested queries is needed in order for these to not be insanely slow on MySQL.
 		// In case of 'recent_played', the MySQL 5.5.62 errored with "1235 This version of MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'" without the extra subquery.
 		$condForRule = [
-			'album_artist'	=> "$conv(`artist`.`name`) $sqlOp $conv(?)",
-			'song_artist'	=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_artists` `ar` ON `t`.`artist_id` = `ar`.`id` WHERE $conv(`ar`.`name`) $sqlOp $conv(?))",
-			'song'			=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $conv(`t`.`title`) $sqlOp $conv(?))",
-			'original_year'	=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MIN(`year`) $sqlOp ?) mysqlhack)",
-			'songrating'	=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE `t`.`rating` $sqlOp ?)",
-			'artistrating'	=> "`artist`.rating $sqlOp ?",
-			'played_times'	=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING SUM(`play_count`) $sqlOp ?) mysqlhack)",
-			'last_play'		=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`last_played`) $sqlOp ?) mysqlhack)",
-			'myplayed'		=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`last_played`) $sqlOp) mysqlhack)", // operator "IS NULL" or "IS NOT NULL"
-			'myplayedartist'=> "`album_artist_id` IN (SELECT * FROM (SELECT `artist_id` from `*PREFIX*music_tracks` GROUP BY `artist_id` HAVING MAX(`last_played`) $sqlOp) mysqlhack)", // operator "IS NULL" or "IS NOT NULL"
-			'song_count'	=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING COUNT(`id`) $sqlOp ?) mysqlhack)",
-			'disk_count'	=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`disk`) $sqlOp ?) mysqlhack)",
-			'time'			=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING SUM(`length`) $sqlOp ?) mysqlhack)",
-			'album_genre'	=> "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` GROUP BY `album_id` HAVING $conv(" . $this->sqlGroupConcat('`g`.`name`') . ") $sqlOp $conv(?)) mysqlhack)",
-			'song_genre'	=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` WHERE $conv(`g`.`name`) $sqlOp $conv(?))",
-			'no_genre'		=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` WHERE `g`.`name` " . (($sqlOp == 'IS NOT NULL') ? '=' : '!=') . ' "")',
-			'playlist'		=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $sqlOp EXISTS (SELECT 1 from `*PREFIX*music_playlists` `p` WHERE `p`.`id` = ? AND `p`.`track_ids` LIKE " . $this->sqlConcat("'%|'", "`t`.`id`", "'|%'") . '))',
-			'playlist_name'	=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE EXISTS (SELECT 1 from `*PREFIX*music_playlists` `p` WHERE $conv(`p`.`name`) $sqlOp $conv(?) AND `p`.`track_ids` LIKE " . $this->sqlConcat("'%|'", "`t`.`id`", "'|%'") . '))',
-			'file'			=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*filecache` `f` ON `t`.`file_id` = `f`.`fileid` WHERE $conv(`f`.`name`) $sqlOp $conv(?))",
-			'recent_played'	=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM (SELECT `album_id`, MAX(`last_played`) FROM `*PREFIX*music_tracks` WHERE `user_id` = ? GROUP BY `album_id` ORDER BY MAX(`last_played`) DESC LIMIT $sqlOp) mysqlhack)",
-			'mbid_song'		=> "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE `t`.`mbid` $sqlOp ?)",
-			'mbid_artist'	=> "`artist`.`mbid` $sqlOp ?",
-			'has_image'		=> "`*PREFIX*music_albums`.`cover_file_id` $sqlOp" // operator "IS NULL" or "IS NOT NULL"
+			'album_artist'     => "$conv(`artist`.`name`) $sqlOp $conv(?)",
+			'song_artist'      => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_artists` `ar` ON `t`.`artist_id` = `ar`.`id` WHERE $conv(`ar`.`name`) $sqlOp $conv(?))",
+			'song'             => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $conv(`t`.`title`) $sqlOp $conv(?))",
+			'original_year'    => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MIN(`year`) $sqlOp ?) mysqlhack)",
+			'songrating'       => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE `t`.`rating` $sqlOp ?)",
+			'artistrating'     => "`artist`.rating $sqlOp ?",
+			'played_times'     => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING SUM(`play_count`) $sqlOp ?) mysqlhack)",
+			'last_play'        => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`last_played`) $sqlOp ?) mysqlhack)",
+			'myplayed'         => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` from `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`last_played`) $sqlOp) mysqlhack)", // operator "IS NULL" or "IS NOT NULL"
+			'myplayedartist'   => "`album_artist_id` IN (SELECT * FROM (SELECT `artist_id` from `*PREFIX*music_tracks` GROUP BY `artist_id` HAVING MAX(`last_played`) $sqlOp) mysqlhack)", // operator "IS NULL" or "IS NOT NULL"
+			'song_count'       => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING COUNT(`id`) $sqlOp ?) mysqlhack)",
+			'disk_count'       => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING MAX(`disk`) $sqlOp ?) mysqlhack)",
+			'time'             => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` GROUP BY `album_id` HAVING SUM(`length`) $sqlOp ?) mysqlhack)",
+			'label'            => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_record_labels` `l` ON `t`.`record_label_id` = `l`.`id` WHERE $conv(`l`.`name`) $sqlOp $conv(?))",
+			'album_genre'      => "`*PREFIX*music_albums`.`id` IN (SELECT * FROM (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` GROUP BY `album_id` HAVING $conv(" . $this->sqlGroupConcat('`g`.`name`') . ") $sqlOp $conv(?)) mysqlhack)",
+			'song_genre'       => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` WHERE $conv(`g`.`name`) $sqlOp $conv(?))",
+			'no_genre'         => '`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*music_genres` `g` ON `t`.`genre_id` = `g`.`id` WHERE `g`.`name` ' . (($sqlOp == 'IS NOT NULL') ? '=' : '!=') . ' "")',
+			'playlist'         => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $sqlOp EXISTS (SELECT 1 from `*PREFIX*music_playlists` `p` WHERE `p`.`id` = ? AND `p`.`track_ids` LIKE " . $this->sqlConcat("'%|'", '`t`.`id`', "'|%'") . '))',
+			'playlist_name'    => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE EXISTS (SELECT 1 from `*PREFIX*music_playlists` `p` WHERE $conv(`p`.`name`) $sqlOp $conv(?) AND `p`.`track_ids` LIKE " . $this->sqlConcat("'%|'", '`t`.`id`', "'|%'") . '))',
+			'file'             => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` JOIN `*PREFIX*filecache` `f` ON `t`.`file_id` = `f`.`fileid` WHERE $conv(`f`.`name`) $sqlOp $conv(?))",
+			'recent_played'    => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM (SELECT `album_id`, MAX(`last_played`) FROM `*PREFIX*music_tracks` WHERE `user_id` = ? GROUP BY `album_id` ORDER BY MAX(`last_played`) DESC LIMIT $sqlOp) mysqlhack)",
+			'mbid_song'        => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $conv(`t`.`mbid`) $sqlOp $conv(?))",
+			'mbid_rel_track'   => "`*PREFIX*music_albums`.`id` IN (SELECT `album_id` FROM `*PREFIX*music_tracks` `t` WHERE $conv(`t`.`mbid_rel_track`) $sqlOp $conv(?))",
+			'mbid_artist'      => "$conv(`artist`.`mbid`) $sqlOp $conv(?)",
+			'mbid_album_group' => "$conv(`*PREFIX*music_albums`.`mbid_group`) $sqlOp $conv(?)",
+			'has_image'        => "`*PREFIX*music_albums`.`cover_file_id` $sqlOp", // operator "IS NULL" or "IS NOT NULL"
 		];
 
 		// Add alias rules
@@ -542,5 +578,21 @@ class AlbumMapper extends BaseMapper {
 		$condForRule['mbid_album'] = parent::advFormatSqlCondition('mbid', $sqlOp, $conv);
 
 		return $condForRule[$rule] ?? parent::advFormatSqlCondition($rule, $sqlOp, $conv);
+	}
+
+	/** @return array<array{id: int, album_artist_id: int, album_artist_uncertain: bool|int|null}> */
+	public function findIdsAndArtistsByHashAndMbid(string $hash, ?string $mbid, string $userId) : array {
+		$params = [$hash, $userId];
+		if ($mbid !== null) {
+			$params[] = $mbid;
+			$mbidCond = '`mbid` = ?';
+		} else {
+			$mbidCond = '`mbid` IS NULL';
+		}
+		$sql = "SELECT `id`, `album_artist_id`, `album_artist_uncertain` FROM `*PREFIX*music_albums` WHERE `hash` = ? AND `user_id` = ? AND $mbidCond";
+		$result = $this->execute($sql, $params);
+		$rows = $result->fetchAll();
+		$result->closeCursor();
+		return $rows;
 	}
 }

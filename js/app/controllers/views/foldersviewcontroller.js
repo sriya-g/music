@@ -5,30 +5,24 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2019 - 2024
+ * @copyright Pauli Järvinen 2019 - 2026
  */
 
 
 angular.module('Music').controller('FoldersViewController', [
-	'$rootScope', '$scope', '$timeout', '$document', 'playQueueService', 'libraryService',
-	function ($rootScope, $scope, $timeout, $document, playQueueService, libraryService) {
+	'$rootScope', '$scope', '$timeout', 'playQueueService', 'libraryService', 'libraryFactory',
+	function ($rootScope, $scope, $timeout, playQueueService, libraryService, libraryFactory) {
+
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		$scope.folders = null;
 		$scope.rootFolder = null;
-		$rootScope.currentView = $scope.getViewIdFromUrl();
 
 		// When making the view visible, the folders are added incrementally step-by-step.
 		// The purpose of this is to keep the browser responsive even in case the view contains
 		// an enormous amount of folders (like several thousands).
-		const INCREMENTAL_LOAD_STEP = 100;
+		const INCREMENTAL_LOAD_STEP = 1000;
 		$scope.incrementalLoadLimit = 0;
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
 
 		function playPlaylist(listId, tracks, startFromTrackId = undefined) {
 			let startIndex = null;
@@ -125,15 +119,11 @@ angular.module('Music').controller('FoldersViewController', [
 			return 'folder-' + $scope.folders[index].id;
 		};
 
-		playQueueService.subscribe('playlistEnded', function() {
-			updateHighlight(null);
-		}, this);
+		playQueueService.subscribe('playlistEnded', $scope, () => updateHighlight(null));
 
-		playQueueService.subscribe('playlistChanged', function(playlistId) {
-			updateHighlight(playlistId);
-		}, this);
+		playQueueService.subscribe('playlistChanged', $scope, (playlistId) => updateHighlight(playlistId));
 
-		subscribe('scrollToTrack', function(_event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
 				let elementId = 'track-' + trackId;
 				// If the track element is hidden (collapsed), scroll to the folder
@@ -147,43 +137,26 @@ angular.module('Music').controller('FoldersViewController', [
 			}
 		});
 
-		$scope.$on('$destroy', () => {
-			_.each(unsubFuncs, function(func) { func(); });
-			playQueueService.unsubscribeAll(this);
-		});
-
-		// Init happens either immediately (after making the loading animation visible)
-		// or once collection has been loaded
-		if (libraryService.collectionLoaded()) {
-			$timeout(initView);
-		}
-
-		subscribe('collectionUpdating', function() {
+		libraryFactory.subscribe('collectionUpdating', $scope, () => {
 			$scope.folders = null;
 			$scope.rootFolder = null;
-		});
-
-		subscribe('collectionLoaded', function () {
-			$timeout(initView);
+			initView();
 		});
 
 		function initView() {
-			$scope.incrementalLoadLimit = 0;
-			if ($scope.$parent) {
-				$scope.$parent.loadFoldersAndThen(function() {
-					$scope.folders = libraryService.getAllFoldersWithTracks();
-					$scope.rootFolder = libraryService.getRootFolder();
-					makeContentVisible();
-				});
-			}
+			libraryFactory.getRootFolder().then(() => {
+				$scope.folders = libraryService.getAllFoldersWithTracks();
+				$scope.rootFolder = libraryService.getRootFolder();
+				makeContentVisible();
+			});
 		}
+		initView();
 
 		function makeContentVisible() {
-			$rootScope.loading = true;
+			$scope.incrementalLoadLimit = 0;
 			if ($scope.foldersFlatLayout) {
 				$timeout(showMore);
 			} else {
-				$scope.incrementalLoadLimit = 0;
 				$timeout(onViewReady);
 			}
 		}
@@ -195,7 +168,7 @@ angular.module('Music').controller('FoldersViewController', [
 		 */
 		function showMore() {
 			// show more entries only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
+			if ($scope.$parent) {
 				$scope.incrementalLoadLimit += INCREMENTAL_LOAD_STEP;
 				if ($scope.incrementalLoadLimit < $scope.folders.length) {
 					$timeout(showMore);
@@ -206,15 +179,10 @@ angular.module('Music').controller('FoldersViewController', [
 		}
 
 		function onViewReady() {
-			$rootScope.loading = false;
 			updateHighlight(playQueueService.getCurrentPlaylistId());
-			$rootScope.$emit('viewActivated');
+			$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 		}
 
-		subscribe('foldersLayoutChanged', makeContentVisible);
-
-		subscribe('deactivateView', function() {
-			$timeout(() => $rootScope.$emit('viewDeactivated'));
-		});
+		$rootScope.subscribe('foldersLayoutChanged', $scope, makeContentVisible);
 	}
 ]);

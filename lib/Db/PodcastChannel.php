@@ -91,14 +91,14 @@ class PodcastChannel extends Entity {
 
 	public function toApi(IURLGenerator $urlGenerator) : array {
 		$result = [
-			'id' => $this->getId(),
+			'id'    => $this->getId(),
 			'title' => $this->getTitle(),
 			'image' => $this->createImageUrl($urlGenerator),
-			'hash' => $this->getContentHash()
+			'hash'  => $this->getContentHash()
 		];
 
 		if ($this->episodes !== null) {
-			$result['episodes'] = \array_map(fn($e) => $e->toApi($urlGenerator), $this->episodes);
+			$result['episodes'] = \array_map(fn ($e) => $e->toApi($urlGenerator), $this->episodes);
 		}
 
 		return $result;
@@ -106,44 +106,44 @@ class PodcastChannel extends Entity {
 
 	public function detailsToApi(IURLGenerator $urlGenerator) : array {
 		return [
-			'id' => $this->getId(),
-			'title' => $this->getTitle(),
-			'description' => $this->getDescription(),
-			'image' => $this->createImageUrl($urlGenerator, ['originalSize' => true]),
-			'link_url' => $this->getLinkUrl(),
-			'rss_url' => $this->getRssUrl(),
-			'language' => $this->getLanguage(),
-			'copyright' => $this->getCopyright(),
-			'author' => $this->getAuthor(),
-			'category' => $this->getCategory(),
-			'published' => $this->getPublished(),
+			'id'              => $this->getId(),
+			'title'           => $this->getTitle(),
+			'description'     => $this->getDescription(),
+			'image'           => $this->createImageUrl($urlGenerator, ['originalSize' => true]),
+			'link_url'        => $this->getLinkUrl(),
+			'rss_url'         => $this->getRssUrl(),
+			'language'        => $this->getLanguage(),
+			'copyright'       => $this->getCopyright(),
+			'author'          => $this->getAuthor(),
+			'category'        => $this->getCategory(),
+			'published'       => $this->getPublished(),
 			'last_build_date' => $this->getLastBuildDate(),
-			'update_checked' => $this->getUpdateChecked(),
+			'update_checked'  => $this->getUpdateChecked(),
 		];
 	}
 
 	public function toAmpacheApi() : array {
 		$result = [
-			'id' => (string)$this->getId(),
-			'name' => $this->getTitle(),
-			'description' => $this->getDescription(),
-			'language' => $this->getLanguage(),
-			'copyright' => $this->getCopyright(),
-			'feed_url' => $this->getRssUrl(),
-			'build_date' => Util::formatDateTimeUtcOffset($this->getLastBuildDate()),
-			'sync_date' => Util::formatDateTimeUtcOffset($this->getUpdateChecked()),
-			'public_url' => $this->getLinkUrl(),
-			'website' => $this->getLinkUrl(),
-			'art' => $this->getImageUrl(),
-			'has_art' => !empty($this->getImageUrl()),
-			'flag' => !empty($this->getStarred()),
-			'rating' => $this->getRating(),
+			'id'            => (string)$this->getId(),
+			'name'          => $this->getTitle(),
+			'description'   => $this->getDescription(),
+			'language'      => $this->getLanguage(),
+			'copyright'     => $this->getCopyright(),
+			'feed_url'      => $this->getRssUrl(),
+			'build_date'    => Util::formatDateTimeUtcOffset($this->getLastBuildDate()),
+			'sync_date'     => Util::formatDateTimeUtcOffset($this->getUpdateChecked()),
+			'public_url'    => $this->getLinkUrl(),
+			'website'       => $this->getLinkUrl(),
+			'art'           => $this->getImageUrl(),
+			'has_art'       => !empty($this->getImageUrl()),
+			'flag'          => !empty($this->getStarred()),
+			'rating'        => $this->getRating(),
 			'preciserating' => $this->getRating(),
 		];
 
 		if ($this->episodes !== null) {
-			$createImageUrl = fn($e) => $this->getImageUrl();
-			$result['podcast_episode'] = \array_map(fn($e) => $e->toAmpacheApi($createImageUrl, null), $this->episodes);
+			$createImageUrl = fn ($e) => $this->getImageUrl();
+			$result['podcast_episode'] = \array_map(fn ($e) => $e->toAmpacheApi($createImageUrl, null), $this->episodes);
 		}
 
 		return $result;
@@ -151,18 +151,18 @@ class PodcastChannel extends Entity {
 
 	public function toSubsonicApi() : array {
 		$result = [
-			'id' => 'podcast_channel-' . $this->getId(),
-			'url' => $this->getRssUrl(),
-			'title' => $this->getTitle(),
-			'description' => $this->getDescription(),
-			'coverArt' => 'podcast_channel-' . $this->getId(),
+			'id'               => 'podcast_channel-' . $this->getId(),
+			'url'              => $this->getRssUrl(),
+			'title'            => $this->getTitle(),
+			'description'      => $this->getDescription(),
+			'coverArt'         => 'podcast_channel-' . $this->getId(),
 			'originalImageUrl' => $this->getImageUrl(),
-			'status' => 'completed',
-			'starred' => Util::formatZuluDateTime($this->getStarred())
+			'status'           => 'completed',
+			'starred'          => Util::formatZuluDateTime($this->getStarred())
 		];
 
 		if ($this->episodes !== null) {
-			$result['episode'] = \array_map(fn($e) => $e->toSubsonicApi(), $this->episodes);
+			$result['episode'] = \array_map(fn ($e) => $e->toSubsonicApi(), $this->episodes);
 		}
 
 		return $result;

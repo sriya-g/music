@@ -16,7 +16,6 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\AppFramework\Db\UniqueConstraintViolationException;
 use OCA\Music\BusinessLayer\Library;
 use OCA\Music\Db\Cache;
-
 use OCP\ICache;
 
 /**
@@ -41,7 +40,7 @@ class CollectionService {
 		private Library $library,
 		private ICache $fileCache,
 		private Cache $dbCache,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -70,9 +69,9 @@ class CollectionService {
 		if ($hash !== null) {
 			$json = $this->fileCache->get('music_collection.json');
 			if ($json === null) {
-				$this->logger->debug("Inconsistent collection state for user $userId: ".
-						"Hash found from DB-backed cache but data not found from the ".
-						"file-backed cache. Removing also the hash.");
+				$this->logger->debug("Inconsistent collection state for user $userId: "
+						. 'Hash found from DB-backed cache but data not found from the '
+						. 'file-backed cache. Removing also the hash.');
 				$this->dbCache->remove($userId, 'collection');
 			}
 		}
@@ -82,6 +81,6 @@ class CollectionService {
 	private function addJsonToCache(string $json, string $userId) : void {
 		$hash = \hash('md5', $json);
 		$this->dbCache->add($userId, 'collection', $hash);
-		$this->fileCache->set('music_collection.json', $json, 5*365*24*60*60);
+		$this->fileCache->set('music_collection.json', $json, 5 * 365 * 24 * 60 * 60);
 	}
 }

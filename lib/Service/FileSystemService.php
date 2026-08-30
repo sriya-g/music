@@ -16,7 +16,6 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\Db\Track;
 use OCA\Music\Db\TrackMapper;
 use OCA\Music\Utility\ArrayUtil;
-
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\Files\FileInfo;
 use OCP\Files\Folder;
@@ -25,7 +24,7 @@ class FileSystemService {
 
 	public function __construct(
 		private TrackMapper $mapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -39,7 +38,7 @@ class FileSystemService {
 		$trackIdsByFolder = $this->mapper->findTrackAndFolderIds($userId);
 		$foldersLut = $this->getFoldersLut($trackIdsByFolder, $userId, $musicFolder);
 		return \array_map(
-			fn($id, $folderInfo) => \array_merge($folderInfo, ['id' => $id]),
+			fn ($id, $folderInfo) => \array_merge($folderInfo, ['id' => $id]),
 			\array_keys($foldersLut), $foldersLut
 		);
 	}
@@ -48,14 +47,14 @@ class FileSystemService {
 	 * @param Track[] $tracks (in|out)
 	 */
 	public function injectFolderPathsToTracks(array $tracks, string $userId, Folder $musicFolder) : void {
-		$folderIds = \array_map(fn($t) => $t->getFolderId(), $tracks);
+		$folderIds = \array_map(fn ($t) => $t->getFolderId(), $tracks);
 		$folderIds = \array_unique($folderIds);
 		$trackIdsByFolder = \array_fill_keys($folderIds, []); // track IDs are not actually used here so we can use empty arrays
 
 		$foldersLut = $this->getFoldersLut($trackIdsByFolder, $userId, $musicFolder);
 
 		// recursive helper to get folder's path and cache all parent paths on the way
-		$getFolderPath = function(int $id, array &$foldersLut) use (&$getFolderPath) : string {
+		$getFolderPath = function (int $id, array &$foldersLut) use (&$getFolderPath) : string {
 			// setup the path if not cached already
 			if (!isset($foldersLut[$id]['path'])) {
 				$parentId = $foldersLut[$id]['parent'];
@@ -82,7 +81,7 @@ class FileSystemService {
 		$descendants = [];
 		$foldersToProcess = [$folderId];
 
-		while(\count($foldersToProcess)) {
+		while (\count($foldersToProcess)) {
 			$descendants = \array_merge($descendants, $foldersToProcess);
 			$foldersToProcess = $this->mapper->findSubFolderIds($foldersToProcess);
 		}
@@ -159,7 +158,7 @@ class FileSystemService {
 								$lut[$rootFolderId]['trackIds'][] = $trackId;
 
 								// remove the former parent folder if it has no more tracks and it's not one of the mount point folders
-								if (\count($entry['trackIds']) == 0 && empty(\array_filter($nodesUnderRoot, fn($n) => $n->getId() == $folderId))) {
+								if (\count($entry['trackIds']) == 0 && empty(\array_filter($nodesUnderRoot, fn ($n) => $n->getId() == $folderId))) {
 									unset($lut[$folderId]);
 								}
 								break;
@@ -185,7 +184,7 @@ class FileSystemService {
 		while (\count($foldersToProcess)) {
 			$parentIds = \array_unique(\array_column($foldersToProcess, 'parent'));
 			// do not process root even if it's included in $foldersToProcess
-			$parentIds = \array_filter($parentIds, fn($i) => $i !== null);
+			$parentIds = \array_filter($parentIds, fn ($i) => $i !== null);
 			$parentIds = ArrayUtil::diff($parentIds, \array_keys($lut));
 			$parentFolders = $this->mapper->findNodeNamesAndParents($parentIds);
 

@@ -19,37 +19,37 @@ class AmpachePreferences {
 
 	private const SETTINGS = [
 		[
-			'id' => 1,
-			'name' => 'download',
-			'level' => 100,
+			'id'          => 1,
+			'name'        => 'download',
+			'level'       => 100,
 			'description' => 'Allow Downloads',
-			'value' => '1',
-			'type' => 'boolean',
-			'category' => 'options',
+			'value'       => '1',
+			'type'        => 'boolean',
+			'category'    => 'options',
 			'subcategory' => 'feature',
-			'has_access' => false
+			'has_access'  => false
 		],
 		[
-			'id' => 122,
-			'name' => 'album_release_type',
-			'level' => 100,
+			'id'          => 122,
+			'name'        => 'album_release_type',
+			'level'       => 100,
 			'description' => 'Album - Group per release type',
-			'value' => '0',
-			'type' => 'boolean',
-			'category' => 'interface',
+			'value'       => '0',
+			'type'        => 'boolean',
+			'category'    => 'interface',
 			'subcategory' => 'library',
-			'has_access' => false
+			'has_access'  => false
 		],
 		[
-			'id' => 130,
-			'name' => 'album_release_type_sort',
-			'level' => 100,
+			'id'          => 130,
+			'name'        => 'album_release_type_sort',
+			'level'       => 100,
 			'description' => 'Album - Group per release type sort',
-			'value' => 'album,ep,live,single',
-			'type' => 'string',
-			'category' => 'interface',
+			'value'       => 'album,ep,live,single',
+			'type'        => 'string',
+			'category'    => 'interface',
 			'subcategory' => 'library',
-			'has_access' => false
+			'has_access'  => false
 		]
 	];
 

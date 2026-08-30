@@ -5,28 +5,17 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2023, 2024
+ * @copyright Pauli Järvinen 2023 - 2026
  */
 
 
 angular.module('Music').controller('SmartListViewController', [
-	'$rootScope', '$scope', 'playQueueService', 'libraryService', '$timeout',
-	function ($rootScope, $scope, playQueueService, libraryService, $timeout) {
+	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'libraryFactory', '$timeout',
+	function ($rootScope, $scope, playQueueService, libraryService, libraryFactory, $timeout) {
 
-		$rootScope.currentView = $scope.getViewIdFromUrl();
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		$scope.tracks = null;
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let _unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			_unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', () => {
-			_.each(_unsubFuncs, (func) => func());
-		});
 
 		function play(startIndex = null) {
 			playQueueService.setPlaylist('smartlist', $scope.tracks, startIndex);
@@ -69,7 +58,7 @@ angular.module('Music').controller('SmartListViewController', [
 			return { track: trackId };
 		};
 
-		subscribe('scrollToTrack', function(_event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
 				$scope.$parent.scrollToItem('track-' + trackId);
 			}
@@ -79,7 +68,7 @@ angular.module('Music').controller('SmartListViewController', [
 		// or once artists have been loaded
 		$timeout(initView);
 
-		subscribe('smartListLoaded', function () {
+		libraryFactory.subscribe('smartListLoaded', $scope, () => {
 			// Nullify any previous tracks to force tracklist directive recreation
 			$scope.tracks = null;
 			$timeout(initView);
@@ -89,16 +78,8 @@ angular.module('Music').controller('SmartListViewController', [
 			const list = libraryService.getSmartList();
 			if (list !== null) {
 				$scope.tracks = list.tracks;
-				$timeout(() => {
-					$rootScope.loading = false;
-					$rootScope.$emit('viewActivated');
-				});
+				$timeout(() => $rootScope.$emit('viewActivated', THIS_VIEW_ID));
 			}
 		}
-
-		subscribe('deactivateView', () => {
-			$rootScope.$emit('viewDeactivated');
-		});
-
 	}
 ]);

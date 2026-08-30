@@ -14,9 +14,8 @@
 
 namespace OCA\Music\Db;
 
-use OCP\IDBConnection;
-
 use OCA\Music\AppFramework\Db\Mapper;
+use OCP\IDBConnection;
 
 /**
  * @method AmpacheSession findEntity(string $sql, array $params)

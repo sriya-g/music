@@ -20,33 +20,29 @@ use Symfony\Component\Console\Output\OutputInterface;
 class RegisterMimeTypes extends Command {
 
 	private array $mimeMappings = [
-		'aac'	=> ['audio/aac'],
-		'aif'	=> ['audio/aiff'],
-		'aifc'	=> ['audio/aiff'],
-		'aiff'	=> ['audio/aiff'],
-		'au'	=> ['audio/basic'],
-		'caf'	=> ['audio/x-caf'],
-		'wpl'	=> ['application/vnd.ms-wpl'],
+		'aac'  => ['audio/aac'],
+		'aif'  => ['audio/aiff'],
+		'aifc' => ['audio/aiff'],
+		'aiff' => ['audio/aiff'],
+		'au'   => ['audio/basic'],
+		'caf'  => ['audio/x-caf'],
+		'wpl'  => ['application/vnd.ms-wpl'],
 	];
 
-	public function __construct(private IMimeTypeLoader $mimeTypeLoader) {
+	public function __construct(
+		private IMimeTypeLoader $mimeTypeLoader,
+	) {
 		parent::__construct();
 	}
 
-	/**
-	 * @return void
-	 */
-	protected function configure() {
+	protected function configure() : void {
 		$this
 			->setName('music:register-mime-types')
 			->setDescription('map following file extensions to proper MIME types: ' . \json_encode(\array_keys($this->mimeMappings)));
 		;
 	}
 
-	/**
-	 * @return int
-	 */
-	protected function execute(InputInterface $input, OutputInterface $output) {
+	protected function execute(InputInterface $input, OutputInterface $output) : int {
 		try {
 			$output->writeln('Registering MIME types for existing files...');
 			$this->registerForExistingFiles($output);
@@ -70,7 +66,7 @@ class RegisterMimeTypes extends Command {
 				}
 			}
 		} else {
-			$output->writeln("  Could not update the filecache");
+			$output->writeln('  Could not update the filecache');
 		}
 	}
 

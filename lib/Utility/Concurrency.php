@@ -18,7 +18,10 @@ use OCA\Music\Db\Cache;
 class Concurrency {
 	private const SEMAPHORE_KEY_BASE = 0xa5e63947; // arbitrarily selected 32-bit base value
 
-	public function __construct(private Cache $cache, private Logger $logger) {
+	public function __construct(
+		private Cache $cache,
+		private Logger $logger,
+	) {
 	}
 
 	public function mutexReserve(string $userId, string $key) : false|\SysvSemaphore {

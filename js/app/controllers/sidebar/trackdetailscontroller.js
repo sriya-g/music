@@ -81,7 +81,7 @@ angular.module('Music').controller('TrackDetailsController', [
 			}
 		});
 
-		$rootScope.$on('playerProgress', function(event, time) {
+		$rootScope.subscribe('playerProgress', $scope, (_event, time) => {
 			// check if we are viewing time-synced lyrics of the currently playing track
 			if ($scope.details && $scope.details.lyrics && $scope.details.lyrics.synced
 					&& $scope.$parent.currentTrack.id == $scope.track.id) {
@@ -131,8 +131,9 @@ angular.module('Music').controller('TrackDetailsController', [
 		};
 
 		$scope.formatDetailName = function(rawName) {
-			// replace musicbrainz in tag names with "mb" to avoid truncation of long names in the sidebar
+			// abbreviate "musicbrainz" and "replaygain" in tag names to avoid truncation of long names in the sidebar
 			rawName = rawName.replace(/musicbrainz/, 'mb');
+			rawName = rawName.replace(/replaygain/, 'rg');
 
 			switch (rawName) {
 			case 'band':			return 'album artist';

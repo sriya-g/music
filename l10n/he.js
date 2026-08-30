@@ -30,7 +30,7 @@ OC.L10N.register(
     "Tracks" : "קטעי מוסיקה",
     "Unknown album" : "אלבום לא ידוע",
     "Unknown artist" : "אמן לא ידוע",
-    "Upload music in the files app to listen to it here" : "יש להעלות מוזיקה ביישום הקבצים להשמעה שלה כאן",
+    "Upload music in the Files app to listen to it here" : "יש להעלות מוזיקה ביישום הקבצים להשמעה שלה כאן",
     "Use this address to browse your music collection from any Ampache compatible player." : "ניתן להשתמש בכתובת זו לעיון בספריית המוזיקה שלך מכל נגן התומך באפצ'י.",
     "Use your username and following password to connect to this Ampache instance:" : "השתמשו בשם המשתמש שלכם ובסיסמא הבאה לחיבור למריץ אפצ'י זה:",
     "Volume" : "עוצמת שמע",

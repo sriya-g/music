@@ -28,7 +28,6 @@ use OCA\Music\Http\ErrorResponse;
 use OCA\Music\Service\DetailsService;
 use OCA\Music\Service\Scanner;
 use OCA\Music\Utility\Random;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -41,17 +40,17 @@ use OCP\IURLGenerator;
 class ShivaApiController extends Controller {
 
 	public function __construct(
-			string $appName,
-			IRequest $request,
-			private IURLGenerator $urlGenerator,
-			private TrackBusinessLayer $trackBusinessLayer,
-			private ArtistBusinessLayer $artistBusinessLayer,
-			private AlbumBusinessLayer $albumBusinessLayer,
-			private DetailsService $detailsService,
-			private Scanner $scanner,
-			private ?string $userId,
-			private IL10N $l10n,
-			private Logger $logger
+		string $appName,
+		IRequest $request,
+		private IURLGenerator $urlGenerator,
+		private TrackBusinessLayer $trackBusinessLayer,
+		private ArtistBusinessLayer $artistBusinessLayer,
+		private AlbumBusinessLayer $albumBusinessLayer,
+		private DetailsService $detailsService,
+		private Scanner $scanner,
+		private ?string $userId,
+		private IL10N $l10n,
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -75,15 +74,15 @@ class ShivaApiController extends Controller {
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function artists(string|int|bool|null $fulltree, string|int|bool|null $albums, ?int $page_size=null, ?int $page=null) : JSONResponse {
+	public function artists(string|int|bool|null $fulltree, string|int|bool|null $albums, ?int $page_size = null, ?int $page = null) : JSONResponse {
 		$fulltree = \filter_var($fulltree, FILTER_VALIDATE_BOOLEAN);
 		$includeAlbums = \filter_var($albums, FILTER_VALIDATE_BOOLEAN);
-		list($limit, $offset) = self::shivaPageToLimits($page_size, $page);
+		[$limit, $offset] = self::shivaPageToLimits($page_size, $page);
 
 		/** @var Artist[] $artists */
 		$artists = $this->artistBusinessLayer->findAll($this->user(), SortBy::Name, $limit, $offset);
 
-		$artists = \array_map(fn($a) => $this->artistToApi($a, $includeAlbums || $fulltree, $fulltree), $artists);
+		$artists = \array_map(fn ($a) => $this->artistToApi($a, $includeAlbums || $fulltree, $fulltree), $artists);
 
 		return new JSONResponse($artists);
 	}
@@ -115,16 +114,16 @@ class ShivaApiController extends Controller {
 			$artistId = $artist->getId();
 			$albums = $this->albumBusinessLayer->findAllByArtist($artistId, $this->user());
 
-			$artistInApi['albums'] = \array_map(fn($a) => $this->albumToApi($a, $includeTracks, false), $albums);
+			$artistInApi['albums'] = \array_map(fn ($a) => $this->albumToApi($a, $includeTracks, false), $albums);
 		}
 		return $artistInApi;
 	}
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function albums(?int $artist=null, string|int|bool|null $fulltree=null, ?int $page_size=null, ?int $page=null) : JSONResponse {
+	public function albums(?int $artist = null, string|int|bool|null $fulltree = null, ?int $page_size = null, ?int $page = null) : JSONResponse {
 		$fulltree = \filter_var($fulltree, FILTER_VALIDATE_BOOLEAN);
-		list($limit, $offset) = self::shivaPageToLimits($page_size, $page);
+		[$limit, $offset] = self::shivaPageToLimits($page_size, $page);
 
 		if ($artist !== null) {
 			$albums = $this->albumBusinessLayer->findAllByArtist($artist, $this->user(), $limit, $offset);
@@ -132,7 +131,7 @@ class ShivaApiController extends Controller {
 			$albums = $this->albumBusinessLayer->findAll($this->user(), SortBy::Name, $limit, $offset);
 		}
 
-		$albums = \array_map(fn($a) => $this->albumToApi($a, $fulltree, $fulltree), $albums);
+		$albums = \array_map(fn ($a) => $this->albumToApi($a, $fulltree, $fulltree), $albums);
 
 		return new JSONResponse($albums);
 	}
@@ -159,12 +158,12 @@ class ShivaApiController extends Controller {
 		if ($includeTracks) {
 			$albumId = $album->getId();
 			$tracks = $this->trackBusinessLayer->findAllByAlbum($albumId, $this->user());
-			$albumInApi['tracks'] = \array_map(fn($t) => $t->toShivaApi($this->urlGenerator), $tracks);
+			$albumInApi['tracks'] = \array_map(fn ($t) => $t->toShivaApi($this->urlGenerator, $this->l10n), $tracks);
 		}
 
 		if ($includeArtists) {
 			$artists = $album->getArtists() ?? [];
-			$albumInApi['artists'] = \array_map(fn($a) => $a->toShivaApi($this->urlGenerator, $this->l10n), $artists);
+			$albumInApi['artists'] = \array_map(fn ($a) => $a->toShivaApi($this->urlGenerator, $this->l10n), $artists);
 		}
 
 		return $albumInApi;
@@ -172,9 +171,9 @@ class ShivaApiController extends Controller {
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function tracks(?int $artist=null, ?int $album=null, string|int|bool|null $fulltree=null, ?int $page_size=null, ?int $page=null) : JSONResponse {
+	public function tracks(?int $artist = null, ?int $album = null, string|int|bool|null $fulltree = null, ?int $page_size = null, ?int $page = null) : JSONResponse {
 		$fulltree = \filter_var($fulltree, FILTER_VALIDATE_BOOLEAN);
-		list($limit, $offset) = self::shivaPageToLimits($page_size, $page);
+		[$limit, $offset] = self::shivaPageToLimits($page_size, $page);
 
 		if ($album !== null) {
 			$tracks = $this->trackBusinessLayer->findAllByAlbum($album, $this->user(), $artist, $limit, $offset);
@@ -184,25 +183,28 @@ class ShivaApiController extends Controller {
 			$tracks = $this->trackBusinessLayer->findAll($this->user(), SortBy::Name, $limit, $offset);
 		}
 		foreach ($tracks as &$track) {
-			$artistId = $track->getArtistId();
-			$albumId = $track->getAlbumId();
-			$track = $track->toShivaApi($this->urlGenerator);
 			if ($fulltree) {
-				$artist = $this->artistBusinessLayer->find($artistId, $this->user());
-				$track['artist'] = $artist->toShivaApi($this->urlGenerator, $this->l10n);
-				$album = $this->albumBusinessLayer->find($albumId, $this->user());
-				$track['album'] = $album->toShivaApi($this->urlGenerator, $this->l10n);
+				$track->setArtist($this->artistBusinessLayer->find($track->getArtistId(), $this->user()));
+				$track->setAlbum($this->albumBusinessLayer->find($track->getAlbumId(), $this->user()));
 			}
+			$track = $track->toShivaApi($this->urlGenerator, $this->l10n);
 		}
 		return new JSONResponse($tracks);
 	}
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function track(int $id) : JSONResponse {
+	public function track(int $id, string|int|bool|null $fulltree = null) : JSONResponse {
+		$fulltree = \filter_var($fulltree, FILTER_VALIDATE_BOOLEAN);
 		try {
 			$track = $this->trackBusinessLayer->find($id, $this->user());
-			return new JSONResponse($track->toShivaApi($this->urlGenerator));
+
+			if ($fulltree) {
+				$track->setArtist($this->artistBusinessLayer->find($track->getArtistId(), $this->user()));
+				$track->setAlbum($this->albumBusinessLayer->find($track->getAlbumId(), $this->user()));
+			}
+
+			return new JSONResponse($track->toShivaApi($this->urlGenerator, $this->l10n));
 		} catch (BusinessLayerException $e) {
 			return new ErrorResponse(Http::STATUS_NOT_FOUND);
 		}
@@ -223,10 +225,10 @@ class ShivaApiController extends Controller {
 				 * create a result which is compatible with the Shiva API specification.
 				 */
 				return new JSONResponse([
-					'track' => $this->entityIdAndUri($id, 'track'),
+					'track'      => $this->entityIdAndUri($id, 'track'),
 					'source_uri' => '',
-					'id' => $fileId,
-					'uri' => $this->urlGenerator->linkToRoute(
+					'id'         => $fileId,
+					'uri'        => $this->urlGenerator->linkToRoute(
 						'music.musicApi.fileLyrics',
 						['fileId' => $fileId, 'format' => 'plaintext']
 					)
@@ -270,7 +272,7 @@ class ShivaApiController extends Controller {
 
 	private function entityIdAndUri(int $id, string $type) : array {
 		return [
-			'id' => $id,
+			'id'  => $id,
 			'uri' => $this->urlGenerator->linkToRoute("music.shivaApi.$type", ['id' => $id])
 		];
 	}
@@ -290,9 +292,9 @@ class ShivaApiController extends Controller {
 		$tracks = $this->trackBusinessLayer->findAllAdvanced('and', $searchRules, $this->user());
 
 		return new JSONResponse([
-			'artists' => \array_map(fn($a) => $this->entityIdAndUri($a->getId(), 'artist'), $artists),
-			'albums' => \array_map(fn($a) => $this->entityIdAndUri($a->getId(), 'album'), $albums),
-			'tracks' => \array_map(fn($t) => $this->entityIdAndUri($t->getId(), 'track'), $tracks)
+			'artists' => \array_map(fn ($a) => $this->entityIdAndUri($a->getId(), 'artist'), $artists),
+			'albums'  => \array_map(fn ($a) => $this->entityIdAndUri($a->getId(), 'album'), $albums),
+			'tracks'  => \array_map(fn ($t) => $this->entityIdAndUri($t->getId(), 'track'), $tracks)
 		]);
 	}
 }

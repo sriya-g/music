@@ -9,7 +9,7 @@
  */
 
 import { escape } from "lodash";
-import { MusicAdminSection } from './AdminSection';
+import { MusicAdminSection } from './MusicAdminSection';
 
 declare var OCP : any;
 declare function t(app : string, text : string, vars?: Object) : string;
@@ -96,7 +96,7 @@ class ScrobblerAdmin implements MusicAdminSection {
 				return;
 			}
 
-			OCA.Music.Dialogs.showNotification(t('music', 'Updated {name} credentials!', {name: this.#name}));
+			OCA.Music.Dialogs.showNotification(t('music', 'Updated {service} credentials!', {service: this.#name}));
 			this.#api_key = apiKeyEl.value;
 			this.#api_secret = apiSecretEl.value;
 			submitButton.disabled = true;

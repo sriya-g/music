@@ -14,23 +14,20 @@ namespace OCA\Music\Command;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command {
 
 	public function __construct(
 		protected \OCP\IUserManager $userManager,
-		protected \OCP\IGroupManager $groupManager
+		protected \OCP\IGroupManager $groupManager,
 	) {
 		parent::__construct();
 	}
 
-	/**
-	 * @return void
-	 */
-	protected function configure() {
+	protected function configure() : void {
 		$this
 			->addArgument(
 				'user_id',
@@ -53,17 +50,14 @@ abstract class BaseCommand extends Command {
 		$this->doConfigure();
 	}
 
-	/**
-	 * @return int
-	 */
-	protected function execute(InputInterface $input, OutputInterface $output) {
+	protected function execute(InputInterface $input, OutputInterface $output) : int {
 		try {
 			self::ensureUsersGiven($input);
 			$argUsers = $this->getArgumentUsers($input);
 			$groupUsers = $this->getArgumentGroupUsers($input);
 			$users = \array_unique(\array_merge($argUsers, $groupUsers));
 			if (!$input->getOption('all') && !\count($users)) {
-				throw new \InvalidArgumentException("No users in selected groups!");
+				throw new \InvalidArgumentException('No users in selected groups!');
 			}
 			$this->doExecute($input, $output, $users);
 			return 0;
@@ -113,7 +107,7 @@ abstract class BaseCommand extends Command {
 		if (!$input->getArgument('user_id')
 			&& !$input->getOption('all')
 			&& !$input->getOption('group')) {
-			throw new \InvalidArgumentException("Specify either the target user(s), --group or --all");
+			throw new \InvalidArgumentException('Specify either the target user(s), --group or --all');
 		}
 	}
 

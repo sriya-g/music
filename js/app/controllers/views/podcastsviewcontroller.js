@@ -5,26 +5,14 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2021 - 2024
+ * @copyright Pauli Järvinen 2021 - 2026
  */
 
 angular.module('Music').controller('PodcastsViewController', [
-	'$scope', '$rootScope', 'playQueueService', 'podcastService', 'libraryService', '$timeout', 'gettextCatalog',
-	function ($scope, $rootScope, playQueueService, podcastService, libraryService, $timeout, gettextCatalog) {
+	'$scope', '$rootScope', 'playQueueService', 'podcastService', 'libraryService', 'libraryFactory', '$timeout', 'gettextCatalog',
+	function ($scope, $rootScope, playQueueService, podcastService, libraryService, libraryFactory, $timeout, gettextCatalog) {
 
-		$rootScope.currentView = $scope.getViewIdFromUrl();
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', () => {
-			_.each(unsubFuncs, function(func) { func(); });
-			playQueueService.unsubscribeAll(this);
-		});
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		// Wrap the supplied tracks as a playlist and pass it to the service for playing
 		function playEpisodes(listId, episodes) {
@@ -70,9 +58,9 @@ angular.module('Music').controller('PodcastsViewController', [
 
 		$scope.showAddPodcast = function() {
 			podcastService.showAddPodcastDialog().then(
-				() => $rootScope.loading = false, // success
-				() => $rootScope.loading = false, // failure
-				() => $rootScope.loading = true,  // adding actually started
+				() => $rootScope.$emit('viewActivated', THIS_VIEW_ID), // success
+				() => $rootScope.$emit('viewActivated', THIS_VIEW_ID), // failure
+				() => $rootScope.$emit('viewBusy', THIS_VIEW_ID),      // adding actually started
 			);
 		};
 
@@ -114,22 +102,18 @@ angular.module('Music').controller('PodcastsViewController', [
 			return gettextCatalog.getString('Show all {{ count }} episodes…', { count: count });
 		};
 
-		playQueueService.subscribe('playlistEnded', function() {
-			updateHighlight(null);
-		}, this);
+		playQueueService.subscribe('playlistEnded', $scope, () => updateHighlight(null));
 
-		playQueueService.subscribe('playlistChanged', function(playlistId) {
-			updateHighlight(playlistId);
-		}, this);
+		playQueueService.subscribe('playlistChanged', $scope, (playlistId) => updateHighlight(playlistId));
 
-		subscribe('scrollToPodcastEpisode', function(_event, episodeId, animationTime = 500) {
+		$rootScope.subscribe('scrollToPodcastEpisode', $scope, (_event, episodeId, animationTime = 500) => {
 			let episode = libraryService.getPodcastEpisode(episodeId);
 			if (episode) {
 				$scope.$parent.scrollToItem('podcast-channel-' + episode.channel.id, animationTime);
 			}
 		});
 
-		subscribe('scrollToPodcastChannel', function(_event, channelId, animationTime = 500) {
+		$rootScope.subscribe('scrollToPodcastChannel', $scope, (_event, channelId, animationTime = 500) => {
 			$scope.$parent.scrollToItem('podcast-channel-' + channelId, animationTime);
 		});
 
@@ -149,7 +133,7 @@ angular.module('Music').controller('PodcastsViewController', [
 			if (containerWidth === 0) {
 				// During page load, the view container may not yet have a valid width. On Firefox on Ubuntu,
 				// the resize event with the valid width doesn't fire at all after the page load. Retry until
-				// a valid width is present. See https://github.com/owncloud/music/issues/1029.
+				// a valid width is present. See https://github.com/nc-music/oc-music/issues/1029.
 				$timeout(updateColumnLayout, 500);
 			} else {
 				let colWidth = 480;
@@ -157,29 +141,17 @@ angular.module('Music').controller('PodcastsViewController', [
 			}
 		}
 
-		subscribe('resize', updateColumnLayout);
+		$rootScope.subscribe('resize', $scope, updateColumnLayout);
 
-		function onContentReady() {
+		// alphabetNavigation and inViewObserver directives need to know if the view contents change
+		podcastService.subscribe('podcastsChanged', $scope, () => $rootScope.$emit('viewContentChanged'));
+
+		libraryFactory.getPodcastChannels().then((channels) => {
 			// show content only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
-				$scope.channels = libraryService.getAllPodcastChannels();
-				$rootScope.loading = false;
-				$timeout(() => $rootScope.$emit('viewActivated'));
+			if ($scope.$parent) {
+				$scope.channels = channels;
+				$timeout(() => $rootScope.$emit('viewActivated', THIS_VIEW_ID));
 			}
-		}
-
-		// Make the content visible immediately if the podcasts are already loaded.
-		// Otherwise it happens on the 'podcastsLoaded' event handler.
-		if (libraryService.podcastsLoaded()) {
-			onContentReady();
-		}
-
-		subscribe('podcastsLoaded', function() {
-			onContentReady();
-		});
-
-		subscribe('deactivateView', function() {
-			$timeout(() => $rootScope.$emit('viewDeactivated'));
 		});
 	}
 ]);

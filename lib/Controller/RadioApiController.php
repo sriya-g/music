@@ -23,7 +23,6 @@ use OCA\Music\Service\PlaylistFileService;
 use OCA\Music\Service\RadioService;
 use OCA\Music\Service\StreamTokenService;
 use OCA\Music\Utility\HttpUtil;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -50,7 +49,7 @@ class RadioApiController extends Controller {
 		private PlaylistFileService $playlistFileService,
 		private ?string $userId,
 		private IRootFolder $rootFolder,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -70,7 +69,7 @@ class RadioApiController extends Controller {
 	public function getAll() : JSONResponse {
 		$stations = $this->businessLayer->findAll($this->user());
 		return new JSONResponse(
-			\array_map(fn($s) => $s->toApi(), $stations)
+			\array_map(fn ($s) => $s->toApi(), $stations)
 		);
 	}
 
@@ -83,7 +82,7 @@ class RadioApiController extends Controller {
 		if ($streamUrl === null) {
 			return new ErrorResponse(Http::STATUS_BAD_REQUEST, "Mandatory argument 'streamUrl' not given");
 		}
-		
+
 		try {
 			$station = $this->businessLayer->create($this->user(), $name, $streamUrl, $homeUrl);
 			return new JSONResponse($station->toApi());
@@ -146,14 +145,14 @@ class RadioApiController extends Controller {
 	 * @param string $name target file name
 	 * @param string $path parent folder path
 	 * @param string $oncollision action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                            supported values:
+	 *                            - 'overwrite' The existing file will be overwritten
+	 *                            - 'keepboth' The new file is named with a suffix to make it unique
+	 *                            - 'abort' (default) The operation will fail
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function exportAllToFile(string $name, string $path, string $oncollision='abort') : JSONResponse {
+	public function exportAllToFile(string $name, string $path, string $oncollision = 'abort') : JSONResponse {
 		try {
 			$userFolder = $this->rootFolder->getUserFolder($this->user());
 			$exportedFilePath = $this->playlistFileService->exportRadioStationsToFile(
@@ -178,7 +177,7 @@ class RadioApiController extends Controller {
 		try {
 			$userFolder = $this->rootFolder->getUserFolder($this->user());
 			$result = $this->playlistFileService->importRadioStationsFromFile($this->user(), $userFolder, $filePath);
-			$result['stations'] = \array_map(fn($s) => $s->toApi(), $result['stations']);
+			$result['stations'] = \array_map(fn ($s) => $s->toApi(), $result['stations']);
 			return new JSONResponse($result);
 		} catch (\OCP\Files\NotFoundException $ex) {
 			return new ErrorResponse(Http::STATUS_NOT_FOUND, 'playlist file not found');
@@ -198,18 +197,18 @@ class RadioApiController extends Controller {
 	}
 
 	/**
-	* get metadata for a channel
-	*/
+	 * get metadata for a channel
+	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function getChannelInfo(int $id, ?string $type=null) : JSONResponse {
+	public function getChannelInfo(int $id, ?string $type = null) : JSONResponse {
 		try {
 			$station = $this->businessLayer->find($id, $this->user());
 			$streamUrl = $station->getStreamUrl();
 
 			switch ($type) {
 				case 'icy':
-					$metadata = $this->service->readIcyMetadata($streamUrl, 3, 5);
+					$metadata = $this->service->readIcyMetadata($streamUrl, 3);
 					break;
 				case 'shoutcast-v1':
 					$metadata = $this->service->readShoutcastV1Metadata($streamUrl);
@@ -221,7 +220,7 @@ class RadioApiController extends Controller {
 					$metadata = $this->service->readIcecastMetadata($streamUrl);
 					break;
 				default:
-					$metadata = $this->service->readIcyMetadata($streamUrl, 3, 5)
+					$metadata = $this->service->readIcyMetadata($streamUrl, 3)
 							?? $this->service->readShoutcastV2Metadata($streamUrl)
 							?? $this->service->readIcecastMetadata($streamUrl)
 							?? $this->service->readShoutcastV1Metadata($streamUrl);
@@ -346,11 +345,11 @@ class RadioApiController extends Controller {
 		} elseif (!$this->tokenService->urlTokenIsValid($url, \rawurldecode($token))) {
 			return new ErrorResponse(Http::STATUS_UNAUTHORIZED, 'the security token is invalid');
 		} else {
-			list('content' => $content, 'status_code' => $status, 'content_type' => $contentType)
+			['content' => $content, 'status_code' => $status, 'content_type' => $contentType]
 				= $this->service->getHlsManifest($url);
 
 			return new FileResponse([
-				'content' => $content,
+				'content'  => $content,
 				'mimetype' => $contentType
 			], $status);
 		}
@@ -373,7 +372,7 @@ class RadioApiController extends Controller {
 		} elseif (!$this->tokenService->urlTokenIsValid($url, \rawurldecode($token))) {
 			return new ErrorResponse(Http::STATUS_UNAUTHORIZED, 'the security token is invalid');
 		} else {
-			list('content' => $content, 'status_code' => $status, 'content_type' => $contentType, 'message' => $message)
+			['content' => $content, 'status_code' => $status, 'content_type' => $contentType, 'message' => $message]
 				= HttpUtil::loadFromUrl($url);
 
 			if ($content === false) {
@@ -381,7 +380,7 @@ class RadioApiController extends Controller {
 				return new ErrorResponse(Http::STATUS_NOT_FOUND, 'failed to read the HLS segment');
 			} else {
 				return new FileResponse([
-					'content' => $content,
+					'content'  => $content,
 					'mimetype' => $contentType ?? 'application/octet-stream'
 				], $status);
 			}

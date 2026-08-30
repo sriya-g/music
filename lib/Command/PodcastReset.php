@@ -21,7 +21,7 @@ class PodcastReset extends BaseCommand {
 	public function __construct(
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
-		private PodcastService $podcastService
+		private PodcastService $podcastService,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -35,7 +35,7 @@ class PodcastReset extends BaseCommand {
 
 	protected function doExecute(InputInterface $input, OutputInterface $output, array $users) : void {
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output) {
+			$this->userManager->callForAllUsers(function ($user) use ($output) {
 				$this->resetPodcasts($user->getUID(), $output);
 			});
 		} else {

@@ -19,7 +19,7 @@ class AmpacheImageService {
 
 	public function __construct(
 		private AmpacheUserMapper $userMapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 

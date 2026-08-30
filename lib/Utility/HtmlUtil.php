@@ -49,9 +49,9 @@ class HtmlUtil {
 	public static function printNgTemplate(string $templateName) : void {
 		$id = \array_slice(\explode('/', $templateName), -1)[0];
 		print(
-			'<script type="text/ng-template" id="'.$id.'.html">' .
-				self::partialContent($templateName) .
-			'</script>'
+			'<script type="text/ng-template" id="' . $id . '.html">'
+				. self::partialContent($templateName)
+			. '</script>'
 		);
 	}
 
@@ -64,7 +64,7 @@ class HtmlUtil {
 	}
 
 	private static function partialContent(string $partialName) : string {
-		$fileName = \join(DIRECTORY_SEPARATOR, [\dirname(__DIR__), '..', 'templates', 'partials', $partialName.'.php']);
+		$fileName = \join(DIRECTORY_SEPARATOR, [\dirname(__DIR__), '..', 'templates', 'partials', $partialName . '.php']);
 
 		\ob_start();
 		try {

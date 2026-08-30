@@ -29,7 +29,7 @@ class PodcastEpisodeMapper extends BaseMapper {
 	 * @param int[] $channelIds
 	 * @return PodcastEpisode[]
 	 */
-	public function findAllByChannel(array $channelIds, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByChannel(array $channelIds, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$channelCount = \count($channelIds);
 		if ($channelCount === 0) {
 			return [];
@@ -65,9 +65,9 @@ class PodcastEpisodeMapper extends BaseMapper {
 	 */
 	protected function advFormatSqlCondition(string $rule, string $sqlOp, string $conv) : string {
 		$condForRule = [
-			'podcast'	=> "`channel_id` IN (SELECT `id` FROM `*PREFIX*music_podcast_channels` `c` WHERE $conv(`c`.`title`) $sqlOp $conv(?))",
-			'time'		=> "`duration` $sqlOp ?",
-			'pubdate'	=> "`published` $sqlOp ?"
+			'podcast' => "`channel_id` IN (SELECT `id` FROM `*PREFIX*music_podcast_channels` `c` WHERE $conv(`c`.`title`) $sqlOp $conv(?))",
+			'time'    => "`duration` $sqlOp ?",
+			'pubdate' => "`published` $sqlOp ?"
 		];
 
 		return $condForRule[$rule] ?? parent::advFormatSqlCondition($rule, $sqlOp, $conv);

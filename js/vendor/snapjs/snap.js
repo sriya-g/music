@@ -747,6 +747,14 @@
         disable: function() {
             utils.dispatchEvent('disable');
             this.action.drag.stopListening();
+
+            // Nextcloud Music modification 2026-07-22:
+            // Ensure the dragging state isn't left active when we suspend snapper's swipe gesture while
+            // drag-and-drop is used to move other elements on the Music UI (like playlist songs). Otherwise,
+            // the snapper would immediately be in dragging state as soon as the suspension is lifted.
+            // The snapper's dragging state gets activated just before Music's SnapController can detect the
+            // start of the drag-and-dorp of a song or other element.
+            this.cache.isDragging = false;
         },
 
         /**

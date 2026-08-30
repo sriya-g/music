@@ -28,7 +28,7 @@ class RadioStationMapper extends BaseMapper {
 	 * @return RadioStation
 	 */
 	public function findByStreamUrl(string $url, string $userId) : RadioStation {
-		$sql = $this->selectUserEntities("`stream_url` = ?");
+		$sql = $this->selectUserEntities('`stream_url` = ?');
 		return $this->findEntity($sql, [$userId, $url]);
 	}
 

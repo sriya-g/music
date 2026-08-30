@@ -60,7 +60,7 @@ class Util {
 		if ($seconds === null) {
 			return null;
 		} else {
-			return \sprintf('%02d:%02d:%02d', ($seconds/3600), ($seconds/60%60), $seconds%60);
+			return \sprintf('%02d:%02d:%02d', ($seconds / 3600), ($seconds / 60 % 60), $seconds % 60);
 		}
 	}
 
@@ -115,7 +115,30 @@ class Util {
 			. ($parts['path'] ?? '')
 			. (isset($parts['query']) ? "?{$parts['query']}" : '')
 			. (isset($parts['fragment']) ? "#{$parts['fragment']}" : '');
+	}
 
+	/**
+	 * Given a potentially relative target URL and the current URL, return the absolute URL to the target.
+	 * If the target URL is already absolute, it is returned as-is.
+	 */
+	public static function urlToAbsolute(string $targetUrl, string $currentUrl) : string {
+		if (\parse_url($targetUrl, PHP_URL_SCHEME) === null) {
+			$urlParts = \parse_url($currentUrl);
+
+			if ($targetUrl[0] == '/') {
+				// the target URL is absolute to the server root => keep only the scheme and host from the current URL
+				$urlParts['path'] = $targetUrl;
+			} else {
+				// the target URL is relative to the current URL => keep the path up to the last '/' and append the target URL
+				$path = $urlParts['path'] ?? '/';
+				$lastSlash = \strrpos($path, '/');
+				$urlParts['path'] = \substr($path, 0, $lastSlash + 1) . $targetUrl;
+			}
+			unset($urlParts['query'], $urlParts['fragment']);
+
+			$targetUrl = self::buildUrl($urlParts);
+		}
+		return $targetUrl;
 	}
 
 	/**
@@ -136,6 +159,77 @@ class Util {
 			return null;
 		} else {
 			return \max($min, \min($input, $max));
+		}
+	}
+
+	/**
+	 * Encode an application version string into a single integer for easier comparison and storage.
+	 * The encoding is done as follows:
+	 * - major version is multiplied by 1,000,000
+	 * - minor version is multiplied by 10,000
+	 * - patch version is multiplied by 100
+	 * - pre-release versions (alpha, beta, rc) are encoded as negative offsets:
+	 *   - alpha: -90 + pre-release version number
+	 *   - beta: -60 + pre-release version number
+	 *   - rc: -30 + pre-release version number
+	 *   - no pre-release: 0
+	 * The final encoded version is the sum of these components.
+	 * There is room for 100 major versions, 100 minor versions, 100 patch versions, and 30+30+30 pre-release versions (alpha + beta + rc).
+	 *
+	 * Examples of the encoded version format:
+	 * 0.0.1-alpha0 => 00000010
+	 * 0.0.1-beta5 => 00000045
+	 * 0.0.1-rc2 => 00000072
+	 * 0.0.1 => 00000100
+	 * 0.1.0 => 00010000
+	 * 1.0.0 => 01000000
+	 * 1.2.3 => 01020300
+	 * 1.2.3-rc1 => 01020271
+	 */
+	public static function encodeVersionString(string $versionString) : int {
+		$versionParts = \explode('.', $versionString);
+		$major = (int)($versionParts[0] ?? 0);
+		$minor = (int)($versionParts[1] ?? 0);
+		$patch = (int)($versionParts[2] ?? 0);
+
+		if (\str_contains($versionString, 'alpha')) {
+			$preReleaseOffset = -90;
+		} elseif (\str_contains($versionString, 'beta')) {
+			$preReleaseOffset = -60;
+		} elseif (\str_contains($versionString, 'rc')) {
+			$preReleaseOffset = -30;
+		} else {
+			$preReleaseOffset = 0;
+		}
+		$preReleaseVersion = \preg_match('/(alpha|beta|rc)[.-]?(\d+)$/', $versionString, $matches) ? (int)$matches[2] : 0;
+		return ($major * 1000000) + ($minor * 10000) + ($patch * 100) + $preReleaseOffset + $preReleaseVersion;
+	}
+
+	/**
+	 * Decode an encoded application version integer back into a version string.
+	 * @see self::encodeVersionString for the encoding scheme
+	 */
+	public static function decodeVersionInt(int $versionInt) : string {
+		$major = (int)($versionInt / 1000000);
+		$minor = (int)(($versionInt % 1000000) / 10000);
+		$patch = (int)(($versionInt % 10000) / 100);
+
+		$preReleaseVer = $versionInt % 100;
+		if ($preReleaseVer === 0) {
+			return "$major.$minor.$patch";
+		} else {
+			$patch += 1;
+			if ($preReleaseVer < 40) {
+				$preReleaseType = 'alpha';
+				$preReleaseVer -= 10;
+			} elseif ($preReleaseVer < 70) {
+				$preReleaseType = 'beta';
+				$preReleaseVer -= 40;
+			} else {
+				$preReleaseType = 'rc';
+				$preReleaseVer -= 70;
+			}
+			return "$major.$minor.$patch-$preReleaseType$preReleaseVer";
 		}
 	}
 }

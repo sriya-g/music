@@ -23,7 +23,7 @@ class ResetDatabase extends BaseCommand {
 	public function __construct(
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
-		private Maintenance $maintenance
+		private Maintenance $maintenance,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -36,7 +36,7 @@ class ResetDatabase extends BaseCommand {
 
 	protected function doExecute(InputInterface $input, OutputInterface $output, array $users) : void {
 		if ($input->getOption('all')) {
-			$output->writeln("Drop tables for <info>all users</info>");
+			$output->writeln('Drop tables for <info>all users</info>');
 			$this->maintenance->resetLibrary(null, true);
 		} else {
 			foreach ($users as $user) {

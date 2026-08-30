@@ -22,7 +22,7 @@ class AmpacheAdvSearch {
 	public function __construct(
 		private IL10N $l10n,
 		private AdvSearchRules $advSearchRules,
-		private PlaylistBusinessLayer $playlistBusinessLayer
+		private PlaylistBusinessLayer $playlistBusinessLayer,
 	) {
 	}
 
@@ -35,10 +35,10 @@ class AmpacheAdvSearch {
 
 		// some entity types have different names in the Ampache API compared to the internal ones
 		$entityType = match ($entityType) {
-			'song' => 'track',
-			'podcast' => 'podcast_channel',
+			'song'        => 'track',
+			'podcast'     => 'podcast_channel',
 			'live_stream' => 'radio_station',
-			default => $entityType
+			default       => $entityType
 		};
 
 		$result = [];
@@ -48,11 +48,11 @@ class AmpacheAdvSearch {
 				$type = self::typeForRule($name);
 				$widget = $this->widgetForRuleType($type, $userId);
 				$result[] = [
-					'name' => $name,
-					'label' => $label,
-					'type' => self::ampacheRuleType($type),
+					'name'   => $name,
+					'label'  => $label,
+					'type'   => self::ampacheRuleType($type),
 					'widget' => $widget,
-					'title' => $title
+					'title'  => $title
 				];
 			}
 		}
@@ -188,14 +188,14 @@ class AmpacheAdvSearch {
 	private static function ampacheRuleType(string $type) : string {
 		return match ($type) {
 			'numeric_rating' => 'numeric',
-			'playlist' => 'boolean_numeric',
-			default => $type
+			'playlist'       => 'boolean_numeric',
+			default          => $type
 		};
 	}
 
 	private function widgetForRuleType(string $type, string $userId) : array {
 		if ($type == 'numeric_rating') {
-			return ['select', \array_map(fn($val) => $this->l10n->n('%n Star', '%n Stars', $val), [0,1,2,3,4,5])];
+			return ['select', \array_map(fn ($val) => $this->l10n->n('%n Star', '%n Stars', $val), [0,1,2,3,4,5])];
 		} elseif ($type == 'text') {
 			return ['input', 'text'];
 		} elseif (\in_array($type, ['numeric', 'numeric_limit', 'days', 'boolean_numeric'])) {

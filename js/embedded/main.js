@@ -41,7 +41,7 @@ import * as playlistTabView from './playlisttabview.js';
 
 		// First, try to register using Nextcloud Files API. This works on NC28+ within the Files app but only on NC31+
 		// within a link-shared public folder. Note that we can't wait for the page load to be finished before doing
-		// this because that would be too late for the registration and cause the issue https://github.com/owncloud/music/issues/1126.
+		// this because that would be too late for the registration and cause the issue https://github.com/nc-music/oc-music/issues/1126.
 		const sharingToken = ncSharingPublic.isPublicShare() ? ncSharingPublic.getSharingToken() : null;
 		// @nextcloud/files 4.x supports only NC33+ while @nextcloud/files 3.x supports NC 26-32
 		if (OCA.Music.Utils.ncMajorVersion() >= 33) {

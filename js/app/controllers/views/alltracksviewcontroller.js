@@ -5,15 +5,15 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2018 - 2024
+ * @copyright Pauli Järvinen 2018 - 2026
  */
 
 
 angular.module('Music').controller('AllTracksViewController', [
-	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'alphabetIndexingService', '$timeout',
-	function ($rootScope, $scope, playQueueService, libraryService, alphabetIndexingService, $timeout) {
+	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'libraryFactory', 'alphabetIndexingService', '$timeout',
+	function ($rootScope, $scope, playQueueService, libraryService, libraryFactory, alphabetIndexingService, $timeout) {
 
-		$rootScope.currentView = $scope.getViewIdFromUrl();
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		let _tracks = null;
 		let _indexChars = alphabetIndexingService.indexChars();
@@ -23,17 +23,6 @@ angular.module('Music').controller('AllTracksViewController', [
 		// but a single indexing char may have several buckets.
 		const BUCKET_MAX_SIZE = 100;
 		$scope.trackBuckets = null;
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let _unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			_unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', function () {
-			_.each(_unsubFuncs, function(func) { func(); });
-		});
 
 		function play(startIndex = null) {
 			playQueueService.setPlaylist('alltracks', _tracks, startIndex);
@@ -98,36 +87,32 @@ angular.module('Music').controller('AllTracksViewController', [
 			}
 		}
 
-		subscribe('scrollToTrack', function(event, trackId) {
+		$rootScope.subscribe('scrollToTrack', $scope, (_event, trackId) => {
 			if ($scope.$parent) {
 				$rootScope.$emit('inViewObserver_revealElement', bucketElementForTrack(trackId));
 				$scope.$parent.scrollToItem('track-' + trackId);
 			}
 		});
 
-		// Init happens either immediately (after making the loading animation visible)
-		// or once artists have been loaded
-		$timeout(initView);
-
-		subscribe('collectionLoaded', function () {
+		libraryFactory.subscribe('collectionUpdating', $scope, () => {
 			// Nullify any previous tracks to force tracklist directive recreation
 			_tracks = null;
 			$scope.trackBuckets = null;
-			$timeout(initView);
+			initView();
 		});
 
 		function initView() {
-			if (libraryService.collectionLoaded()) {
+			libraryFactory.getCollection().then(() => {
 				_tracks = libraryService.getTracksInAlphaOrder();
 				$scope.trackBuckets = createTrackBuckets();
 				$timeout(function() {
-					$rootScope.loading = false;
-					$rootScope.$emit('viewActivated');
+					$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 				});
-			}
+			});
 		}
+		initView();
 
-		function trackAtIndexPreceedsIndexCharAt(trackIdx, charIdx) {
+		function trackAtIndexPrecedesIndexCharAt(trackIdx, charIdx) {
 			let name = _tracks[trackIdx].track.artist.sortName;
 			return (charIdx >= _indexChars.length
 				|| alphabetIndexingService.titlePrecedesIndexCharAt(name, charIdx));
@@ -140,7 +125,7 @@ angular.module('Music').controller('AllTracksViewController', [
 				charIdx < _indexChars.length && trackIdx < _tracks.length;
 				++charIdx)
 			{
-				if (trackAtIndexPreceedsIndexCharAt(trackIdx, charIdx + 1)) {
+				if (trackAtIndexPrecedesIndexCharAt(trackIdx, charIdx + 1)) {
 					// Track at trackIdx belongs to bucket of the char _indexChars[charIdx]
 
 					let bucket = null;
@@ -165,20 +150,12 @@ angular.module('Music').controller('AllTracksViewController', [
 						++trackIdx;
 					}
 					while (trackIdx < _tracks.length
-							&& trackAtIndexPreceedsIndexCharAt(trackIdx, charIdx + 1));
+							&& trackAtIndexPrecedesIndexCharAt(trackIdx, charIdx + 1));
 				}
 			}
 
 			return buckets;
 		}
-
-		subscribe('deactivateView', function() {
-			// The small delay may help in bringing up the load indicator a bit faster
-			// on huge collections (tens of thousands of tracks)
-			$timeout(function() {
-				$rootScope.$emit('viewDeactivated');
-			}, 100);
-		});
 
 	}
 ]);

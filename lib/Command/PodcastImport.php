@@ -13,10 +13,8 @@
 namespace OCA\Music\Command;
 
 use OCA\Music\Service\PodcastService;
-
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
-
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -27,7 +25,7 @@ class PodcastImport extends BaseCommand {
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
 		private IRootFolder $rootFolder,
-		private PodcastService $podcastService
+		private PodcastService $podcastService,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -53,7 +51,7 @@ class PodcastImport extends BaseCommand {
 		}
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $file) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $file) {
 				$this->executeForUser($user->getUID(), $file, $output);
 			});
 		} else {

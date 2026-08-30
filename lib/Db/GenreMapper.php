@@ -28,7 +28,7 @@ class GenreMapper extends BaseMapper {
 	 * @see \OCA\Music\Db\BaseMapper::selectEntities
 	 * @return string SQL query
 	 */
-	protected function selectEntities(string $condition, ?string $extension=null) : string {
+	protected function selectEntities(string $condition, ?string $extension = null) : string {
 		return "SELECT
 					`*PREFIX*music_genres`.*,
 					{$this->sqlCoalesce('`trackCount`', '0')} AS `trackCount`,
@@ -55,11 +55,10 @@ class GenreMapper extends BaseMapper {
 	 * {@inheritdoc}
 	 * @see BaseMapper::advFormatSqlCondition()
 	 */
-	protected function advFormatSqlCondition(string $rule, string $sqlOp, string $conv): string
-	{
+	protected function advFormatSqlCondition(string $rule, string $sqlOp, string $conv): string {
 		$condForRule = [
-			'album_count'	=> "{$this->sqlCoalesce('`albumCount`', '0')} $sqlOp ?",
-			'song_count'	=> "{$this->sqlCoalesce('`trackCount`', '0')} $sqlOp ?",
+			'album_count' => "{$this->sqlCoalesce('`albumCount`', '0')} $sqlOp ?",
+			'song_count'  => "{$this->sqlCoalesce('`trackCount`', '0')} $sqlOp ?",
 		];
 
 		return $condForRule[$rule] ?? parent::advFormatSqlCondition($rule, $sqlOp, $conv);

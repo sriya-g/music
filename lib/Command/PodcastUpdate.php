@@ -22,7 +22,7 @@ class PodcastUpdate extends BaseCommand {
 	public function __construct(
 		\OCP\IUserManager $userManager,
 		\OCP\IGroupManager $groupManager,
-		private PodcastService $podcastService
+		private PodcastService $podcastService,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -54,7 +54,7 @@ class PodcastUpdate extends BaseCommand {
 		$force = (bool)$input->getOption('force');
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $olderThan, $force) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $olderThan, $force) {
 				$this->updateForUser($user->getUID(), $olderThan, $force, $output);
 			});
 		} else {
@@ -86,7 +86,7 @@ class PodcastUpdate extends BaseCommand {
 		});
 
 		if ($result['changed'] + $result['unchanged'] + $result['failed'] === 0) {
-			$output->writeln("  (no channels to update)");
+			$output->writeln('  (no channels to update)');
 		}
 	}
 }

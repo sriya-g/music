@@ -14,8 +14,8 @@
 
 namespace OCA\Music\Http;
 
-use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Response;
 use OCP\Files\File;
 
 /**
@@ -31,7 +31,7 @@ class FileResponse extends Response {
 	 * @param File|array{content: string, mimetype: string} $file
 	 * @param int $statusCode the Http status code, defaults to 200
 	 */
-	public function __construct(File|array $file, int $statusCode=Http::STATUS_OK) {
+	public function __construct(File|array $file, int $statusCode = Http::STATUS_OK) {
 		if (\is_array($file)) {
 			$this->file = $file['content'];
 			$mime = $file['mimetype'];

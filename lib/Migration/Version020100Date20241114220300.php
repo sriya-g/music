@@ -6,8 +6,8 @@ namespace OCA\Music\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
-use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
+use OCP\Migration\SimpleMigrationStep;
 
 /**
  * Migrate the DB schema to Music v2.1.0 level from the v1.9.1 level

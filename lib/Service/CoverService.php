@@ -19,17 +19,17 @@ use OCA\Music\Db\Album;
 use OCA\Music\Db\Artist;
 use OCA\Music\Db\Cache;
 use OCA\Music\Db\Entity;
-use OCA\Music\Db\PodcastChannel;
 use OCA\Music\Db\Playlist;
+use OCA\Music\Db\PodcastChannel;
 use OCA\Music\Db\RadioStation;
 use OCA\Music\Utility\HttpUtil;
 use OCA\Music\Utility\PlaceholderImage;
 use OCA\Music\Utility\Random;
-use OCP\Files\Folder;
 use OCP\Files\File;
-
+use OCP\Files\Folder;
 use OCP\IConfig;
 use OCP\IL10N;
+use OCP\ISession;
 
 /**
  * utility to get cover image for album
@@ -63,7 +63,7 @@ class CoverService {
 	 *                       scaling and cropping altogether.
 	 * @return array|null Image data in format accepted by \OCA\Music\Http\FileResponse
 	 */
-	public function getCover(Entity $entity, string $userId, Folder $rootFolder, ?int $size=null, bool $allowPlaceholder=true) : ?array {
+	public function getCover(Entity $entity, string $userId, Folder $rootFolder, ?int $size = null, bool $allowPlaceholder = true) : ?array {
 		if ($entity instanceof Playlist) {
 			$trackIds = $entity->getTrackIdsAsArray();
 			$albums = $this->albumBusinessLayer->findAlbumsWithCoversForTracks($trackIds, $userId, 4);
@@ -90,13 +90,13 @@ class CoverService {
 		return $result;
 	}
 
-	public function getCoverMosaic(array $entities, string $userId, Folder $rootFolder, ?int $size=null) : ?array {
+	public function getCoverMosaic(array $entities, string $userId, Folder $rootFolder, ?int $size = null) : ?array {
 		if (\count($entities) === 0) {
 			return null;
 		} elseif (\count($entities) === 1) {
 			return $this->getCover($entities[0], $userId, $rootFolder, $size);
 		} else {
-			$covers = \array_map(fn($entity) => $this->getCover($entity, $userId, $rootFolder), $entities);
+			$covers = \array_map(fn ($entity) => $this->getCover($entity, $userId, $rootFolder), $entities);
 			return $this->createMosaic($covers, $size);
 		}
 	}
@@ -221,7 +221,7 @@ class CoverService {
 	 * Remove album cover image from cache if it is there. Silently do nothing if there
 	 * is no cached cover. All users are targeted if no $userId passed.
 	 */
-	public function removeAlbumCoverFromCache(int $albumId, ?string $userId=null) : void {
+	public function removeAlbumCoverFromCache(int $albumId, ?string $userId = null) : void {
 		$this->cache->remove($userId, 'album_cover_hash_' . $albumId);
 	}
 
@@ -229,7 +229,7 @@ class CoverService {
 	 * Remove artist cover image from cache if it is there. Silently do nothing if there
 	 * is no cached cover. All users are targeted if no $userId passed.
 	 */
-	public function removeArtistCoverFromCache(int $artistId, ?string $userId=null) : void {
+	public function removeArtistCoverFromCache(int $artistId, ?string $userId = null) : void {
 		$this->cache->remove($userId, 'artist_cover_hash_' . $artistId);
 	}
 
@@ -247,7 +247,7 @@ class CoverService {
 
 		if ($entity instanceof PodcastChannel) {
 			if ($entity->getImageUrl() !== null) {
-				list('content' => $image, 'content_type' => $mime) = HttpUtil::loadFromUrl($entity->getImageUrl());
+				['content' => $image, 'content_type' => $mime] = HttpUtil::loadFromUrl($entity->getImageUrl());
 				if ($image !== false) {
 					$response = ['mimetype' => $mime, 'content' => $image];
 				}
@@ -373,7 +373,7 @@ class CoverService {
 
 	private function createMosaic(array $covers, ?int $size) : array {
 		$size = ($size > 0) ? $size : $this->coverSize; // DO_NOT_CROP_OR_SCALE handled here the same as null, i.e. default size
-		$pieceSize = $size/2;
+		$pieceSize = $size / 2;
 		$mosaicImg = \imagecreatetruecolor($size, $size);
 		if ($mosaicImg === false) {
 			$this->logger->warning("Failed to create mosaic image of size $size x $size");
@@ -438,9 +438,15 @@ class CoverService {
 	}
 
 	/**
-	 * Create and store an access token which can be used to read cover images of a user.
-	 * A user may have only one valid cover image access token at a time; the latest token
-	 * always overwrites the previously obtained one.
+	 * Get an access token which can be used to read cover images of a user.
+	 *
+	 * The token remains the same for the duration of the user session. A new token is created
+	 * and stored if this session doesn't yet have one.
+	 *
+	 * A user may have only one valid cover image access token at a time. This is relevant if the
+	 * user has multiple parallel sessions. In case like that, each session will have a stable
+	 * token for the duration of the session but only the latest obtained one is "active" in sense
+	 * that it can be used to access the cover art.
 	 *
 	 * The reason this is needed is because the mediaSession in Firefox loads the cover images
 	 * in a context where normal cookies and other standard request headers are not available.
@@ -449,16 +455,22 @@ class CoverService {
 	 * load the user data. The solution is to use a temporary token which grants access just to
 	 * the cover images. This token can be then sent as URL argument by the mediaSession.
 	 */
-	public function createAccessToken(string $userId) : string {
-		$token = Random::secure(32);
+	public function getAccessToken(string $userId, ISession $session) : string {
+		$token = $session->get('music.cover_access_token');
+		if ($token === null) {
+			$token = Random::secure(32);
+			$session->set('music.cover_access_token', $token);
+		}
+		// Store the token also to our onw database table to be able to verify the passed token
+		// later without the user session.
 		// It might be neater to use a dedicated DB table for this, but the generic cache table
 		// will do, at least for now.
-		$this->cache->set($userId, 'cover_access_token', $token);
+		$this->cache->set($userId, 'cover_access_token', $token, true);
 		return $token;
 	}
 
 	/**
-	 * @see CoverService::createAccessToken
+	 * @see CoverService::getAccessToken
 	 * @throws \OutOfBoundsException if the token is not valid
 	 */
 	public function getUserForAccessToken(?string $token) : string {

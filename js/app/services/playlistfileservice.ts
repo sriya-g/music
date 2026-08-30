@@ -10,15 +10,12 @@
 
 import * as ng from 'angular';
 import { gettextCatalog } from 'angular-gettext';
-import { MusicRootScope } from 'app/config/musicrootscope';
 import { IService } from 'restangular';
 import { LibraryService, Playlist } from './libraryservice';
 
 ng.module('Music').service('playlistFileService', [
-'$rootScope', '$q', 'libraryService', 'playlistService', 'gettextCatalog', 'Restangular',
-function(
-	$rootScope : MusicRootScope, $q : ng.IQService, libraryService : LibraryService, 
-	playlistService : any, gettextCatalog : gettextCatalog, Restangular : IService) {
+'$q', 'libraryService', 'playlistService', 'gettextCatalog', 'Restangular',
+function($q : ng.IQService, libraryService : LibraryService, playlistService : any, gettextCatalog : gettextCatalog, Restangular : IService) {
 
 	function queryOverwrite(path : string, onSelection : CallableFunction) {
 		const fileName = path.split('/').pop();
@@ -122,8 +119,8 @@ function(
 		},
 
 		// Export radio stations to file
-		exportRadio() : ng.IPromise<any> {
-			let deferred = $q.defer();
+		exportRadio() : ng.IPromise<void> {
+			let deferred = $q.defer<void>();
 
 			let selPath : string|null = null;
 
@@ -191,7 +188,6 @@ function(
 																			{ count: result.failed_count });
 							}
 							OCA.Music.Dialogs.showNotification(message);
-							$rootScope.$emit('playlistUpdated', playlist.id);
 							playlist.busy = false;
 							deferred.resolve(playlist);
 						},
@@ -234,10 +230,10 @@ function(
 		},
 
 		// Import radio stations from a playlist file
-		importRadio: function() : ng.IPromise<any> {
-			let deferred = $q.defer();
+		importRadio: function() : ng.IPromise<void> {
+			let deferred = $q.defer<void>();
 
-			function onFileSelected(file : string) : ng.IPromise<any> {
+			function onFileSelected(file : string) : ng.IPromise<void> {
 				deferred.notify('started');
 
 				return Restangular.all('radio/import').post({filePath: file}).then(
@@ -250,7 +246,6 @@ function(
 																		{ count: result.failed_count });
 						}
 						OCA.Music.Dialogs.showNotification(message);
-						$rootScope.$emit('playlistUpdated', 'radio');
 						deferred.resolve();
 					},
 					function(_error) {

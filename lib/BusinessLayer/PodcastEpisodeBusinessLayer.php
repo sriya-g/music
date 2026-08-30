@@ -15,11 +15,10 @@ namespace OCA\Music\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
-
 use OCA\Music\Db\BaseMapper;
 use OCA\Music\Db\MatchMode;
-use OCA\Music\Db\PodcastEpisodeMapper;
 use OCA\Music\Db\PodcastEpisode;
+use OCA\Music\Db\PodcastEpisodeMapper;
 use OCA\Music\Db\SortBy;
 use OCA\Music\Utility\StringUtil;
 
@@ -35,7 +34,7 @@ class PodcastEpisodeBusinessLayer extends BusinessLayer {
 
 	public function __construct(
 		PodcastEpisodeMapper $mapper,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($mapper);
 	}
@@ -44,7 +43,7 @@ class PodcastEpisodeBusinessLayer extends BusinessLayer {
 	 * @param int|int[] $channelIds
 	 * @return PodcastEpisode[]
 	 */
-	public function findAllByChannel($channelIds, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByChannel($channelIds, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		if (!\is_array($channelIds)) {
 			$channelIds = [$channelIds];
 		}
@@ -75,7 +74,7 @@ class PodcastEpisodeBusinessLayer extends BusinessLayer {
 		\assert($itunesNodes !== null); // children() returns null only if the SimpleXMLElement represents an attribute
 
 		if (!$xmlNode->enclosure || !$xmlNode->enclosure->attributes()) {
-			$logger->debug("No stream URL for the episode " . $xmlNode->title);
+			$logger->debug('No stream URL for the episode ' . $xmlNode->title);
 			$streamUrl = null;
 			$mimetype = null;
 			$size = null;

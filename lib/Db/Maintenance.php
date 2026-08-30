@@ -14,15 +14,14 @@
 
 namespace OCA\Music\Db;
 
-use OCP\IDBConnection;
-
 use OCA\Music\AppFramework\Core\Logger;
+use OCP\IDBConnection;
 
 class Maintenance {
 
 	public function __construct(
 		private IDBConnection $db,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -48,7 +47,7 @@ class Maintenance {
 				);
 			}
 		}
-	
+
 		return $modRows;
 	}
 
@@ -103,7 +102,7 @@ class Maintenance {
 	 * @param string|null $extraCond
 	 * @return int Number of removed rows
 	 */
-	private function removeUnreferencedDbRows(string $tgtTable, string $refTable, string $tgtTableKey, string $refTableKey, ?string $extraCond=null) : int {
+	private function removeUnreferencedDbRows(string $tgtTable, string $refTable, string $tgtTableKey, string $refTableKey, ?string $extraCond = null) : int {
 		$tgtTable = '*PREFIX*' . $tgtTable;
 		$refTable = '*PREFIX*' . $refTable;
 
@@ -116,8 +115,7 @@ class Maintenance {
 					WHERE `$refTable`.`$refTableKey` IS NULL
 				) mysqlhack
 			)"
-			.
-			(empty($extraCond) ? '' : " AND $extraCond")
+			. (empty($extraCond) ? '' : " AND $extraCond")
 		);
 	}
 
@@ -167,7 +165,7 @@ class Maintenance {
 	 */
 	private function removeObsoleteArtists() : int {
 		// Note: This originally used the NOT IN operation but that was terribly inefficient on PostgreSQL,
-		// see https://github.com/owncloud/music/issues/997
+		// see https://github.com/nc-music/oc-music/issues/997
 		return $this->db->executeStatement(
 			'DELETE FROM `*PREFIX*music_artists`
 				WHERE NOT EXISTS (SELECT 1 FROM `*PREFIX*music_albums` WHERE `*PREFIX*music_artists`.`id` = `album_artist_id` LIMIT 1)
@@ -178,6 +176,10 @@ class Maintenance {
 
 	private function removeObsoleteGenres() : int {
 		return $this->removeUnreferencedDbRows('music_genres', 'music_tracks', 'id', 'genre_id');
+	}
+
+	private function removeObsoleteRecordLabels() : int {
+		return $this->removeUnreferencedDbRows('music_record_labels', 'music_tracks', 'id', 'record_label_id');
 	}
 
 	/**
@@ -198,43 +200,46 @@ class Maintenance {
 	}
 
 	/**
-	 * Removes orphaned data from the database
-	 * @return array describing the number of removed entries per type
+	 * @param callable():int $func Function returning a count
+	 * @return array{count: int, time_ms: int}
 	 */
-	public function cleanUp() : array {
-		$removedScanFlags = $this->removeStrayScanningStatus();
+	private static function timedExecute(callable $func) : array {
+		$startTime = \hrtime(true);
+		$result = $func();
+		$elapsedTime = (int)((\hrtime(true) - $startTime) / 1000000);
+		return ['count' => $result, 'time_ms' => $elapsedTime];
+	}
+
+	/**
+	 * Removes orphaned data from the database
+	 * @return ?array<string, array{count: int, time_ms: int}> For each handled entity type (keys), the value contains the number of elements
+	 *         removed and the time taken on the operation in milliseconds; null if the cleanup was skipped because of an ongoing scan job
+	 */
+	public function cleanUp() : ?array {
+		$scanFlagResult = ['scan_flags' => self::timedExecute(fn () => $this->removeStrayScanningStatus())];
 
 		// Don't clean during an ongoing scan. This may cause the scanning to fail with a deadlock error on MariaDB,
-		// see https://github.com/owncloud/music/issues/918. It could also remove a just scanned album row before the
+		// see https://github.com/nc-music/oc-music/issues/918. It could also remove a just scanned album row before the
 		// contained track rows have been added to the DB, which would have happened a few milliseconds later.
-		$skipDuringScan = $this->scanningInProgress();
-		if (!$skipDuringScan) {
-			$removedCovers = $this->removeObsoleteAlbumCoverImages();
-			$removedCovers += $this->removeObsoleteArtistCoverImages();
-	
-			$removedTracks = $this->removeObsoleteTracks();
-			$removedAlbums = $this->removeObsoleteAlbums();
-			$removedArtists = $this->removeObsoleteArtists();
-			$removedGenres = $this->removeObsoleteGenres();
-			$removedBookmarks = $this->removeObsoleteBookmarks();
-			$removedEpisodes = $this->removeObsoletePodcastEpisodes();
-	
-			$removedAlbums += $this->removeAlbumsWithNoArtist();
-			$removedTracks += $this->removeTracksWithNoAlbum();
-			$removedTracks += $this->removeTracksWithNoArtist();
+		if ($this->scanningInProgress()) {
+			return null;
 		}
 
-		return [
-			'scanFlags' => $removedScanFlags,
-			'covers' => $removedCovers ?? 0,
-			'artists' => $removedArtists ?? 0,
-			'albums' => $removedAlbums ?? 0,
-			'tracks' => $removedTracks ?? 0,
-			'genres' => $removedGenres ?? 0,
-			'bookmarks' => $removedBookmarks ?? 0,
-			'podcast_episodes' => $removedEpisodes ?? 0,
-			'skipped_because_scan_in_progress' => $skipDuringScan
+		$handlers = [
+			['covers',           fn () => $this->removeObsoleteAlbumCoverImages() + $this->removeObsoleteArtistCoverImages()],
+			['tracks',           fn () => $this->removeObsoleteTracks() + $this->removeTracksWithNoAlbum() + $this->removeTracksWithNoArtist()],
+			['albums',           fn () => $this->removeObsoleteAlbums() + $this->removeAlbumsWithNoArtist()],
+			['artists',          fn () => $this->removeObsoleteArtists()],
+			['genres',           fn () => $this->removeObsoleteGenres()],
+			['record_labels',    fn () => $this->removeObsoleteRecordLabels()],
+			['bookmarks',        fn () => $this->removeObsoleteBookmarks()],
+			['podcast_episodes', fn () => $this->removeObsoletePodcastEpisodes()],
 		];
+
+		return $scanFlagResult + \array_combine(
+			\array_column($handlers, 0),
+			\array_map(fn($cleanFunc) => self::timedExecute($cleanFunc), \array_column($handlers, 1))
+		);
 	}
 
 	/**
@@ -252,7 +257,7 @@ class Maintenance {
 		$params = [];
 		$sql = "DELETE FROM `*PREFIX*music_$table`";
 		if (!$allUsers) {
-			$sql .=  ' WHERE `user_id` = ?';
+			$sql .= ' WHERE `user_id` = ?';
 			$params[] = $userId;
 		}
 		$this->db->executeStatement($sql, $params);
@@ -277,7 +282,7 @@ class Maintenance {
 		}
 
 		if ($allUsers) {
-			$this->logger->info("Erased music databases of all users");
+			$this->logger->info('Erased music databases of all users');
 		} else {
 			$this->logger->info("Erased music database of user $userId");
 		}

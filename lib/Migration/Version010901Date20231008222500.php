@@ -6,8 +6,8 @@ namespace OCA\Music\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
-use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
+use OCP\Migration\SimpleMigrationStep;
 
 /**
  * Migrate the DB schema to Music v1.9.1 level from the v1.4.0 level
@@ -54,8 +54,9 @@ class Version010901Date20231008222500 extends SimpleMigrationStep {
 	 */
 	private function fixInconsistentIdTypes(ISchemaWrapper $schema) : void {
 		$schema->getTable('music_albums')->changeColumn('album_artist_id', ['unsigned' => true]);
-		$schema->getTable('music_tracks')->changeColumn('artist_id', ['unsigned' => true])
-										->changeColumn('album_id', ['unsigned' => true]);
+		$schema->getTable('music_tracks')
+			->changeColumn('artist_id', ['unsigned' => true])
+			->changeColumn('album_id', ['unsigned' => true]);
 		$schema->getTable('music_bookmarks')->changeColumn('entry_id', ['unsigned' => true]);
 		$schema->getTable('music_ampache_users')->changeColumn('id', ['unsigned' => true]);
 	}

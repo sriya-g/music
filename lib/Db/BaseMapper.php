@@ -12,14 +12,13 @@
 
 namespace OCA\Music\Db;
 
+use OCA\Music\AppFramework\Db\Mapper;
+use OCA\Music\AppFramework\Db\UniqueConstraintViolationException;
+use OCA\Music\Utility\StringUtil;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\IConfig;
 use OCP\IDBConnection;
-
-use OCA\Music\AppFramework\Db\Mapper;
-use OCA\Music\AppFramework\Db\UniqueConstraintViolationException;
-use OCA\Music\Utility\StringUtil;
 
 /**
  * Common base class for data access classes of the Music app
@@ -49,8 +48,8 @@ abstract class BaseMapper extends Mapper {
 		string $tableName,
 		string $entityClass,
 		protected string $nameColumn,
-		protected ?array $uniqueColumns=null,
-		protected ?string $parentIdColumn=null
+		protected ?array $uniqueColumns = null,
+		protected ?string $parentIdColumn = null,
 	) {
 		parent::__construct($db, $tableName, $entityClass);
 		$this->dbType = $config->getSystemValue('dbtype');
@@ -81,14 +80,14 @@ abstract class BaseMapper extends Mapper {
 
 	/**
 	 * Find all entities matching the given IDs. Specifying the owning user is optional.
-	 * @param integer[] $ids  IDs of the entities to be found
+	 * @param integer[] $ids IDs of the entities to be found
 	 * @param string|null $userId
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findById(array $ids, ?string $userId=null) : array {
+	public function findById(array $ids, ?string $userId = null) : array {
 		$count = \count($ids);
-		$condition = "`{$this->getTableName()}`.`id` IN ". $this->questionMarks($count);
+		$condition = "`{$this->getTableName()}`.`id` IN " . $this->questionMarks($count);
 
 		if (empty($userId)) {
 			$sql = $this->selectEntities($condition);
@@ -109,8 +108,8 @@ abstract class BaseMapper extends Mapper {
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAll(string $userId, int $sortBy=SortBy::Name, ?int $limit=null, ?int $offset=null,
-							?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+	public function findAll(string $userId, int $sortBy = SortBy::Name, ?int $limit = null, ?int $offset = null,
+							?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		$sorting = $this->formatSortingClause($sortBy);
 		[$condition, $params] = $this->formatTimestampConditions($createdMin, $createdMax, $updatedMin, $updatedMax);
 		$sql = $this->selectUserEntities($condition, $sorting);
@@ -128,8 +127,8 @@ abstract class BaseMapper extends Mapper {
 	 * @phpstan-return EntityType[]
 	 */
 	public function findAllByName(
-		?string $name, string $userId, int $matchMode=MatchMode::Exact, ?int $limit=null, ?int $offset=null,
-		?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+		?string $name, string $userId, int $matchMode = MatchMode::Exact, ?int $limit = null, ?int $offset = null,
+		?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 
 		$params = [$userId];
 
@@ -153,7 +152,7 @@ abstract class BaseMapper extends Mapper {
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAllStarred(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllStarred(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		if (\property_exists($this->entityClass, 'starred')) {
 			$sql = $this->selectUserEntities(
 				"`{$this->getTableName()}`.`starred` IS NOT NULL",
@@ -187,7 +186,7 @@ abstract class BaseMapper extends Mapper {
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAllRated(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllRated(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		if (\property_exists($this->entityClass, 'rating')) {
 			$sql = $this->selectUserEntities(
 				"`{$this->getTableName()}`.`rating` > 0",
@@ -203,22 +202,22 @@ abstract class BaseMapper extends Mapper {
 	 * Find all entities matching multiple criteria, as needed for the Ampache API method `advanced_search`
 	 * @param string $conjunction Operator to use between the rules, either 'and' or 'or'
 	 * @param array $rules Array of arrays: [['rule' => string, 'operator' => string, 'input' => string], ...]
-	 * 				Here, 'rule' has dozens of possible values depending on the business layer in question
-	 * 				(see https://ampache.org/api/api-advanced-search#available-search-rules, alias names not supported here),
-	 * 				'operator' is one of
-	 * 				['contain', 'notcontain', 'start', 'end', 'is', 'isnot', 'sounds', 'notsounds', 'regexp', 'notregexp',
-	 * 				 '>=', '<=', '=', '!=', '>', '<', 'before', 'after', 'true', 'false', 'equal', 'ne', 'limit'],
-	 * 				'input' is the right side value of the 'operator' (disregarded for the operators 'true' and 'false')
+	 *                     Here, 'rule' has dozens of possible values depending on the business layer in question
+	 *                     (see https://ampache.org/api/api-advanced-search#available-search-rules, alias names not supported here),
+	 *                     'operator' is one of
+	 *                     ['contain', 'notcontain', 'start', 'end', 'is', 'isnot', 'sounds', 'notsounds', 'regexp', 'notregexp',
+	 *                     '>=', '<=', '=', '!=', '>', '<', 'before', 'after', 'true', 'false', 'equal', 'ne', 'limit'],
+	 *                     'input' is the right side value of the 'operator' (disregarded for the operators 'true' and 'false')
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAllAdvanced(string $conjunction, array $rules, string $userId, int $sortBy=SortBy::Name, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllAdvanced(string $conjunction, array $rules, string $userId, int $sortBy = SortBy::Name, ?int $limit = null, ?int $offset = null) : array {
 		$sqlConditions = [];
 		$sqlParams = [$userId];
 
 		foreach ($rules as $rule) {
 			$rule['input'] = self::advConvertInput((string)$rule['input'], $rule['rule']);
-			list('op' => $sqlOp, 'conv' => $sqlConv, 'param' => $param) = $this->advFormatSqlOperator($rule['operator'], $rule['input'], $userId);
+			['op' => $sqlOp, 'conv' => $sqlConv, 'param' => $param] = $this->advFormatSqlOperator($rule['operator'], $rule['input'], $userId);
 			$cond = $this->advFormatSqlCondition($rule['rule'], $sqlOp, $sqlConv);
 			$sqlConditions[] = $cond;
 			// On some conditions, the parameter may need to be repeated several times
@@ -289,9 +288,9 @@ abstract class BaseMapper extends Mapper {
 	 * @param bool $excludeChildless Exclude entities having no child-entities if applicable for this business layer (eg. artists without albums)
 	 * @return array of arrays like ['id' => string, 'name' => ?string]
 	 */
-	public function findAllIdsAndNames(string $userId, ?int $parentId, ?int $limit=null, ?int $offset=null,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null,
-			bool $excludeChildless=false, ?string $name=null) : array {
+	public function findAllIdsAndNames(string $userId, ?int $parentId, ?int $limit = null, ?int $offset = null,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null,
+			bool $excludeChildless = false, ?string $name = null) : array {
 		$sql = "SELECT `id`, `{$this->nameColumn}` AS `name` FROM `{$this->getTableName()}` WHERE `user_id` = ?";
 		$params = [$userId];
 		if ($parentId !== null) {
@@ -351,7 +350,7 @@ abstract class BaseMapper extends Mapper {
 
 	/**
 	 * Delete all entities with given IDs without specifying the user
-	 * @param integer[] $ids  IDs of the entities to be deleted
+	 * @param integer[] $ids IDs of the entities to be deleted
 	 */
 	public function deleteById(array $ids) : void {
 		$count = \count($ids);
@@ -367,7 +366,7 @@ abstract class BaseMapper extends Mapper {
 	 * @param array $params SQL parameters for the condition
 	 */
 	protected function deleteByCond(string $condition, array $params) : void {
-		$sql = "DELETE FROM `{$this->getTableName()}` WHERE ". $condition;
+		$sql = "DELETE FROM `{$this->getTableName()}` WHERE " . $condition;
 		$result = $this->execute($sql, $params);
 		$result->closeCursor();
 	}
@@ -570,7 +569,7 @@ abstract class BaseMapper extends Mapper {
 	 * @param string|null $extension Any extension (e.g. ORDER BY, LIMIT) to be added after
 	 *                               the conditions in the SQL statement
 	 */
-	protected function selectUserEntities(?string $condition=null, ?string $extension=null) : string {
+	protected function selectUserEntities(?string $condition = null, ?string $extension = null) : string {
 		$allConditions = "`{$this->getTableName()}`.`user_id` = ?";
 
 		if (!empty($condition)) {
@@ -587,7 +586,7 @@ abstract class BaseMapper extends Mapper {
 	 * @param string|null $extension Any extension (e.g. ORDER BY, LIMIT) to be added after
 	 *                               the conditions in the SQL statement
 	 */
-	protected function selectEntities(string $condition, ?string $extension=null) : string {
+	protected function selectEntities(string $condition, ?string $extension = null) : string {
 		return "SELECT * FROM `{$this->getTableName()}` WHERE $condition $extension ";
 	}
 
@@ -754,9 +753,9 @@ abstract class BaseMapper extends Mapper {
 	/**
 	 * Format SQL condition matching the given advanced search rule and SQL operator.
 	 * Derived classes should override this to provide support for table-specific rules.
-	 * @param string $rule	Identifier of the property which is the target of the SQL condition. The identifiers match the Ampache API specification.
-	 * @param string $sqlOp	SQL (comparison) operator to be used
-	 * @param string $conv	SQL conversion function to be applied on the target column and the parameter (e.g. "LOWER")
+	 * @param string $rule Identifier of the property which is the target of the SQL condition. The identifiers match the Ampache API specification.
+	 * @param string $sqlOp SQL (comparison) operator to be used
+	 * @param string $conv SQL conversion function to be applied on the target column and the parameter (e.g. "LOWER")
 	 * @return string SQL condition statement to be used in the "WHERE" clause
 	 */
 	protected function advFormatSqlCondition(string $rule, string $sqlOp, string $conv) : string {
@@ -771,7 +770,7 @@ abstract class BaseMapper extends Mapper {
 			case 'rating':			return "`$table`.`rating` $sqlOp ?";
 			case 'added':			return "`$table`.`created` $sqlOp ?";
 			case 'updated':			return "`$table`.`updated` $sqlOp ?";
-			case 'mbid':			return "`$table`.`mbid` $sqlOp ?";
+			case 'mbid':			return "$conv(`$table`.`mbid`) $sqlOp $conv(?)";
 			case 'recent_added':	return "`$table`.`id` IN (SELECT * FROM (SELECT `id` FROM `$table` WHERE `user_id` = ? ORDER BY `created` DESC LIMIT $sqlOp) mysqlhack)";
 			case 'recent_updated':	return "`$table`.`id` IN (SELECT * FROM (SELECT `id` FROM `$table` WHERE `user_id` = ? ORDER BY `updated` DESC LIMIT $sqlOp) mysqlhack)";
 			default:				throw new \DomainException("Rule '$rule' not supported on this entity type");
@@ -872,18 +871,24 @@ abstract class BaseMapper extends Mapper {
 			throw new \BadMethodCallException('not supported');
 		}
 
-		$properties = \array_map(fn($col) => $entity->columnToProperty($col), $this->uniqueColumns);
-		$values = \array_map(fn($prop) => $entity->$prop, $properties);
+		$properties = \array_map(fn ($col) => $entity->columnToProperty($col), $this->uniqueColumns);
+		$values = \array_map(fn ($prop) => $entity->$prop, $properties);
 
-		$conds = \array_map(fn($col) => "`$col` = ?", $this->uniqueColumns);
+		$conds = \array_map(
+			fn ($col, $val) => ($val === null) ? "`$col` IS NULL" : "`$col` = ?",
+			$this->uniqueColumns,
+			$values
+		);
 		$sql = "SELECT `id` FROM {$this->getTableName()} WHERE " . \implode(' AND ', $conds);
+		$params = \array_filter($values, fn ($val) => $val !== null);
 
-		$result = $this->execute($sql, $values);
+		$result = $this->execute($sql, $params);
 		$id = $result->fetchOne();
 		$result->closeCursor();
 
 		if ($id === false) {
-			throw new DoesNotExistException('Conflicting entity not found');
+			throw new DoesNotExistException("Conflicting entity not found in table '{$this->unprefixedTableName()}' for unique columns: "
+				. \json_encode($this->uniqueColumns) . ' with values: ' . \json_encode($values));
 		}
 
 		return (int)$id;
@@ -895,7 +900,7 @@ abstract class BaseMapper extends Mapper {
 		$created = $result->fetchOne();
 		$result->closeCursor();
 		if ($created === false) {
-			throw new DoesNotExistException('ID not found');
+			throw new DoesNotExistException("ID $id not found in table '{$this->unprefixedTableName()}'");
 		}
 		return $created;
 	}

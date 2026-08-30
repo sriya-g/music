@@ -11,60 +11,67 @@
  */
 
 angular.module('Music').controller('SettingsViewController', [
-	'$scope', '$rootScope', 'Restangular', '$q', '$timeout', 'gettextCatalog',
-	function ($scope, $rootScope, Restangular, $q, $timeout, gettextCatalog) {
+	'$scope', '$rootScope', 'Restangular', '$q', '$timeout', 'gettextCatalog', 'libraryService', 'libraryFactory',
+	function ($scope, $rootScope, Restangular, $q, $timeout, gettextCatalog, libraryService, libraryFactory) {
 
-		$rootScope.currentView = $scope.getViewIdFromUrl();
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		$scope.issueTrackerUrl = 'https://github.com/nc-music/music/issues';
 		$scope.ampacheClientsUrl = 'https://github.com/nc-music/music/wiki/Ampache';
 		$scope.subsonicClientsUrl = 'https://github.com/nc-music/music/wiki/Subsonic';
+		$scope.adminSettingsUiUrl = OC.generateUrl('settings/admin/music');
 
 		$scope.desktopNotificationsSupported = (typeof Notification !== 'undefined');
 
-		let savedExcludedPaths = [];
-
-		// $rootScope listeneres must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
+		function initScanned() {
+			libraryFactory.getCollection().then(() => {
+				$scope.scannedFileIds = libraryService.getAllTracks().map((track) => Object.values(track.files)).flat();
+			});
 		}
 
-		$scope.$on('$destroy', function () {
-			_.each(unsubFuncs, function(func) { func(); });
-		});
+		initScanned();
+		libraryFactory.subscribe('collectionUpdating', $scope, initScanned);
+
+		let savedExcludedPaths = [];
 
 		$scope.selectPath = function() {
+			// Store the parent reference before asynchronous actions;
+			// $scope.$parent may not be available any more in the callback in case
+			// the user has navigated to another view in the meantime.
+			const parent = $scope.$parent;
+
 			OCA.Music.Dialogs.folderPicker(
 				gettextCatalog.getString('Path to your music collection'),
-				function (path) {
+				(path) => {
 					if ($scope.settings.path !== path) {
 						$scope.pathChangeOngoing = true;
 
 						// Stop any ongoing scan if path got changed
-						$scope.$parent.stopScanning();
+						parent.stopScanning();
 
-						// Store the parent reference before posting the changed value to backend;
-						// $scope.$parent may not be available any more in the callback in case
-						// the user has navigated to another view in the meantime.
-						let parent = $scope.$parent;
 						Restangular.all('settings/user/path').post({value: path}).then(
-							function (data) {
+							(data) => {
 								if (data.success) {
 									$scope.errorPath = false;
 									$scope.settings.path = path;
-									parent.update();
+									libraryFactory.reloadCollection();
+									parent.updateFilesToScan();
 								} else {
 									$scope.errorPath = true;
 								}
 								$scope.pathChangeOngoing = false;
 							},
-							function(_error) { // error handling
+							(_error) => { // error handling
 								$scope.pathChangeOngoing = false;
 								$scope.errorPath = true;
 							}
 						);
+					} else {
+						// Same path re-selected: check for unscanned/obsolete files without
+						// reloading the full collection, unless we are already scanning
+						if (!parent.scanning) {
+							parent.updateFilesToScan();
+						}
 					}
 				}
 			);
@@ -106,6 +113,7 @@ angular.module('Music').controller('SettingsViewController', [
 						$scope.savingExcludedPaths = false;
 						$scope.errorIgnoredPaths = false;
 						savedExcludedPaths = paths;
+						$scope.updateFilesToScan();
 					},
 					function(_error) {
 						// error handling
@@ -116,30 +124,30 @@ angular.module('Music').controller('SettingsViewController', [
 			}
 		};
 
-		let cancelSaveScanMetada = null;
+		let cancelSaveScanMetadata = null;
 		$scope.savingScanMetadata = 0;
 		$scope.$watch('settings.scanMetadata', function(enabled, previouslyEnabled) {
 			// send the new value to the server only when moving between valid states, not on first init
 			if (enabled !== undefined && previouslyEnabled !== undefined) {
 				// if there is already one save operation running, cancel that first
-				if (cancelSaveScanMetada !== null) {
-					cancelSaveScanMetada.resolve();
+				if (cancelSaveScanMetadata !== null) {
+					cancelSaveScanMetadata.resolve();
 				}
 
 				$scope.savingScanMetadata++;
-				cancelSaveScanMetada = $q.defer();
-				Restangular.all('settings/user/enable_scan_metadata').withHttpConfig({timeout: cancelSaveScanMetada.promise}).post({value: enabled}).then(
+				cancelSaveScanMetadata = $q.defer();
+				Restangular.all('settings/user/enable_scan_metadata').withHttpConfig({timeout: cancelSaveScanMetadata.promise}).post({value: enabled}).then(
 					function(_data) {
 						// success
 						$scope.savingScanMetadata--;
 						$scope.errorScanMetadata = false;
-						cancelSaveScanMetada = null;
+						cancelSaveScanMetadata = null;
 					},
 					function(error) {
 						// error handling
 						$scope.savingScanMetadata--;
 						$scope.errorScanMetadata = (error.xhrStatus != 'abort'); // aborting is not an error
-						cancelSaveScanMetada = null;
+						cancelSaveScanMetadata = null;
 					}
 				);
 			}
@@ -158,22 +166,22 @@ angular.module('Music').controller('SettingsViewController', [
 
 						// $scope.$parent may not be available any more in the callback in case
 						// the user has navigated to another view in the meantime
-						let parent = $scope.$parent;
-						let executeReset = function() {
+						const parent = $scope.$parent;
+						const executeReset = function() {
 							Restangular.all('resetscanned').post().then(
-									function(data) {
-										if (data.success) {
-											parent.resetScanned();
-											parent.update();
-										}
-										$scope.collectionResetOngoing = false;
-									},
-									function(error) { // error handling
-										$scope.collectionResetOngoing = false;
-										const errMsg = gettextCatalog.getString('Failed to reset the collection:');
-										OCA.Music.Dialogs.showNotification(errMsg + ' ' + error.status);
+								(data) => {
+									if (data.success) {
+										libraryFactory.reloadCollection();
+										parent.updateFilesToScan();
 									}
-								);
+									$scope.collectionResetOngoing = false;
+								},
+								(error) => { // error handling
+									$scope.collectionResetOngoing = false;
+									const errMsg = gettextCatalog.getString('Failed to reset the collection:');
+									OCA.Music.Dialogs.showNotification(errMsg + ' ' + error.status);
+								}
+							);
 						};
 
 						// Trigger the reset with a small delay. This is to tackle a small issue when
@@ -196,13 +204,10 @@ angular.module('Music').controller('SettingsViewController', [
 					if (confirmed) {
 						$scope.radioResetOngoing = true;
 
-						// $scope.$parent may not be available any more in the callback in case
-						// the user has navigated to another view in the meantime
-						let parent = $scope.$parent;
 						Restangular.all('radio/reset').post().then(
 								function(data) {
 									if (data.success) {
-										parent.updateRadio();
+										libraryFactory.resetRadioStations();
 									}
 									$scope.radioResetOngoing = false;
 								},
@@ -226,13 +231,10 @@ angular.module('Music').controller('SettingsViewController', [
 					if (confirmed) {
 						$scope.podcastsResetOngoing = true;
 
-						// $scope.$parent may not be available any more in the callback in case
-						// the user has navigated to another view in the meantime
-						let parent = $scope.$parent;
 						Restangular.all('podcasts/reset').post().then(
 								function(data) {
 									if (data.success) {
-										parent.updatePodcasts();
+										libraryFactory.resetPodcasts();
 									}
 									$scope.podcastsResetOngoing = false;
 								},
@@ -277,7 +279,7 @@ angular.module('Music').controller('SettingsViewController', [
 						$scope.savingIgnoredArticles = false;
 						$scope.errorIgnoredArticles = false;
 						$scope.settings.ignoredArticles = articles;
-						$rootScope.$emit('updateIgnoredArticles', articles);
+						libraryService.setIgnoredArticles(articles);
 					},
 					function(_error) {
 						// error handling
@@ -322,10 +324,10 @@ angular.module('Music').controller('SettingsViewController', [
 			});
 		};
 
-		$rootScope.$on('viewActivated', function () {
-			$scope.settings.scrobblers.forEach(function (scrobbler) {
+		function setupScrobblerActions(scrobblers) {
+			scrobblers.forEach(function (scrobbler) {
 				scrobbler.generateScrobbleSession = function() {
-					window.open(scrobbler.tokenRequestUrl, '_blank', { popup: true });
+					window.open(scrobbler.tokenRequestUrl, '_blank', 'popup,width=600,height=800');
 					const bc = new BroadcastChannel(scrobbler.identifier + '-scrobble-session-result');
 					bc.onmessage = function(e) {
 						$timeout(() => scrobbler.hasSession = e.data);
@@ -344,9 +346,9 @@ angular.module('Music').controller('SettingsViewController', [
 						.then(function(data) {
 							if (data?.success === true) {
 								scrobbler.hasSession = false;
-								return;
+							} else {
+								errHandler(data.error);
 							}
-							errHandler(data.error);
 						}, errHandler);
 				};
 
@@ -371,7 +373,7 @@ angular.module('Music').controller('SettingsViewController', [
 					};
 				}
 			});
-		});
+		}
 
 		$scope.copyToClipboard = function(elementId) {
 			let range = document.createRange();
@@ -392,16 +394,11 @@ angular.module('Music').controller('SettingsViewController', [
 		$timeout(function() {
 			Restangular.one('settings').get().then(function (value) {
 				$scope.settings = value;
-				$rootScope.loading = false;
 				savedExcludedPaths = _.clone(value.excludedPaths);
 				$scope.ignoredArticles = value.ignoredArticles.join(' ');
-				$rootScope.$emit('viewActivated');
+				setupScrobblerActions($scope.settings.scrobblers);
+				$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 			});
 		});
-
-		subscribe('deactivateView', function() {
-			$rootScope.$emit('viewDeactivated');
-		});
-
 	}
 ]);

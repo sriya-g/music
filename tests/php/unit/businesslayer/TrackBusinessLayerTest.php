@@ -19,8 +19,9 @@ use OCA\Music\Db\Cache;
 use OCA\Music\Db\Track;
 use OCA\Music\Db\TrackMapper;
 use OCA\Music\Service\FileSystemService;
+use PHPUnit\Framework\TestCase;
 
-class TrackBusinessLayerTest extends \PHPUnit\Framework\TestCase {
+class TrackBusinessLayerTest extends TestCase {
 	private $mapper;
 	private $fileSystemService;
 	private $logger;
@@ -49,6 +50,19 @@ class TrackBusinessLayerTest extends \PHPUnit\Framework\TestCase {
 		$this->artistId = 3;
 		$this->albumId = 3;
 		$this->fileId = 2;
+
+		\OC::$server = new class($this) {
+			private TestCase $testCase;
+			public function __construct(TestCase $testCase) {
+				$this->testCase = $testCase;
+			}
+
+			public function query(string $class) {
+				return $this->testCase->getMockBuilder($class)
+					->disableOriginalConstructor()
+					->getMock();
+			}
+		};
 	}
 
 	public function testFindAllByArtist() {
@@ -118,13 +132,17 @@ class TrackBusinessLayerTest extends \PHPUnit\Framework\TestCase {
 		$this->assertEquals($track, $result);
 	}
 
-	public function testAddOrUpdateTrackWithBpmAndComposerId() {
+	public function testAddOrUpdateTrackWithOptionalParameters() {
 		$fileId = 2;
 
 		$this->mapper->expects($this->once())
 			->method('updateOrInsert')
 			->with($this->callback(function (Track $track) {
-				return $track->getBpm() === 120
+				return $track->getRecordLabelId() === 99
+					&& $track->getLength() == 185
+					&& $track->getBitrate() == 128000
+					&& $track->getSampleRate() == 44100
+					&& $track->getBpm() === 120
 					&& $track->getComposerId() === 42;
 			}))
 			->will($this->returnCallback(function (Track $track) {
@@ -134,18 +152,23 @@ class TrackBusinessLayerTest extends \PHPUnit\Framework\TestCase {
 
 		$result = $this->trackBusinessLayer->addOrUpdateTrack(
 			'test', null, null, null, 1, 1, 1, $fileId, 'audio/mpeg', $this->userId,
-			null, null, 120, 42);
+			99, 185, 128000, 44100, 120, 42);
+		$this->assertEquals(99, $result->getRecordLabelId());
+		$this->assertEquals(185, $result->getLength());
+		$this->assertEquals(128000, $result->getBitrate());
+		$this->assertEquals(44100, $result->getSampleRate());
 		$this->assertEquals(120, $result->getBpm());
 		$this->assertEquals(42, $result->getComposerId());
 	}
 
-	public function testAddOrUpdateTrackWithNullBpmAndComposerId() {
+	public function testAddOrUpdateTrackWithoutOptionalParameters() {
 		$fileId = 2;
 
 		$this->mapper->expects($this->once())
 			->method('updateOrInsert')
 			->with($this->callback(function (Track $track) {
-				return $track->getBpm() === null
+				return $track->getRecordLabelId() === null
+					&& $track->getBpm() === null
 					&& $track->getComposerId() === null;
 			}))
 			->will($this->returnCallback(function (Track $track) {
@@ -155,6 +178,7 @@ class TrackBusinessLayerTest extends \PHPUnit\Framework\TestCase {
 
 		$result = $this->trackBusinessLayer->addOrUpdateTrack(
 			'test', null, null, null, 1, 1, 1, $fileId, 'audio/mpeg', $this->userId);
+		$this->assertNull($result->getRecordLabelId());
 		$this->assertNull($result->getBpm());
 		$this->assertNull($result->getComposerId());
 	}

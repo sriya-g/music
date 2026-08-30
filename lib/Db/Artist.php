@@ -30,7 +30,7 @@ use OCP\IURLGenerator;
  * @method void setStarred(?string $timestamp)
  * @method int getRating()
  * @method void setRating(int $rating)
- * 
+ *
  * @method int getTrackCount()
  * @method int getOwnAlbumCount()
  * @method int getCompositionCount()
@@ -129,26 +129,26 @@ class Artist extends Entity {
 	 */
 	public function toCollection(IURLGenerator $urlGenerator, IL10N $l10n, array $albums) : array {
 		return [
-			'id' => $this->getId(),
-			'name' => $this->getNameString($l10n),
+			'id'     => $this->getId(),
+			'name'   => $this->getNameString($l10n),
 			'albums' => $albums,
-			'cover' => $this->coverToAPI($urlGenerator),
-			'roles' => $this->getRoles(),
+			'cover'  => $this->coverToAPI($urlGenerator),
+			'roles'  => $this->getRoles(),
 		];
 	}
 
 	public function toShivaApi(IURLGenerator $urlGenerator, IL10N $l10n) : array {
 		return [
-			'id' => $this->getId(),
-			'name' => $this->getNameString($l10n),
+			'id'    => $this->getId(),
+			'name'  => $this->getNameString($l10n),
 			'image' => $this->coverToAPI($urlGenerator),
-			'slug' => $this->slugify('name'),
-			'uri' => $this->getUri($urlGenerator)
+			'slug'  => $this->slugify('name'),
+			'uri'   => $this->getUri($urlGenerator)
 		];
 	}
 
 	public static function unknownNameString(IL10N $l10n) : string {
-		return (string) $l10n->t('Unknown artist');
+		return (string)$l10n->t('Unknown artist');
 	}
 
 	/**

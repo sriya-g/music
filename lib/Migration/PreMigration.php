@@ -21,7 +21,8 @@ class PreMigration implements IRepairStep {
 
 	public function __construct(
 		private IDBConnection $db,
-		private IConfig $config) {
+		private IConfig $config,
+	) {
 	}
 
 	public function getName() {
@@ -38,8 +39,8 @@ class PreMigration implements IRepairStep {
 		// Drop obsolete tables created by previous versions if they still exist.
 		// No need to check version numbers here.
 		$this->dropTables([
-				'music_album_artists',
-				'music_playlist_tracks'
+			'music_album_artists',
+			'music_playlist_tracks'
 		]);
 
 		// Wipe clean the tables which have changed so that the old data does not

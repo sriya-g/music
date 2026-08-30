@@ -93,3 +93,25 @@ Feature: Subsonic API - Search
       | Sea of Sorrows  | Orchestral Film Music Vol. 1    | Simon Bowman              | 1         | 2013  | 2     |
       | To The Edge     | Orchestral Film Music Vol. 1    | Simon Bowman              | 1         | 2013  | 1     |
       | Vagues          | Nuance                          | Pascal Boiseau (Pascalb)  | 3         | 2006  | 8     |
+
+  Scenario: Empty query (search3) used to find all the songs of the library; check the path property
+    When I specify the parameter "query" with value ""
+    And I specify the parameter "songCount" with value "100"
+    And I specify the parameter "albumCount" with value "0"
+    And I specify the parameter "artistCount" with value "0"
+    And I request the "search3" resource
+    Then the XML result should contain "song" entries:
+      | title                      | path                                                                     |
+      | Aç                         | /folder2/23975-[AudioTrimmer.com].mp3                                    |
+      | Balrog Boogie              | /folder2/subfolder/391002-[AudioTrimmer.com].mp3                         |
+      | Forgotten Days             | /folder1/1050077-[AudioTrimmer.com].mp3                                  |
+      | Gunpowder Chant            | /folder2/subfolder/deeply/nested/subfolder/391013-[AudioTrimmer.com].mp3 |
+      | Heroines                   | /folder2/subfolder/391010-[AudioTrimmer.com].mp3                         |
+      | Médiane                    | /23969-[AudioTrimmer.com].mp3                                            |
+      | Nocturne                   | /folder1/1050078-[AudioTrimmer.com].mp3                                  |
+      | Poetic Pitbull Revolutions | /folder1/391014-[AudioTrimmer.com].mp3                                   |
+      | Rag Doll Physics           | /folder2/subfolder/391005-[AudioTrimmer.com].mp3                         |
+      | Reverie                    | /folder1/1048300-[AudioTrimmer.com].mp3                                  |
+      | Sea of Sorrows             | /folder1/1048293-[AudioTrimmer.com].mp3                                  |
+      | To The Edge                | /folder1/1048292-[AudioTrimmer.com].mp3                                  |
+      | Vagues                     | /folder2/23976-[AudioTrimmer.com].mp3                                    |

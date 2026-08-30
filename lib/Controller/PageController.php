@@ -18,7 +18,6 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
-use OCP\IL10N;
 use OCP\IRequest;
 
 class PageController extends Controller {
@@ -26,7 +25,6 @@ class PageController extends Controller {
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private IL10N $l10n
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -34,7 +32,6 @@ class PageController extends Controller {
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function index() : TemplateResponse {
-		$userLang = $this->l10n->getLanguageCode();
-		return new TemplateResponse($this->appName, 'main', ['lang' => $userLang]);
+		return new TemplateResponse($this->appName, 'main');
 	}
 }

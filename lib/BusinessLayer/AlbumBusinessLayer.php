@@ -17,9 +17,8 @@ namespace OCA\Music\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayer;
 use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
-
-use OCA\Music\Db\AlbumMapper;
 use OCA\Music\Db\Album;
+use OCA\Music\Db\AlbumMapper;
 use OCA\Music\Db\ArtistMapper;
 use OCA\Music\Db\Entity;
 use OCA\Music\Db\MatchMode;
@@ -44,7 +43,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 		AlbumMapper $albumMapper,
 		private ArtistMapper $artistMapper,
 		private FileSystemService $fileSystemService,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($albumMapper);
 	}
@@ -64,7 +63,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @see BusinessLayer::findById()
 	 * @return Album[]
 	 */
-	public function findById(array $ids, ?string $userId=null, bool $preserveOrder=false) : array {
+	public function findById(array $ids, ?string $userId = null, bool $preserveOrder = false) : array {
 		$albums = parent::findById($ids, $userId, $preserveOrder);
 		if ($userId !== null) {
 			return $this->injectExtraFields($albums, $userId);
@@ -78,8 +77,8 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @see BusinessLayer::findAll()
 	 * @return Album[]
 	 */
-	public function findAll(string $userId, int $sortBy=SortBy::Name, ?int $limit=null, ?int $offset=null,
-							?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+	public function findAll(string $userId, int $sortBy = SortBy::Name, ?int $limit = null, ?int $offset = null,
+							?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		$albums = parent::findAll($userId, $sortBy, $limit, $offset, $createdMin, $createdMax, $updatedMin, $updatedMax);
 		$effectivelyLimited = ($limit !== null && $limit < \count($albums));
 		$everyAlbumIncluded = (!$effectivelyLimited && !$offset && !$createdMin && !$createdMax && !$updatedMin && !$updatedMax);
@@ -90,7 +89,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * Returns all albums filtered by name of album or artist
 	 * @return Album[]
 	 */
-	public function findAllByNameRecursive(string $name, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByNameRecursive(string $name, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$name = \trim($name);
 		$albums = $this->mapper->findAllByNameRecursive($name, $userId, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
@@ -100,7 +99,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * Returns all albums filtered by artist (both album and track artists as well as composers are considered)
 	 * @return Album[] albums
 	 */
-	public function findAllByArtist(int $artistId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByArtist(int $artistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$albums = $this->mapper->findAllByArtist($artistId, $userId, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -110,7 +109,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @param int|int[] $artistId
 	 * @return Album[] albums
 	 */
-	public function findAllByAlbumArtist(int|array $artistId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByAlbumArtist(int|array $artistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		if (empty($artistId)) {
 			return [];
 		} else {
@@ -132,7 +131,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @param int|null $offset
 	 * @return Album[] albums
 	 */
-	public function findAllByGenre(int $genreId, string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllByGenre(int $genreId, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$albums = $this->mapper->findAllByGenre($genreId, $userId, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -147,7 +146,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @return Album[] albums
 	 */
 	public function findAllByYearRange(
-			int $fromYear, int $toYear, string $userId, ?int $limit=null, ?int $offset=null) : array {
+			int $fromYear, int $toYear, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$reverseOrder = false;
 		if ($fromYear > $toYear) {
 			$reverseOrder = true;
@@ -179,8 +178,8 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @return Album[]
 	 */
 	public function findAllByName(
-			?string $name, string $userId, int $matchMode=MatchMode::Exact, ?int $limit=null, ?int $offset=null,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+			?string $name, string $userId, int $matchMode = MatchMode::Exact, ?int $limit = null, ?int $offset = null,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		$albums = parent::findAllByName($name, $userId, $matchMode, $limit, $offset, $createdMin, $createdMax, $updatedMin, $updatedMax);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -190,7 +189,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @see BusinessLayer::findAllStarred()
 	 * @return Album[]
 	 */
-	public function findAllStarred(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllStarred(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$albums = parent::findAllStarred($userId, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -200,7 +199,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @see BusinessLayer::findAllRated()
 	 * @return Album[]
 	 */
-	public function findAllRated(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllRated(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$albums = $this->mapper->findAllRated($userId, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -211,8 +210,8 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @return Album[]
 	 */
 	public function findAllAdvanced(
-			string $conjunction, array $rules, string $userId, int $sortBy=SortBy::Name,
-			?Random $random=null, ?int $limit=null, ?int $offset=null) : array {
+			string $conjunction, array $rules, string $userId, int $sortBy = SortBy::Name,
+			?Random $random = null, ?int $limit = null, ?int $offset = null) : array {
 		$albums = parent::findAllAdvanced($conjunction, $rules, $userId, $sortBy, $random, $limit, $offset);
 		return $this->injectExtraFields($albums, $userId);
 	}
@@ -221,7 +220,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * Find most frequently played albums, judged by the total play count of the contained tracks
 	 * @return Album[]
 	 */
-	public function findFrequentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findFrequentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$countsPerAlbum = $this->mapper->getAlbumTracksPlayCount($userId, $limit, $offset);
 		$ids = \array_keys($countsPerAlbum);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -231,7 +230,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * Find most recently played albums
 	 * @return Album[]
 	 */
-	public function findRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$playTimePerAlbum = $this->mapper->getLatestAlbumPlayTimes($userId, $limit, $offset);
 		$ids = \array_keys($playTimePerAlbum);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -241,7 +240,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * Find least recently played albums
 	 * @return Album[]
 	 */
-	public function findNotRecentPlay(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findNotRecentPlay(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$playTimePerAlbum = $this->mapper->getFurthestAlbumPlayTimes($userId, $limit, $offset);
 		$ids = \array_keys($playTimePerAlbum);
 		return $this->findById($ids, $userId, /*preserveOrder=*/true);
@@ -275,12 +274,14 @@ class AlbumBusinessLayer extends BusinessLayer {
 			$years = $this->mapper->getYearsByAlbumId($albumIds, $userId);
 			$diskCounts = $this->mapper->getDiscCountByAlbumId($albumIds, $userId);
 			$genres = $this->mapper->getGenresByAlbumId($albumIds, $userId);
+			$labels = $this->mapper->getRecordLabelsByAlbumId($albumIds, $userId);
 
 			foreach ($albums as $album) {
 				$albumId = $album->getId();
-				$album->setArtists(\array_map(fn($id) => $artists[$id], $artistIdsByAlbum[$albumId] ?? []));
+				$album->setArtists(\array_map(fn ($id) => $artists[$id], $artistIdsByAlbum[$albumId] ?? []));
 				$album->setNumberOfDisks($diskCounts[$albumId] ?? 1);
 				$album->setGenres($genres[$albumId] ?? null);
+				$album->setRecordLabels($labels[$albumId] ?? null);
 				$album->setYears($years[$albumId] ?? null);
 			}
 		}
@@ -317,23 +318,56 @@ class AlbumBusinessLayer extends BusinessLayer {
 
 	/**
 	 * Adds an album if it does not exist already or updates an existing album
-	 * @param string|null $name the name of the album
-	 * @param integer $albumArtistId
+	 * @param ?string $name the name of the album
+	 * @param integer $albumArtistId ID of the album artist or best guess of it on incomplete metadata
+	 * @param bool $albumArtistUncertain True if @a $albumArtistId is not based on actual file metadata
+	 * @param bool $isCompilation value of the `compilation` metadata flag, indicating the album is a compilation of various artists
+	 * @param ?string $mbid the MusicBrainz Release Id of the album (non-null values normalized to all lowercase, 1..36 ASCII chars)
+	 * @param ?string $mbidGroup the MusicBrainz Release Group Id of the album
 	 * @param string $userId
 	 * @return Album The added/updated album
 	 */
-	public function addOrUpdateAlbum(?string $name, int $albumArtistId, string $userId) : Album {
-		// Generate hash from the set of fields forming the album identity to prevent duplicates.
+	public function addOrUpdateAlbum(?string $name, int $albumArtistId, bool $albumArtistUncertain, bool $isCompilation, ?string $mbid, ?string $mbidGroup, string $userId) : Album {
 		// The uniqueness of album name is evaluated in case-insensitive manner.
 		$lowerName = \mb_strtolower($name ?? '');
-		$hash = \hash('md5', "$lowerName|$albumArtistId");
+		$hash = \hash('md5', "$lowerName");
 
-		return $this->cachedGet($userId, $hash, function () use ($name, $albumArtistId, $userId, $hash) {
+		return $this->cachedGet($userId, "$hash|$albumArtistId|$mbid", function () use ($name, $albumArtistId, $albumArtistUncertain, $isCompilation, $mbid, $mbidGroup, $userId, $hash) {
 			$album = new Album();
 			$album->setName(StringUtil::truncate($name, 256)); // some DB setups can't truncate automatically to column max size
 			$album->setUserId($userId);
 			$album->setAlbumArtistId($albumArtistId);
+			$album->setAlbumArtistUncertain($albumArtistUncertain);
+			$album->setCompilation($isCompilation);
+			$album->setMbid($mbid);
+			$album->setMbidGroup($mbidGroup);
 			$album->setHash($hash);
+
+			if ($albumArtistUncertain) {
+				$potentialMatches = $this->mapper->findIdsAndArtistsByHashAndMbid($hash, $mbid, $userId);
+
+				if (\count($potentialMatches) > 0) {
+					$artistMatch = ArrayUtil::find($potentialMatches, fn ($row) => $row['album_artist_id'] === $albumArtistId);
+					if ($artistMatch) {
+						// DB already has an album with the same name, MBID (which might be null), and album artist, update it
+						$album->setId($artistMatch['id']);
+						$album->setAlbumArtistUncertain($artistMatch['album_artist_uncertain']);
+						return $this->mapper->update($album);
+					} else {
+						$varArtistsId = $this->artistMapper->getVariousArtistsId($userId);
+						$varArtistsMatch = ArrayUtil::find($potentialMatches, fn ($row) => $row['album_artist_id'] === $varArtistsId)
+										?? ArrayUtil::find($potentialMatches, fn ($row) => $row['album_artist_uncertain']);
+						if ($varArtistsMatch) {
+							// The DB has an album with the same name and MBID and either artist "Various Artists" or an uncertain artist.
+							// In the latter case, we move the album to artist "Various Artists".
+							$album->setId($varArtistsMatch['id']);
+							$album->setAlbumArtistId($varArtistsId);
+							return $this->mapper->update($album);
+						}
+					}
+				}
+			}
+
 			return $this->mapper->updateOrInsert($album);
 		});
 	}
@@ -374,7 +408,7 @@ class AlbumBusinessLayer extends BusinessLayer {
 	 * @param string[]|null $userIds the users whose music library is targeted; all users are targeted if omitted
 	 * @return Album[] albums which got modified, empty array if none
 	 */
-	public function removeCovers(array $coverFileIds, ?array $userIds=null) : array {
+	public function removeCovers(array $coverFileIds, ?array $userIds = null) : array {
 		return $this->mapper->removeCovers($coverFileIds, $userIds);
 	}
 

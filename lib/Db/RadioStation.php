@@ -27,23 +27,23 @@ class RadioStation extends Entity {
 
 	public function toApi() : array {
 		return [
-			'id' => $this->getId(),
-			'name' => $this->getName(),
+			'id'         => $this->getId(),
+			'name'       => $this->getName(),
 			'stream_url' => $this->getStreamUrl(),
-			'home_url' => $this->getHomeUrl(),
-			'created' => $this->getCreated(),
-			'updated' => $this->getUpdated()
+			'home_url'   => $this->getHomeUrl(),
+			'created'    => $this->getCreated(),
+			'updated'    => $this->getUpdated()
 		];
 	}
 
 	public function toAmpacheApi(callable $createImageUrl) : array {
 		return [
-			'id' => $this->getId(),
-			'name' => $this->getName() ?? $this->getStreamUrl(),
-			'url' => $this->getStreamUrl(),
+			'id'       => $this->getId(),
+			'name'     => $this->getName() ?? $this->getStreamUrl(),
+			'url'      => $this->getStreamUrl(),
 			'site_url' => $this->getHomeUrl(),
-			'art' => $createImageUrl($this),
-			'has_art' => false, // art is always a placeholder on radio stations
+			'art'      => $createImageUrl($this),
+			'has_art'  => false, // art is always a placeholder on radio stations
 		];
 	}
 }

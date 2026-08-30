@@ -9,7 +9,7 @@ HtmlUtil::addWebpackStyle('app');
 ?>
 
 
-<div id="app" ng-app="Music" ng-strict-di ng-cloak ng-init="started = false; lang = '<?php HtmlUtil::p($_['lang']) ?>'">
+<div id="app" ng-app="Music" ng-strict-di ng-cloak ng-init="started = false">
 
 	<?php
 	HtmlUtil::printNgTemplate('views/albumsview');
@@ -36,7 +36,7 @@ HtmlUtil::addWebpackStyle('app');
 			</div>
 
 			<div id="controls-container">
-				<div id="app-navigation-toggle" ng-controller="SnapController" ng-click="toggle()" class="icon-menu"></div>
+				<div id="app-navigation-toggle" ng-controller="SnapController" ng-click="toggle()" ng-on-dragenter="itemDragToToggle()" class="icon-menu"></div>
 				<?php HtmlUtil::printPartial('controls'); ?>
 			</div>
 
@@ -44,11 +44,11 @@ HtmlUtil::addWebpackStyle('app');
 				<div class="icon-audio svg"></div>
 				<div>
 					<h2 translate>No music found</h2>
-					<p translate>Upload music in the files app to listen to it here</p>
+					<p translate>Upload music in the Files app to listen to it here</p>
 				</div>
 			</div>
 
-			<div id="toScan" class="emptycontent clickable" ng-show="!scanning && unscannedFiles.length && viewingLibrary()" ng-click="startScanning(unscannedFiles)">
+			<div id="toScan" class="emptycontent clickable" ng-show="filesToScanBannerAllowed() && unscannedFiles.length" ng-click="startScanning(unscannedFiles)">
 				<div class="icon-audio svg"></div>
 				<div>
 					<h2 translate>New music available</h2>
@@ -57,7 +57,7 @@ HtmlUtil::addWebpackStyle('app');
 				<a class="close icon-close" aria-label="{{ Close | translate }}" ng-click="hideScanBar($event)"></a>
 			</div>
 
-			<div id="toRescan" class="emptycontent clickable" ng-show="!scanning && !unscannedFiles.length && dirtyFiles.length && viewingLibrary()" ng-click="startScanning(dirtyFiles)">
+			<div id="toRescan" class="emptycontent clickable" ng-show="filesToScanBannerAllowed() && !unscannedFiles.length && dirtyFiles.length" ng-click="startScanning(dirtyFiles)">
 				<div class="icon-audio svg"></div>
 				<div>
 					<h2 translate>Some of the previously scanned files may have changed</h2>
@@ -66,7 +66,7 @@ HtmlUtil::addWebpackStyle('app');
 				<a class="close icon-close" aria-label="{{ Close | translate }}" ng-click="hideScanBar($event)"></a>
 			</div>
 
-			<div id="toRemove" class="emptycontent clickable" ng-show="!scanning && !unscannedFiles.length && !dirtyFiles.length && obsoleteFiles.length && viewingLibrary()" ng-click="removeObsolete()">
+			<div id="toRemove" class="emptycontent clickable" ng-show="filesToScanBannerAllowed() && !unscannedFiles.length && !dirtyFiles.length && obsoleteFiles.length" ng-click="removeObsolete()">
 				<div class="icon-delete"></div>
 				<div>
 					<h2 translate translate-n="obsoleteFiles.length" translate-plural="{{ $count }} previously scanned files are no longer available">
@@ -83,6 +83,7 @@ HtmlUtil::addWebpackStyle('app');
 					<h2 translate>Scanning music…</h2>
 					<p translate>{{ scanningScanned }} of {{ scanningTotal }}</p>
 				</div>
+				<button ng-click="stopScanning(); updateFilesToScan()" translate>Abort</button>
 			</div>
 
 			<div id="searchContainer" ng-controller="SearchController">
@@ -103,8 +104,8 @@ HtmlUtil::addWebpackStyle('app');
 				</div>
 			</div>
 
-			<img id="updateData" ng-show="updateAvailable && currentView!='#/settings'"
-				 class="svg clickable" src="<?php HtmlUtil::printSvgPath('reload') ?>" ng-click="update()"
+			<img id="updateData" ng-show="updateAvailable && getCurrentViewId() != '#/settings'"
+				 class="svg clickable" src="<?php HtmlUtil::printSvgPath('reload') ?>" ng-click="updateCollection()"
 				 alt  ="{{ 'New music available. Click here to reload the music library.' | translate }}"
 				 title="{{ 'New music available. Click here to reload the music library.' | translate }}" >
 

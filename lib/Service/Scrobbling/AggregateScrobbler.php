@@ -28,20 +28,20 @@ class AggregateScrobbler implements IScrobbler {
 	) {
 	}
 
-	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null): void {
+	public function recordTrackPlayed(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null): void {
 		foreach ($this->scrobblers as $scrobbler) {
 			try {
-				$scrobbler->recordTrackPlayed($track, $timeOfPlay);
+				$scrobbler->recordTrackPlayed($track, $timeOfPlay, $client);
 			} catch (\Throwable $e) {
 				$this->logger->error('Error recording play on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
 			}
 		}
 	}
 
-	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null): void {
+	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null): void {
 		foreach ($this->scrobblers as $scrobbler) {
 			try {
-				$scrobbler->setNowPlaying($track, $timeOfPlay);
+				$scrobbler->setNowPlaying($track, $timeOfPlay, $client);
 			} catch (\Throwable $e) {
 				$this->logger->error('Error setting now playing on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
 			}

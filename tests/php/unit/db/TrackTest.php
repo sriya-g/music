@@ -9,18 +9,18 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
  * @copyright Morris Jobke 2013, 2014
- * @copyright Pauli Järvinen 2017 - 2025
+ * @copyright Pauli Järvinen 2017 - 2026
  */
 
 namespace OCA\Music\Db;
 
 class TrackTest extends \PHPUnit\Framework\TestCase {
 	private $urlGenerator;
+	private $l10n;
 
 	protected function setUp() : void {
-		$this->urlGenerator = $this->getMockBuilder('\OCP\IURLGenerator')
-			->disableOriginalConstructor()
-			->getMock();
+		$this->urlGenerator = $this->getMockBuilder(\OCP\IURLGenerator::class)->getMock();
+		$this->l10n = $this->getMockBuilder(\OCP\IL10N::class)->getMock();
 	}
 
 	public function testToShivaApi() {
@@ -40,16 +40,16 @@ class TrackTest extends \PHPUnit\Framework\TestCase {
 			->will($this->returnValue('someUrl'));
 
 		$this->assertEquals([
-			'id' => 1,
-			'title' => 'The title',
+			'id'      => 1,
+			'title'   => 'The title',
 			'ordinal' => 4,
-			'artist' => ['id' => 3, 'uri' => 'someUrl'],
-			'album' => ['id' => 1, 'uri' => 'someUrl'],
-			'length' => 123,
-			'files' => ['audio/mp3' => 'someUrl'],
+			'artist'  => ['id' => 3, 'uri' => 'someUrl'],
+			'album'   => ['id' => 1, 'uri' => 'someUrl'],
+			'length'  => 123,
+			'files'   => ['audio/mp3' => 'someUrl'],
 			'bitrate' => 123,
-			'slug' => 'the-title',
-			'uri' => 'someUrl'
-			], $track->toShivaApi($this->urlGenerator));
+			'slug'    => 'the-title',
+			'uri'     => 'someUrl'
+		], $track->toShivaApi($this->urlGenerator, $this->l10n));
 	}
 }

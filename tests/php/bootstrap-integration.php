@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Nextcloud Music app
  *

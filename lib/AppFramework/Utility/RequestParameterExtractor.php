@@ -19,18 +19,16 @@ use OCP\IRequest;
 class RequestParameterExtractor {
 	public function __construct(
 		private IRequest $request,
-		private array $customFilters = []
+		private array $customFilters = [],
 	) {
 	}
 
 	/**
-	 * @param object|string $object an object or classname
-	 * @param string $method the method for which we want to extract parameters from the HTTP request
+	 * @param \ReflectionMethod $refMethod the method for which we want to extract parameters from the HTTP request
 	 * @throws RequestParameterExtractorException if a required parameter is not found from the request
 	 * @return array<string|string[]|int|bool|null>
 	 */
-	public function getParametersForMethod($object, string $method) : array {
-		$refMethod = new \ReflectionMethod($object, $method);
+	public function getParametersForMethod(\ReflectionMethod $refMethod) : array {
 		return \array_map([$this, 'getParameterValueFromRequest'], $refMethod->getParameters());
 	}
 

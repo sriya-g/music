@@ -5,7 +5,7 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2023
+ * @copyright Pauli Järvinen 2023 - 2026
  */
 
 import * as ng from 'angular';
@@ -14,9 +14,8 @@ import * as ng from 'angular';
  * Extension of the AngularJS IRootScopeService with some app-specific fields
  */
 export interface MusicRootScope extends ng.IRootScopeService {
-	currentView : string;
 	playing : boolean;
 	playingView : string;
 	loading : boolean;
-	loadingCollection : boolean;
+	searchMode : boolean;
 }

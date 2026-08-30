@@ -5,29 +5,19 @@
  * later. See the COPYING file.
  *
  * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
- * @copyright Pauli Järvinen 2020 - 2024
+ * @copyright Pauli Järvinen 2020 - 2026
  */
 
 
 angular.module('Music').controller('RadioViewController', [
-	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'gettextCatalog', 'Restangular', '$timeout',
-	function ($rootScope, $scope, playQueueService, libraryService, gettextCatalog, Restangular, $timeout) {
+	'$rootScope', '$scope', 'playQueueService', 'libraryService', 'libraryFactory', 'gettextCatalog', 'Restangular', '$timeout',
+	function ($rootScope, $scope, playQueueService, libraryService, libraryFactory, gettextCatalog, Restangular, $timeout) {
+
+		const THIS_VIEW_ID = $scope.getCurrentViewId();
 
 		const INCREMENTAL_LOAD_STEP = 1000;
 		$scope.incrementalLoadLimit = INCREMENTAL_LOAD_STEP;
 		$scope.stations = null;
-		$rootScope.currentView = $scope.getViewIdFromUrl();
-
-		// $rootScope listeners must be unsubscribed manually when the control is destroyed
-		let unsubFuncs = [];
-
-		function subscribe(event, handler) {
-			unsubFuncs.push( $rootScope.$on(event, handler) );
-		}
-
-		$scope.$on('$destroy', function() {
-			_.each(unsubFuncs, function(func) { func(); });
-		});
 
 		$scope.getCurrentStationIndex = function() {
 			return listIsPlaying() ? $scope.$parent.currentTrackIndex : null;
@@ -63,9 +53,7 @@ angular.module('Music').controller('RadioViewController', [
 					}
 					// Fire an event to tell the alphabet navigation about the change. This must happen asynchronously
 					// to ensure that the alphabet navigation has up-to-date item count available when it handles the event.
-					$timeout(function() {
-						$rootScope.$emit('viewContentChanged');
-					});
+					$timeout(() => $rootScope.$emit('viewContentChanged'));
 				},
 				function (error) {
 					station.busy = false;
@@ -97,14 +85,14 @@ angular.module('Music').controller('RadioViewController', [
 			}
 		};
 
-		subscribe('scrollToStation', function(event, stationId) {
+		$rootScope.subscribe('scrollToStation', $scope, (_event, stationId) => {
 			if ($scope.$parent) {
 				$scope.$parent.scrollToItem('radio-station-' + stationId);
 			}
 		});
 
 		// Reload the view if the stations got updated (by import from file or renaming a station)
-		subscribe('playlistUpdated', function(event, playlistId, onlyReorder) {
+		libraryService.subscribe('playlistUpdated', $scope, (_event, playlistId, onlyReorder) => {
 			if (playlistId === 'radio') {
 				if (onlyReorder !== true) {
 					initView();
@@ -117,14 +105,12 @@ angular.module('Music').controller('RadioViewController', [
 
 				// Fire an event to tell the alphabet navigation about the change. This must happen asynchronously
 				// to ensure that the alphabet navigation has up-to-date item count available when it handles the event.
-				$timeout(function() {
-					$rootScope.$emit('viewContentChanged');
-				});
+				$timeout(() => $rootScope.$emit('viewContentChanged'));
 			}
 		});
 
 		function listIsPlaying() {
-			return ($rootScope.playingView === $rootScope.currentView);
+			return ($rootScope.playingView === $scope.getCurrentViewId());
 		}
 
 		/**
@@ -132,21 +118,13 @@ angular.module('Music').controller('RadioViewController', [
 		 */
 		$scope.getStationTitle = function(index) {
 			let station = $scope.stations[index].track;
-			return station.name || station.stream_url;
+			return station.name;
 		};
 		$scope.getStationElementId = function(index) {
 			return 'radio-station-' + $scope.stations[index].track.id;
 		};
 
-		// Init happens either immediately (after making the loading animation visible)
-		// or once the radio stations have been loaded
-		if (libraryService.radioStationsLoaded()) {
-			$timeout(initView);
-		}
-
-		subscribe('radioStationsLoaded', function () {
-			$timeout(initView);
-		});
+		libraryFactory.getRadioStations().then((_stations) => initView());
 
 		function initView() {
 			$scope.incrementalLoadLimit = 0;
@@ -161,30 +139,14 @@ angular.module('Music').controller('RadioViewController', [
 		 */
 		function showMore() {
 			// show more entries only if the view is not already (being) deactivated
-			if ($rootScope.currentView && $scope.$parent) {
+			if ($scope.$parent) {
 				$scope.incrementalLoadLimit += INCREMENTAL_LOAD_STEP;
 				if ($scope.incrementalLoadLimit < $scope.stations.length) {
 					$timeout(showMore);
 				} else {
-					$rootScope.loading = false;
-					$rootScope.$emit('viewActivated');
+					$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 				}
 			}
 		}
-
-		function showLess() {
-			$scope.incrementalLoadLimit -= INCREMENTAL_LOAD_STEP;
-			if ($scope.incrementalLoadLimit > 0) {
-				$timeout(showLess);
-			} else {
-				$scope.incrementalLoadLimit = 0;
-				$rootScope.$emit('viewDeactivated');
-			}
-		}
-
-		subscribe('deactivateView', function() {
-			$timeout(showLess);
-		});
-
 	}
 ]);

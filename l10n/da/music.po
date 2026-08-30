@@ -139,7 +139,7 @@ msgid "Unknown artist"
 msgstr "Ukendt artist"
 
 #: ../templates/main.php:135
-msgid "Upload music in the files app to listen to it here"
+msgid "Upload music in the Files app to listen to it here"
 msgstr "Upload musk i fil-appen og lyt til dem her"
 
 #: ../templates/fake-template.php:12

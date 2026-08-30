@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Nextcloud Music app
  *
@@ -13,7 +14,6 @@
 
 // to execute without Nextcloud, we need to create our own classloader
 \spl_autoload_register(function ($className) {
-
 	$classPath = \str_replace('\\', '/', $className) . '.php';
 
 	if (\strpos($classPath, 'OCA/Music/Tests/Utility') === 0) {

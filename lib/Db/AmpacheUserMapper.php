@@ -15,7 +15,6 @@
 namespace OCA\Music\Db;
 
 use OCA\Music\Utility\ArrayUtil;
-
 use OCP\IDBConnection;
 
 /**
@@ -25,7 +24,9 @@ use OCP\IDBConnection;
  */
 class AmpacheUserMapper {
 
-	public function __construct(private IDBConnection $db) {
+	public function __construct(
+		private IDBConnection $db,
+	) {
 	}
 
 	/**
@@ -68,7 +69,7 @@ class AmpacheUserMapper {
 		}
 
 		return [
-			'key_id' => (int)$row['id'],
+			'key_id'  => (int)$row['id'],
 			'user_id' => $row['user_id']
 		];
 	}

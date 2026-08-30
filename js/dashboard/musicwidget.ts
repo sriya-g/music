@@ -112,7 +112,7 @@ export class MusicWidget {
 			}
 		}, 300);
 
-		this.#queue.subscribe('trackChanged', (track) => {
+		this.#queue.subscribe('trackChanged', this, (track) => {
 			this.#player.pause();
 			this.#debouncedPlayCurrent();
 
@@ -135,11 +135,12 @@ export class MusicWidget {
 			});
 		});
 
-		this.#queue.subscribe('playlistEnded', () => {
+		this.#queue.subscribe('playlistEnded', this, () => {
 			this.#progressAndOrder.hide();
 			this.#currentSongLabel.hide();
 			this.#controls.hide();
 			this.#trackList?.find('.current').removeClass('current');
+			this.#player.stop();
 		});
 
 		this.#player.on('play', () => {
@@ -153,7 +154,10 @@ export class MusicWidget {
 		});
 
 		this.#player.on('stop', () => {
-			this.#queue.clearPlaylist();
+			// avoid infinite loop since clearPlaylist() triggers 'playlistEnded' which again calls #player.stop() which triggers 'stop'...
+			if (!this.#queue.isEmpty()) {
+				this.#queue.clearPlaylist();
+			}
 		});
 
 		this.#player.on('end', () => this.#onNextButton());

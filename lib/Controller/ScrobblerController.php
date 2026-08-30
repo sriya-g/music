@@ -33,7 +33,7 @@ class ScrobblerController extends Controller {
 		IRequest $request,
 		private IL10N $l10n,
 		private ?string $userId,
-		private array $externalScrobblers
+		private array $externalScrobblers,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -43,12 +43,12 @@ class ScrobblerController extends Controller {
 	#[NoCSRFRequired]
 	public function handleToken(?string $serviceIdentifier, ?string $token) : StandaloneTemplateResponse {
 		$params = [
-			'lang' => $this->l10n->getLanguageCode(),
-			'success' => false,
-			'headline' => $this->l10n->t('Unexpected error'),
-			'identifier' => $serviceIdentifier,
+			'lang'                => $this->l10n->getLanguageCode(),
+			'success'             => false,
+			'headline'            => $this->l10n->t('Unexpected error'),
+			'identifier'          => $serviceIdentifier,
 			'getsession_response' => '',
-			'instructions' => $this->l10n->t('Please contact your server administrator for assistance.')
+			'instructions'        => $this->l10n->t('Please contact your server administrator for assistance.')
 		];
 
 		$response = new StandaloneTemplateResponse($this->appName, 'scrobble-getsession-result', [], 'base');

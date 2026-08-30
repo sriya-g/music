@@ -12,6 +12,8 @@
 import * as ng from 'angular';
 import * as _ from 'lodash';
 
+declare var OCP : any;
+
 export interface Artist {
 	id : number;
 	name : string;
@@ -47,6 +49,7 @@ export interface Track extends BaseTrack {
 	folder : Folder;
 	genre : Genre;
 	favorite : boolean;
+	files : Record<string, number>;
 	get formattedNumber() : string|null;
 }
 
@@ -57,6 +60,7 @@ export interface RadioStation extends BaseTrack {
 
 export interface PlaylistEntry<T extends BaseTrack> {
 	track : T;
+	index : number;
 }
 
 export interface Playlist {
@@ -117,9 +121,8 @@ export interface SearchResult<T> {
 
 const DIACRITIC_REG_EXP = /[\u0300-\u036f]/g;
 
-
 export class LibraryService {
-	#ignoredArticles : string[] = [];
+	#ignoredArticles : string[] = OCP.InitialState.loadState('music', 'ignored_articles', []);
 	#collection : Artist[] = null;
 	#artistsIndex : { [id: number] : Artist } = {};
 	#albumsIndex : { [id: number] : Album } = {};
@@ -135,6 +138,11 @@ export class LibraryService {
 	#genres : Genre[] = null;
 	#radioStations : PlaylistEntry<RadioStation>[] = null;
 	#podcastChannels : PodcastChannel[] = null;
+	#rootScope : ng.IRootScopeService;
+
+	constructor($rootScope : ng.IRootScopeService) {
+		this.#rootScope = $rootScope;
+	}
 
 	/** 
 	 * Sort array according to a specified text field. The field may be specified as a dot-separated path.
@@ -149,10 +157,11 @@ export class LibraryService {
 			const aProp : any = getSortProperty(a);
 			const bProp : any = getSortProperty(b);
 
-			if (aProp == null) {
-				return -1;
-			} else if (bProp == null) {
+			// sort missing properties after existing ones
+			if (!aProp) {
 				return 1;
+			} else if (!bProp) {
+				return -1;
 			} else {
 				return aProp.localeCompare(bProp, locale);
 			}
@@ -263,26 +272,33 @@ export class LibraryService {
 			number : null,
 			disk : null,
 			favorite : false,
+			files : {},
 			formattedNumber : null
 		};
 	}
 
-	#playlistEntry<T extends BaseTrack>(track : T) : PlaylistEntry<T> {
-		return (track !== null) ? { track: track } : null;
+	#playlistEntry<T extends BaseTrack>(track : T, index : number) : PlaylistEntry<T> {
+		return (track !== null) ? { track: track, index: index } : null;
 	}
 
-	#playlistEntryFromId(trackId : number) : PlaylistEntry<Track> {
-		return this.#playlistEntry(this.#tracksIndex[trackId] ?? this.#errorTrack(trackId));
+	#playlistEntryFromId(trackId : number, index : number) : PlaylistEntry<Track> {
+		return this.#playlistEntry(this.#tracksIndex[trackId] ?? this.#errorTrack(trackId), index);
 	}
 
-	#wrapRadioStation(station : any) : PlaylistEntry<RadioStation> {
+	#reindexPlaylist(playlist : Playlist) : void {
+		for (let i = 0; i < playlist.tracks.length; ++i) {
+			playlist.tracks[i].index = i;
+		}
+	}
+
+	#wrapRadioStation(station : any, index : number) : PlaylistEntry<RadioStation> {
 		station.type = 'radio';
-		return this.#playlistEntry(station);
+		return this.#playlistEntry(station, index);
 	}
 
 	#wrapPlaylist(playlist : any) : Playlist {
 		let wrapped = $.extend({}, playlist); // clone the playlist
-		wrapped.tracks = _(playlist.trackIds).map((id) => this.#playlistEntryFromId(id)).value();
+		wrapped.tracks = _(playlist.trackIds).map((id, index) => this.#playlistEntryFromId(id, index)).value();
 		delete wrapped.trackIds;
 		return wrapped;
 	}
@@ -394,7 +410,16 @@ export class LibraryService {
 		};
 	}
 
+	#publish(eventName : string, ...args: any[]) : void {
+		this.#rootScope.$emit('libraryService:' + eventName, ...args);
+	}
+
 	// PUBLIC INTERFACE
+	subscribe(eventName : string, listenerScope : ng.IScope, listener : (event: ng.IAngularEvent, ...args: any[]) => any) : void {
+		var handle = this.#rootScope.$on('libraryService:' + eventName, listener);
+		listenerScope.$on('$destroy', handle);
+	}
+
 	setIgnoredArticles(articles : string[]) : void {
 		this.#ignoredArticles = articles;
 		if (this.#collection) {
@@ -543,20 +568,23 @@ export class LibraryService {
 		});
 	}
 	setRadioStations(radioStationsData : any[]) : void {
-		this.#radioStations = _.map(radioStationsData, (station) => this.#wrapRadioStation(station));
+		this.#radioStations = _.map(radioStationsData, (station, index) => this.#wrapRadioStation(station, index));
 		this.sortRadioStations();
 	}
 	sortRadioStations() : void {
 		this.#sortByPlaylistEntryTextField(this.#radioStations, 'stream_url');
 		this.#sortByPlaylistEntryTextField(this.#radioStations, 'name');
+		this.#publish('playlistUpdated', 'radio', /*onlyReorder=*/true);
 	}
 	addRadioStation(radioStationData : any) : void {
 		this.addRadioStations([radioStationData]);
 	}
 	addRadioStations(radioStationsData : any) : void {
-		let newStations = _.map(radioStationsData, (station) => this.#wrapRadioStation(station))
+		let prevCount = this.#radioStations.length;
+		let newStations = _.map(radioStationsData, (station, index : number) => this.#wrapRadioStation(station, index + prevCount))
 		this.#radioStations = this.#radioStations.concat(newStations);
 		this.sortRadioStations();
+		this.#publish('playlistUpdated', 'radio', /*onlyReorder=*/false);
 	}
 	removeRadioStation(stationId : number) : number {
 		let idx = _.findIndex(this.#radioStations, entry => entry.track.id == stationId);
@@ -598,18 +626,22 @@ export class LibraryService {
 	replacePlaylist(playlist : any) : void {
 		let idx = _.findIndex(this.#playlists, { id: playlist.id });
 		this.#playlists[idx] = this.#wrapPlaylist(playlist);
+		this.#publish('playlistUpdated', playlist.id, /*onlyReorder=*/false);
 	}
 	addToPlaylist(playlistId : number, trackId : number) : void {
 		let playlist = this.getPlaylist(playlistId);
-		playlist.tracks.push(this.#playlistEntryFromId(trackId));
+		playlist.tracks.push(this.#playlistEntryFromId(trackId, playlist.tracks.length));
+		this.#reindexPlaylist(playlist);
 	}
 	removeFromPlaylist(playlistId : number, indexToRemove : number) : void {
 		let playlist = this.getPlaylist(playlistId);
 		playlist.tracks.splice(indexToRemove, 1);
+		this.#reindexPlaylist(playlist);
 	}
 	reorderPlaylist(playlistId : number, srcIndex : number, dstIndex : number) : void {
 		let playlist = this.getPlaylist(playlistId);
 		this.#moveArrayElement(playlist.tracks, srcIndex, dstIndex);
+		this.#reindexPlaylist(playlist);
 	}
 	sortPlaylist(playlistId : number, byProperty : string) : void {
 		let playlist = this.getPlaylist(playlistId);
@@ -631,6 +663,7 @@ export class LibraryService {
 			console.error('Unexpected playlist sort property ' + byProperty);
 			break;
 		}
+		this.#reindexPlaylist(playlist);
 	}
 	removeDuplicatesFromPlaylist(playlistId : number) : PlaylistEntry<Track>[] {
 		let playlist = this.getPlaylist(playlistId);
@@ -648,7 +681,9 @@ export class LibraryService {
 		}
 
 		// remove (and return) the duplicates
-		return _.pullAt(playlist.tracks, indicesToRemove);
+		let duplicates = _.pullAt(playlist.tracks, indicesToRemove);
+		this.#reindexPlaylist(playlist);
+		return duplicates;
 	}
 	getCollection() : Artist[] {
 		return this.#collection;
@@ -686,6 +721,9 @@ export class LibraryService {
 	}
 	getTracksInGenreOrder() : PlaylistEntry<Track>[] {
 		return this.#tracksInGenreOrder;
+	}
+	getAllTracks() : Track[] {
+		return Object.values(this.#tracksIndex);
 	}
 	getTrackCount() : number {
 		return this.#tracksInAlphaOrder?.length ?? 0;
@@ -802,11 +840,9 @@ export class LibraryService {
 		let tracks = _.map(this.#smartList.tracks, 'track');
 		return this.#search(tracks, ['title', 'artist.name'], query, maxResults);
 	}
-	searchTracksInPlaylist(playlistId : number, query : string, maxResults = Infinity) : SearchResult<Track> {
+	searchPlaylistEntries(playlistId : number, query : string, maxResults = Infinity) : SearchResult<PlaylistEntry<Track>> {
 		let entries = this.getPlaylist(playlistId)?.tracks || [];
-		let tracks = _.map(entries, 'track');
-		tracks = _.uniq(tracks);
-		return this.#search(tracks, ['title', 'artist.name'], query, maxResults);
+		return this.#search(entries, ['track.title', 'track.artist.name'], query, maxResults);
 	}
 	searchRadioStations(query : string, maxResults = Infinity) : SearchResult<RadioStation> {
 		let stations = _.map(this.#radioStations, 'track');
@@ -818,4 +854,4 @@ export class LibraryService {
 	}
 }
 
-ng.module('Music').service('libraryService', [LibraryService]);
+ng.module('Music').service('libraryService', ['$rootScope', LibraryService]);

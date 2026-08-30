@@ -17,10 +17,8 @@ use OCA\Music\AppFramework\Utility\FileExistsException;
 use OCA\Music\BusinessLayer\PlaylistBusinessLayer;
 use OCA\Music\Db\Playlist;
 use OCA\Music\Service\PlaylistFileService;
-
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
-
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -32,7 +30,7 @@ class PlaylistExport extends BaseCommand {
 		\OCP\IGroupManager $groupManager,
 		private IRootFolder $rootFolder,
 		private PlaylistBusinessLayer $businessLayer,
-		private PlaylistFileService $playlistFileService
+		private PlaylistFileService $playlistFileService,
 	) {
 		parent::__construct($userManager, $groupManager);
 	}
@@ -83,15 +81,15 @@ class PlaylistExport extends BaseCommand {
 		$overwrite = (bool)$input->getOption('overwrite');
 
 		if (empty($ids) && empty($names) && !$allLists) {
-			throw new \InvalidArgumentException('At least one of the arguments <error>list-id</error>, ' .
-												'<error>list-name</error>, <error>all-lists</error> must be given');
+			throw new \InvalidArgumentException('At least one of the arguments <error>list-id</error>, '
+												. '<error>list-name</error>, <error>all-lists</error> must be given');
 		} elseif ($allLists && (!empty($ids) || !empty($names))) {
-			throw new \InvalidArgumentException('Argument <error>all-lists</error> should not be used together with ' .
-												'<error>list-id</error> nor <error>list-name</error>');
+			throw new \InvalidArgumentException('Argument <error>all-lists</error> should not be used together with '
+												. '<error>list-id</error> nor <error>list-name</error>');
 		}
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $ids, $names, $allLists, $dir, $overwrite) {
+			$this->userManager->callForAllUsers(function ($user) use ($output, $ids, $names, $allLists, $dir, $overwrite) {
 				$this->executeForUser($user->getUID(), $ids, $names, $allLists, $dir, $overwrite, $output);
 			});
 		} else {

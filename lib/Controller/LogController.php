@@ -14,20 +14,19 @@
 
 namespace OCA\Music\Controller;
 
+use OCA\Music\AppFramework\Core\Logger;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
-use OCA\Music\AppFramework\Core\Logger;
-
 class LogController extends Controller {
 
 	public function __construct(
 		string $appName,
 		IRequest $request,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}

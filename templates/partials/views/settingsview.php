@@ -30,7 +30,6 @@
 					<li translate><strong>**</strong> matches zero or more arbitrary characters including path segment separators '/'</li>
 				</ul>
 				<p translate>Paths with a leading '/' character are resolved relative to the user home directory and others relative to the music library base path.</p>
-				<p translate>Changes to the excluded paths will only take effect upon rescan.</p>
 			</div>
 		</em>
 		<table id="excluded-paths" class="grid">
@@ -58,6 +57,52 @@
 		<p><em translate>Changes on this setting take effect only upon rescan of the library.</em></p>
 	</div>
 
+	<h2 translate>Scanning</h2>
+	<div ng-if="checkingScanStatus">
+		<span class="icon-loading-small"></span>
+	</div>
+	<div ng-if="scanning" class="scan-controls">
+		<span class="icon-loading-small"></span>
+		<span translate>Scanning music…</span>
+		<span translate>{{ scanningScanned }} of {{ scanningTotal }}</span>
+		<button ng-click="stopScanning(); updateFilesToScan()" translate>Abort</button>
+	</div>
+	<div ng-if="!scanning && !checkingScanStatus" class="scan-controls">
+		<div ng-if="noMusicAvailable">
+			<span translate>The configured library path contains no audio files</span>
+		</div>
+		<div ng-if="unscannedFiles.length">
+			<span translate translate-n="{{ unscannedFiles.length }}" translate-plural="The configured library path contains {{ $count }} unscanned audio files.">
+				The configured library path contains {{ $count }} unscanned audio file.
+			</span>
+			<button ng-click="startScanning(unscannedFiles)" translate>Scan</button>
+		</div>
+		<div ng-if="dirtyFiles.length">
+			<span translate translate-n="{{ dirtyFiles.length }}" translate-plural="There are {{ $count }} previously scanned files which may have changed.">
+				There is {{ $count }} previously scanned file which may have changed.
+			</span>
+			<button ng-click="startScanning(dirtyFiles)" translate>Rescan</button>
+		</div>
+		<div ng-if="obsoleteFiles.length">
+			<span translate translate-n="obsoleteFiles.length" translate-plural="The library contains {{ $count }} previously scanned files which are no longer accessible. Remove them permanently from the library and any playlists?">
+				The library contains {{ $count }} previously scanned file which is no longer accessible. Remove it permanently from the library and any playlists?
+			</span>
+			<button ng-click="removeObsolete()" translate>Remove</button>
+		</div>
+		<div ng-if="filesScannedOnOldSw.length">
+			<span translate translate-n="filesScannedOnOldSw.length" translate-plural="The library contains {{ $count }} files scanned on an older version of Music without support for all the current features. Rescan them to take full advantage of the latest features.">
+				The library contains {{ $count }} file scanned on an older version of Music without support for all the current features. Rescan it to take full advantage of the latest features.
+			</span>
+			<button ng-click="startScanning(filesScannedOnOldSw)" translate>Rescan</button>
+		</div>
+		<div ng-if="scannedFileIds.length">
+			<span translate translate-n="scannedFileIds.length" translate-plural="The library contains {{ $count }} scanned tracks. These may be rescanned without affecting any user-created playlists.">
+				The library contains {{ $count }} scanned track. This may be rescanned without affecting any user-created playlists.
+			</span>
+			<button ng-click="startScanning(scannedFileIds)" translate>Rescan</button>
+		</div>
+	</div>
+
 	<h2 translate>Reset</h2>
 	<div>
 		<div class="label-container">
@@ -67,7 +112,6 @@
 		<input type="button" ng-class="{ 'invisible': collectionResetOngoing }"
 			class="icon-delete reset-button" id="reset-collection" ng-click="resetCollection()"/>
 		<p><em translate>This action resets all the scanned tracks and all the user-created playlists. After this, the collection can be scanned again from scratch.</em></p>
-		<p><em translate>This may be desirable after changing the excluded paths, or if the database would somehow get corrupted. If the latter happens, please report a bug to the <a href="{{issueTrackerUrl}}" target="_blank">issue tracker</a>.</em></p>
 	</div>
 	<div>
 		<div class="label-container">
@@ -184,7 +228,7 @@
 			<div>
 				<p ng-hide="scrobbler.configured" translate>The server administrator can configure your server for scrobbling, see the <strong>Admin</strong> section below.</p>
 				<p ng-show="scrobbler.configured && !scrobbler.hasSession" translate translate-params-service="scrobbler.service">Click <strong>Connect</strong> to scrobble your streams to {{service}}.</p>
-				<p ng-show="scrobbler.configured && scrobbler.hasSession" translate translate translate-params-service="scrobbler.service">Your streams will be scrobbled to {{service}}. Click <strong>Disconnect</strong> to stop scrobbling.</p>
+				<p ng-show="scrobbler.configured && scrobbler.hasSession" translate translate-params-service="scrobbler.service">Your streams will be scrobbled to {{service}}. Click <strong>Disconnect</strong> to stop scrobbling.</p>
 			</div>
 			<button ng-show="scrobbler.configured" ng-disabled="scrobbler.hasSession" ng-click="scrobbler.generateScrobbleSession()" translate>Connect</button>
 			<button ng-show="scrobbler.configured" ng-disabled="!scrobbler.hasSession" ng-click="scrobbler.clearScrobbleSession()" translate>Disconnect</button>
@@ -204,8 +248,12 @@
 
 	<h2 translate>Admin</h2>
 	<div>
-		<p translate translate-params-filename="'<cloud root>/config/config.php'" translate-params-url="'https://github.com/nc-music/music/wiki/Admin-settings'">
-			There is no settings UI for the server-wide settings of the Music app but some settings are available by adding specific key-value pairs to the file <samp>{{filename}}</samp>. The available keys are documented <a href="{{url}}" target="_blank">here</a>.
+		<p translate
+			translate-params-admin-ui-url="::adminSettingsUiUrl"
+			translate-params-filename="'<cloud root>/config/config.php'"
+			translate-params-admin-doc-url="'https://github.com/nc-music/music/wiki/Admin-settings'"
+		>
+			Users with administrator rights can find some server-wide settings of Music from <a href="{{adminUiUrl}}" target="_blank">Administrator settings</a>. More settings are available by adding specific key-value pairs to the file <samp>{{filename}}</samp>. The available keys are documented <a href="{{adminDocUrl}}" target="_blank">here</a>.
 		</p>
 	</div>
 
@@ -217,6 +265,10 @@
 			<span translate>Music</span> <span>v{{ settings.appVersion }}</span>
 			(<a href="https://github.com/nc-music/music/releases" target="_blank" translate>version history</a>)
 		</p>
+		<a id="sponsor-link" href="https://github.com/sponsors/nc-music" target="_blank">
+			<span class="icon icon-heart"></span>
+			<span translate>Support the development of Music</span>
+		</a>
 		<p translate>
 			Please report any bugs and issues to the <a href="{{issueTrackerUrl}}" target="_blank">issue tracker</a>
 		</p>

@@ -39,11 +39,11 @@ class ArtistTest extends \PHPUnit\Framework\TestCase {
 		$artist->setCoverFileId(100);
 
 		$this->assertEquals([
-			'id' => 3,
-			'name' => 'The name',
+			'id'    => 3,
+			'name'  => 'The name',
 			'image' => 'https://some.url',
-			'slug' => 'the-name',
-			'uri' => 'https://some.url'
+			'slug'  => 'the-name',
+			'uri'   => 'https://some.url'
 		], $artist->toShivaApi($this->urlGenerator, $this->l10n));
 	}
 

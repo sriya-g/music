@@ -1,4 +1,4 @@
-<div id="smartlist-filters" class="sidebar-content" ng-controller="SmartListFiltersController" ng-if="contentType=='smartlist' && smartListParams">
+<div id="smartlist-filters" class="sidebar-content" ng-controller="SmartListFiltersController" ng-if="contentType=='smartlist'">
 
 	<h1 translate>Smart playlist filters</h1>
 

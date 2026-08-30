@@ -17,7 +17,6 @@ use OCA\Music\AppFramework\Utility\FileExistsException;
 use OCA\Music\Http\ErrorResponse;
 use OCA\Music\Http\RelayStreamResponse;
 use OCA\Music\Service\PodcastService;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -40,7 +39,7 @@ class PodcastApiController extends Controller {
 		private IRootFolder $rootFolder,
 		private PodcastService $podcastService,
 		private ?string $userId,
-		private Logger $logger
+		private Logger $logger,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -61,7 +60,7 @@ class PodcastApiController extends Controller {
 	public function getAll() : JSONResponse {
 		$channels = $this->podcastService->getAllChannels($this->user(), /*$includeEpisodes=*/ true);
 		return new JSONResponse(
-			\array_map(fn($c) => $c->toApi($this->urlGenerator), $channels)
+			\array_map(fn ($c) => $c->toApi($this->urlGenerator), $channels)
 		);
 	}
 
@@ -180,8 +179,8 @@ class PodcastApiController extends Controller {
 	 * check a single channel for updates
 	 * @param int $id Channel ID
 	 * @param string|null $prevHash Previous content hash known by the client. If given, the result will tell
-	 *								if the channel content has updated from this state. If omitted, the result
-	 *								will tell if the channel changed from its previous server-known state.
+	 *                              if the channel content has updated from this state. If omitted, the result
+	 *                              will tell if the channel changed from its previous server-known state.
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
@@ -215,10 +214,10 @@ class PodcastApiController extends Controller {
 	 * @param string $name target file name
 	 * @param string $path parent folder path
 	 * @param string $oncollision action to take on file name collision,
-	 *								supported values:
-	 *								- 'overwrite' The existing file will be overwritten
-	 *								- 'keepboth' The new file is named with a suffix to make it unique
-	 *								- 'abort' (default) The operation will fail
+	 *                            supported values:
+	 *                            - 'overwrite' The existing file will be overwritten
+	 *                            - 'keepboth' The new file is named with a suffix to make it unique
+	 *                            - 'abort' (default) The operation will fail
 	 */
 	#[NoAdminRequired]
 	#[NoCSRFRequired]

@@ -20,7 +20,7 @@ angular.module('Music').directive('popupSubMenu', ['$rootScope', function($rootS
 		link: function(scope) {
 			scope.expanded = false;
 
-			$rootScope.$on('popup-menu:close', function(_event, _source) {
+			$rootScope.subscribe('popup-menu:close', scope, (_event, _source) => {
 				scope.expanded = false;
 			});
 

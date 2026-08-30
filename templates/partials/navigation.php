@@ -6,7 +6,7 @@ HtmlUtil::printNgTemplate('navigationitem');
 
 <div id="app-navigation" ng-controller="NavigationController">
 	<ul>
-		<li navigation-item text="'Albums' | translate" destination="'#'" title="{{ albumCountText() }}" icon="'album'">
+		<li navigation-item text="'Albums' | translate" destination="'#/'" title="{{ albumCountText() }}" icon="'album'">
 			<popup-menu>
 				<popup-menu-item ng-click="toggleAlbumsCompactLayout(false);" platform-icon="albumsCompactLayout ? 'radio-button' : 'radio-button-checked'">{{ 'Normal layout' | translate }}</popup-menu-item>
 				<popup-menu-item ng-click="toggleAlbumsCompactLayout(true);" platform-icon="albumsCompactLayout ? 'radio-button-checked' : 'radio-button'">{{ 'Compact layout' | translate }}</popup-menu-item>
@@ -88,7 +88,7 @@ HtmlUtil::printNgTemplate('navigationitem');
 				<popup-menu-item ng-click="remove(playlist);" platform-icon="'delete'">{{ 'Delete' | translate }}</popup-menu-item>
 			</popup-menu>
 		</li>
-		<li id="music-nav-search" class="docked-navigation-item music-navigation-item" ng-class="{active: currentView=='#/search'}"
+		<li id="music-nav-search" class="docked-navigation-item music-navigation-item" ng-class="{active: getCurrentViewId() == '#/search'}"
 			title="{{ showSearch ? null : '[CTRL+F]' }}">
 			<div class="music-navigation-item-content">
 				<div class="icon-search" ng-click="startSearch()"></div>
@@ -105,7 +105,7 @@ HtmlUtil::printNgTemplate('navigationitem');
 				</popup-menu>
 			</div>
 		</li>
-		<li id="music-nav-settings" class="docked-navigation-item" ng-class="{active: currentView=='#/settings'}">
+		<li id="music-nav-settings" class="docked-navigation-item" ng-class="{active: getCurrentViewId() == '#/settings'}">
 			<a class="music-navigation-item-content" ng-click="navigateTo('#/settings');">
 				<span class="icon-settings-dark"></span>
 				<span class="label" translate>Settings</span>

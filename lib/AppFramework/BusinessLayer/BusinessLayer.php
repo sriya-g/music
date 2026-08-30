@@ -21,7 +21,6 @@ use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\SortBy;
 use OCA\Music\Utility\ArrayUtil;
 use OCA\Music\Utility\Random;
-
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\MultipleObjectsReturnedException;
 use OCP\IL10N;
@@ -36,7 +35,9 @@ abstract class BusinessLayer {
 	/**
 	 * @phpstan-param BaseMapper<EntityType> $mapper
 	 */
-	public function __construct(protected BaseMapper $mapper) {
+	public function __construct(
+		protected BaseMapper $mapper,
+	) {
 	}
 
 	/**
@@ -105,13 +106,13 @@ abstract class BusinessLayer {
 	 * Find all entities matching the given IDs.
 	 * Specifying the user is optional; if omitted, the caller should make sure that
 	 * user's data is not leaked to unauthorized users.
-	 * @param integer[] $ids  IDs of the entities to be found
+	 * @param integer[] $ids IDs of the entities to be found
 	 * @param string|null $userId
 	 * @param bool $preserveOrder If true, then the result will be in the same order as @a $ids
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findById(array $ids, ?string $userId=null, bool $preserveOrder=false) : array {
+	public function findById(array $ids, ?string $userId = null, bool $preserveOrder = false) : array {
 		$entities = [];
 		if (\count($ids) > 0) {
 			// don't use more than 999 SQL args in one query since that may be a problem for SQLite
@@ -150,8 +151,8 @@ abstract class BusinessLayer {
 	 * @phpstan-return EntityType[]
 	 */
 	public function findAll(
-			string $userId, int $sortBy=SortBy::Name, ?int $limit=null, ?int $offset=null,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+			string $userId, int $sortBy = SortBy::Name, ?int $limit = null, ?int $offset = null,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		return $this->mapper->findAll($userId, $sortBy, $limit, $offset, $createdMin, $createdMax, $updatedMin, $updatedMax);
 	}
 
@@ -165,8 +166,8 @@ abstract class BusinessLayer {
 	 * @phpstan-return EntityType[]
 	 */
 	public function findAllByName(
-			?string $name, string $userId, int $matchMode=MatchMode::Exact, ?int $limit=null, ?int $offset=null,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null) : array {
+			?string $name, string $userId, int $matchMode = MatchMode::Exact, ?int $limit = null, ?int $offset = null,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null) : array {
 		if ($name !== null) {
 			$name = \trim($name);
 		}
@@ -178,7 +179,7 @@ abstract class BusinessLayer {
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAllStarred(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllStarred(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findAllStarred($userId, $limit, $offset);
 	}
 
@@ -195,7 +196,7 @@ abstract class BusinessLayer {
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
-	public function findAllRated(string $userId, ?int $limit=null, ?int $offset=null) : array {
+	public function findAllRated(string $userId, ?int $limit = null, ?int $offset = null) : array {
 		return $this->mapper->findAllRated($userId, $limit, $offset);
 	}
 
@@ -203,20 +204,20 @@ abstract class BusinessLayer {
 	 * Find all entities matching multiple criteria, as needed for the Ampache API method `advanced_search`
 	 * @param string $conjunction Operator to use between the rules, either 'and' or 'or'
 	 * @param array $rules Array of arrays: [['rule' => string, 'operator' => string, 'input' => string], ...]
-	 * 				Here, 'rule' has dozens of possible values depending on the business layer in question,
-	 * 				(see https://ampache.org/api/api-advanced-search#available-search-rules, alias names not supported here),
-	 * 				'operator' is one of 
-	 * 				['contain', 'notcontain', 'start', 'end', 'is', 'isnot', 'sounds', 'notsounds', 'regexp', 'notregexp',
-	 * 				 '>=', '<=', '=', '!=', '>', '<', 'before', 'after', 'true', 'false', 'equal', 'ne', 'limit'],
-	 * 				'input' is the right side value of the 'operator' (disregarded for the operators 'true' and 'false')
+	 *                     Here, 'rule' has dozens of possible values depending on the business layer in question,
+	 *                     (see https://ampache.org/api/api-advanced-search#available-search-rules, alias names not supported here),
+	 *                     'operator' is one of
+	 *                     ['contain', 'notcontain', 'start', 'end', 'is', 'isnot', 'sounds', 'notsounds', 'regexp', 'notregexp',
+	 *                     '>=', '<=', '=', '!=', '>', '<', 'before', 'after', 'true', 'false', 'equal', 'ne', 'limit'],
+	 *                     'input' is the right side value of the 'operator' (disregarded for the operators 'true' and 'false')
 	 * @param Random $random When the randomization utility is passed, the result set will be in random order (still supporting proper paging).
-	 * 						 In this case, the argument $sortBy is ignored.
+	 *                       In this case, the argument $sortBy is ignored.
 	 * @return Entity[]
 	 * @phpstan-return EntityType[]
 	 */
 	public function findAllAdvanced(
-			string $conjunction, array $rules, string $userId, int $sortBy=SortBy::Name,
-			?Random $random=null, ?int $limit=null, ?int $offset=null) : array {
+			string $conjunction, array $rules, string $userId, int $sortBy = SortBy::Name,
+			?Random $random = null, ?int $limit = null, ?int $offset = null) : array {
 
 		if ($conjunction !== 'and' && $conjunction !== 'or') {
 			throw new BusinessLayerException("Bad conjunction '$conjunction'");
@@ -225,7 +226,7 @@ abstract class BusinessLayer {
 			if ($random !== null) {
 				// in case the random order is requested, the limit/offset handling happens after the DB query
 				$entities = $this->mapper->findAllAdvanced($conjunction, $rules, $userId, SortBy::Name);
-				$indices = $random->getIndices(\count($entities), $offset, $limit, $userId, 'adv_search_'.$this->mapper->unprefixedTableName());
+				$indices = $random->getIndices(\count($entities), $offset, $limit, $userId, 'adv_search_' . $this->mapper->unprefixedTableName());
 				$entities = ArrayUtil::multiGet($entities, $indices);
 			} else {
 				$entities = $this->mapper->findAllAdvanced($conjunction, $rules, $userId, $sortBy, $limit, $offset);
@@ -270,9 +271,9 @@ abstract class BusinessLayer {
 	 * @param bool $excludeChildless Exclude entities having no child-entities if applicable for this business layer (eg. artists without albums)
 	 * @return array of arrays like ['id' => string, 'name' => string]
 	 */
-	public function findAllIdsAndNames(string $userId, IL10N $l10n, ?int $parentId=null, ?int $limit=null, ?int $offset=null,
-			?string $createdMin=null, ?string $createdMax=null, ?string $updatedMin=null, ?string $updatedMax=null,
-			bool $excludeChildless=false, ?string $name=null) : array {
+	public function findAllIdsAndNames(string $userId, IL10N $l10n, ?int $parentId = null, ?int $limit = null, ?int $offset = null,
+			?string $createdMin = null, ?string $createdMax = null, ?string $updatedMin = null, ?string $updatedMax = null,
+			bool $excludeChildless = false, ?string $name = null) : array {
 		try {
 			$idsAndNames = $this->mapper->findAllIdsAndNames(
 				$userId, $parentId, $limit, $offset, $createdMin, $createdMax, $updatedMin, $updatedMax, $excludeChildless, $name);

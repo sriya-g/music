@@ -16,7 +16,6 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\Utility\FilesUtil;
 use OCA\Music\Utility\LocalCacheTrait;
 use OCA\Music\Utility\StringUtil;
-
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\IConfig;
@@ -36,7 +35,7 @@ class LibrarySettings {
 		private string $appName,
 		private IConfig $configManager,
 		private IRootFolder $rootFolder,
-		private Logger $logger
+		private Logger $logger,
 	) {
 	}
 
@@ -68,7 +67,7 @@ class LibrarySettings {
 			if ($path[0] !== '/') {
 				$path = '/' . $path;
 			}
-			if ($path[\strlen($path)-1] !== '/') {
+			if ($path[\strlen($path) - 1] !== '/') {
 				$path .= '/';
 			}
 			$this->configManager->setUserValue($userId, $this->appName, 'path', $path);
@@ -97,7 +96,7 @@ class LibrarySettings {
 	 * @return string[]
 	 */
 	public function getExcludedPaths(string $userId) : array {
-		return $this->cachedGet($userId, 'excluded_paths', function() use ($userId) {
+		return $this->cachedGet($userId, 'excluded_paths', function () use ($userId) {
 			$paths = $this->configManager->getUserValue($userId, $this->appName, 'excluded_paths');
 			if (empty($paths)) {
 				return [];
@@ -107,11 +106,21 @@ class LibrarySettings {
 		});
 	}
 
+	/**
+	 * @throws LibraryFolderException if the configured music folder cannot be resolved
+	 */
 	public function getFolder(string $userId) : Folder {
-		return $this->cachedGet($userId, 'music_folder', fn () => FilesUtil::getFolderFromRelativePath(
-			$this->rootFolder->getUserFolder($userId),
-			$this->getPath($userId)
-		));
+		return $this->cachedGet($userId, 'music_folder', function () use ($userId) {
+			$path = $this->getPath($userId);
+			try {
+				return FilesUtil::getFolderFromRelativePath($this->rootFolder->getUserFolder($userId), $path);
+			} catch (\OCP\Files\NotFoundException | \OCP\Files\NotPermittedException | \InvalidArgumentException $e) {
+				// Without this, the failure would surface as an HTTP 500 on every endpoint resolving the
+				// filesystem, giving the user no hint that it's their own path setting which is at fault.
+				$this->logger->warning("Music folder '$path' of user $userId could not be resolved: " . $e->getMessage());
+				throw new LibraryFolderException("Configured music folder '$path' is not available", 0, $e);
+			}
+		});
 	}
 
 	public function pathBelongsToMusicLibrary(string $filePath, string $userId) : bool {
@@ -123,11 +132,11 @@ class LibrarySettings {
 	}
 
 	private function getAbsoluteLibPath(string $userId) : string {
-		return $this->cachedGet($userId, 'music_folder_abs_path', fn() => self::normalizePath($this->getFolder($userId)->getPath()));
+		return $this->cachedGet($userId, 'music_folder_abs_path', fn () => self::normalizePath($this->getFolder($userId)->getPath()));
 	}
 
 	private function getHomePath(string $userId) : string {
-		return $this->cachedGet($userId, 'home_path', fn() => $this->rootFolder->getUserFolder($userId)->getPath());
+		return $this->cachedGet($userId, 'home_path', fn () => $this->rootFolder->getUserFolder($userId)->getPath());
 	}
 
 	private function pathIsExcluded(string $filePath, string $musicPath, string $userId) : bool {
