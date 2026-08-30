@@ -31,6 +31,7 @@ jobs:
             git fetch origin listenbrainz-support
             git reset --hard origin/listenbrainz-support
 
-            # Notify Nextcloud to reload changes
+            # Complete any pending app migrations/upgrades and enable
+            docker exec --user www-data nextcloud-aio-nextcloud php occ upgrade --no-interaction
             docker exec --user www-data nextcloud-aio-nextcloud php occ app:enable music
             echo "==> Deployment completed successfully!"
