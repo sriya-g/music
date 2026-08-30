@@ -28,9 +28,8 @@ jobs:
             cd /var/lib/docker/volumes/nextcloud_aio_nextcloud/_data/custom_apps/music
 
             # Fetch latest commits and reset to clean state
-            sudo git fetch origin listenbrainz-support
-            sudo git reset --hard origin/listenbrainz-support
-            sudo chown -R 33:33 .
+            git fetch origin listenbrainz-support
+            git reset --hard origin/listenbrainz-support
 
             # Notify Nextcloud to reload changes
             docker exec --user www-data nextcloud-aio-nextcloud php occ app:enable music
