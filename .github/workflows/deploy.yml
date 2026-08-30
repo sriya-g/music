@@ -1,0 +1,37 @@
+name: Deploy to Nextcloud Server
+
+on:
+  push:
+    branches:
+      - listenbrainz-support
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Nextcloud AIO
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_TAILSCALE_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            echo "==> Updating Music app..."
+            cd /var/lib/docker/volumes/nextcloud_aio_nextcloud/_data/custom_apps/music
+
+            # Fetch latest commits and reset to clean state
+            sudo git fetch origin listenbrainz-support
+            sudo git reset --hard origin/listenbrainz-support
+            sudo chown -R 33:33 .
+
+            # Notify Nextcloud to reload changes
+            docker exec --user www-data nextcloud-aio-nextcloud php occ app:enable music
+            echo "==> Deployment completed successfully!"
