@@ -1,0 +1,591 @@
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023
+ */
+
+/**
+ * Constant definitions shared between the Music app and the embedded Files/Share player
+ */
+
+:root {
+	--music-albumart-small-border-radius: var(--border-radius);
+	--music-albumart-large-border-radius: var(--border-radius);
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2024 - 2026
+ */
+
+.music-progress-info {
+	text-align: center;
+	overflow: hidden;
+}
+
+.music-progress-info span {
+	line-height: 30px;
+}
+
+.music-progress-info .seek-bar {
+	width: 100%;
+	height: 15px;
+	margin: 0 auto 0 auto;
+	position: relative;
+	background-color: rgba(230, 230, 230, 0.8);
+}
+
+.music-progress-info .seek-bar, .music-progress-info .play-bar, .music-progress-info .buffer-bar {
+	display: block;
+}
+
+.music-progress-info .play-bar, .music-progress-info .buffer-bar {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 15px;
+	width: 0%;
+	background-color: var(--color-primary, #1d2d44);
+}
+
+.music-progress-info .translucent {
+	opacity: 0.75;
+}
+
+.music-progress-info .buffer-bar {
+	opacity: 0.15;
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023 - 2026
+ */
+
+.music-volume-control {
+	width: 66px;
+	height: 66px;
+}
+
+.music-volume-control .volume-icon-and-percent * {
+	position: absolute;
+	top: 0;
+	inset-inline-start: 0;
+}
+
+.music-volume-control .volume-icon-and-percent .volume-percent {
+	visibility: hidden;
+	text-align: center;
+	font-weight: bolder;
+	cursor: default;
+}
+
+.music-volume-control.adjusting .volume-percent {
+	visibility: visible;
+}
+
+.music-volume-control.adjusting .volume-icon {
+	visibility: hidden;
+}
+
+.music-volume-control .volume-slider {
+	position: absolute;
+	width: 58px;
+	height: 3px;
+	min-height: 3px;
+	top: 31px;
+	inset-inline-start: 21px;
+	margin: 0;
+	-webkit-appearance: none;
+	background-color: silver;
+	transform: rotate(270deg);
+}
+
+/** On RTL languages, the default orientation of the slider is inverted so have to rotate to other direction to have high values on top */
+.music-volume-control .volume-slider:dir(rtl) {
+	transform: rotate(90deg);
+}
+
+.music-volume-control .volume-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	background-color: #666;
+	border-radius: 100%;
+	width: 10px;
+	height: 10px;
+}
+
+.music-volume-control .volume-slider:hover::-webkit-slider-thumb {
+	cursor: pointer;
+}
+
+.music-volume-control .volume-slider::-moz-range-thumb {
+	-moz-appearance: none;
+	background-color: #666;
+	border-radius: 100%;
+	width: 10px;
+	height: 10px;
+}
+
+.music-volume-control .volume-slider:hover::-moz-range-thumb {
+	cursor: pointer;
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023 - 2026
+ */
+
+ /* "Tablet" style */
+#music-controls.tablet {
+	padding: 0;
+}
+#music-controls.tablet #albumart-container {
+	margin-inline-start: 10px;
+}
+#music-controls.tablet #info-and-progress {
+	inset-inline-start: 230px;
+	inset-inline-end: 120px;
+}
+#music-controls.tablet #title {
+	font-size: 14px;
+}
+
+/* "Mobile" style */
+#music-controls.mobile #music-song-area {
+	height: 90px;
+}
+#music-controls.mobile #play,
+#music-controls.mobile #pause {
+	margin-left: -4px;
+}
+#music-controls.mobile #next {
+	margin-left: -8px;
+}
+#music-controls.mobile .control {
+	margin-inline-end: 0;
+}
+#music-controls.mobile #albumart-container {
+	margin-inline-start: 4px;
+}
+#music-controls.mobile #info-and-progress {
+	inset-inline-start: 205px;
+	inset-inline-end: 50px;
+}
+#music-controls.mobile #song-info {
+	height: 50px;
+	width: calc(100% - 50px);
+}
+#music-controls.mobile .music-progress-info {
+	white-space: nowrap;
+	display: block;
+	position: relative;
+	inset-inline-start: -62px;
+	width: calc(100% + 62px);
+}
+#music-controls.mobile .music-progress-info .progress-text {
+	position: absolute;
+	inset-inline: 0;
+	top: -6px;
+	width: auto;
+	z-index: 1;
+	pointer-events: none;
+	color: var(--color-primary-text, #fff);
+	text-shadow: #000 0 0 5px;
+}
+#music-controls.mobile .music-volume-control {
+	inset-inline-end: 40px;
+}
+
+/* "Extra narrow" style */
+#music-controls.extra-narrow #prev {
+	display: none;
+}
+#music-controls.extra-narrow #info-and-progress {
+	inset-inline-start: 160px;
+	inset-inline-end: 40px;
+}
+#music-controls.extra-narrow #song-info {
+	width: calc(100% - 30px);
+}
+#music-controls.extra-narrow .music-volume-control .volume-icon-and-percent {
+	display: none;
+}
+
+/* Hide the music controls when menu on left is in collapsible mode (on portrait phone)
+ * and the menu is open */
+body.snapjs-left #music-controls,
+body.snapjs-right #music-controls {
+	visibility: hidden;
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2017 - 2026
+ */
+
+#music-controls .icon-music-dark {
+	background-image: url(img/5347a8f54eb01e2ae5be.svg);
+}
+
+#music-controls .icon-radio-nav {
+	background-image: url(img/463648f71ce4ea7920a0.svg);
+}
+
+#music-controls {
+	width: 100%;
+	padding: 0 20px 0 20px;
+	position: fixed;
+	bottom: 0;
+	background-color: var(--color-main-background-translucent, rgba(255, 255, 255, .95));
+	z-index: 50;
+	text-align: start;
+
+	/* For NC25+: */
+	margin-bottom: var(--body-container-margin);
+	border-end-end-radius: var(--body-container-radius);
+}
+
+#music-controls #music-song-area {
+	height: 66px;
+	width: 100%;
+	white-space: nowrap;
+}
+
+#music-controls #playlist-area {
+	display: none;
+	width: 100%;
+	height: 24px;
+}
+
+#music-controls.with-playlist #playlist-area {
+	display: block;
+}
+
+#music-controls #playlist-area > span {
+	margin-top: 5px;
+	margin-inline-start: 10px;
+	font-size: 14px;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: pre;
+}
+
+#music-controls #playlist-area #playlist-name {
+	inset-inline-start: 10px;
+	font-weight: bold;
+	max-width: 66%;
+}
+
+#music-controls #playlist-area #menu-container {
+	position: absolute;
+	margin-inline-start: 10px;
+}
+
+#music-controls #playlist-area .icon-more {
+	border: none;
+	background-color: transparent;
+	vertical-align: top;
+	min-height: 18px;
+	margin-top: 8px;
+	opacity: .4;
+}
+
+#music-controls #playlist-area .icon-more:hover {
+	opacity: 1.0;
+}
+
+#music-controls, #music-controls * {
+	display: inline-block;
+	box-sizing: border-box;
+}
+
+#music-controls .time-separator {
+	display: inline;
+}
+
+#music-controls .control {
+	height: 52px;
+	width: 64px;
+	padding: 10px;
+	margin: 9px 0px 5px;
+	cursor: pointer;
+	opacity: .4;
+}
+
+#music-controls .control.disabled {
+	cursor: default !important;
+	opacity: .15 !important;
+}
+
+#music-controls .control.small {
+	height: 44px;
+	width: 44px;
+	margin: 13px 0px 9px;
+}
+
+#music-controls .control#close {
+	height: 46px;
+	width: 46px;
+	margin: 0;
+	padding: 15px;
+	position: absolute;
+	inset-inline-end: 0;
+	top: 0;
+}
+
+#music-controls .control:hover:not(.disabled),
+#music-controls .control:focus:not(.disabled) {
+	opacity: 1;
+}
+
+#music-controls .control.volume-percent:hover:not(.disabled) {
+	opacity: .4;
+	cursor: default;
+}
+
+#music-controls .svg {
+	filter: var(--background-invert-if-dark);
+}
+
+#music-controls #albumart-container {
+	position: relative;
+	width: 50px;
+	height: 50px;
+	margin: 8px 12px 8px 20px;
+}
+
+#music-controls #albumart {
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	background-size: cover;
+	background-position: center;
+	display: inline-block;
+	border-radius: var(--music-albumart-small-border-radius);
+}
+
+#music-controls #albumart-container.icon-loading #albumart {
+	opacity: 0.2;
+}
+
+#music-controls #info-and-progress {
+	display: inline-block;
+	position: absolute;
+	inset-inline-start: 260px;
+	inset-inline-end: 180px;
+	width: auto;
+	height: 100%;
+}
+
+#music-controls #song-info {
+	height: 100%;
+	width: 50%;
+	margin-top: 7px;
+	vertical-align: top;
+}
+
+#music-controls #song-info span {
+	width: 100%;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+	vertical-align: top;
+}
+
+#music-controls #title {
+	font-weight: bold;
+	font-size: 21px;
+	line-height: 29px;
+}
+
+#music-controls .music-progress-info {
+	width: 45%;
+	margin: 9px auto 25px auto;
+	white-space: normal;
+}
+
+#music-controls .music-volume-control {
+	position: absolute;
+	inset-inline-end: 54px;
+}
+
+/* Ensure the music controls don't cover the bottom of the file list when visible */
+.files-list:has(+ #music-controls:not([style*="display: none"])) .files-list__table {
+	margin-bottom: 114px;
+}
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023 - 2026
+ */
+ 
+ /* Playlist tab view shown in the Files sidebar */
+
+.musicPlaylistTabView p {
+	margin-top: 24px;
+	font-weight: bold;
+}
+
+.musicPlaylistTabView .loading {
+	height: 50px;
+}
+
+.musicPlaylistTabView li {
+	padding-top: 4px;
+	padding-bottom: 4px;
+	padding-inline-start: 8px;
+}
+
+.musicPlaylistTabView ol {
+	list-style: decimal inside;
+}
+
+.musicPlaylistTabView ol li {
+	cursor: pointer;
+	list-style-type: decimal;
+}
+
+.musicPlaylistTabView ol li::marker {
+	color: #767676;
+}
+
+.musicPlaylistTabView ol li:hover,
+.musicPlaylistTabView ol li.current {
+	transition: background-color 0.3s ease;
+	background-color: var(--color-background-dark, #f7f7f7);
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023 - 2025
+ */
+
+#music-controls #playlist-area .popovermenu {
+	box-sizing: content-box;
+	padding: 0;
+	bottom: 24px;
+	transform: translateX(50%);
+	inset-inline-end: 50% ;
+	margin-inline-end: 0;
+	display: none;
+}
+
+/* Place the caret under the popup */
+#music-controls #playlist-area .popovermenu::after {
+	inset-inline-end: 50%;
+	transform: translateX(50%) translateY(100%) rotate(180deg);
+	bottom: 0;
+}
+
+/** translateX has no bidirectional alternative, so handle RTL separately */
+#music-controls #playlist-area .popovermenu:dir(rtl) {
+	transform: translateX(-50%);
+}
+
+#music-controls #playlist-area .popovermenu:dir(rtl)::after {
+	transform: translateX(-50%) translateY(100%) rotate(180deg);
+}
+
+#music-controls #playlist-area .popovermenu.open {
+	display: block;
+}
+
+#music-controls #playlist-area .popovermenu ul {
+	display: block;
+	padding: 4px;
+}
+
+#music-controls #playlist-area .popovermenu ul li {
+	padding: 0;
+	white-space: nowrap;
+}
+
+#music-controls #playlist-area .popovermenu ul a {
+	opacity: .7;
+	line-height: 36px;
+	padding-inline-end: 10px;
+}
+
+#music-controls #playlist-area .popovermenu ul a:hover {
+	opacity: 1.0;
+}
+
+#music-controls #playlist-area .popovermenu ul a span {
+	display: inline;
+}
+
+#music-controls #playlist-area .popovermenu ul a [class^='icon-'] {
+	padding: 18px 0 18px 36px;
+	background-size: 16px;
+}
+
+#music-controls #playlist-area .popovermenu ul li.disabled a {
+	cursor: default !important;
+	opacity: .15 !important;
+}
+
+#music-controls #playlist-area .popovermenu ul li.disabled * {
+	cursor: default !important;
+}
+
+#music-controls #playlist-area .popovermenu .hidden {
+	display: none;
+}
+
+/**
+ * Nextcloud Music app
+ *
+ * This file is licensed under the Affero General Public License version 3 or
+ * later. See the COPYING file.
+ *
+ * @author Pauli Järvinen <pauli.jarvinen@gmail.com>
+ * @copyright Pauli Järvinen 2023
+ */
+
+/* Play overlay for individual shared file */
+.play-overlay {
+	visibility: hidden;
+	cursor: pointer;
+	position: relative;
+	opacity: .7;
+}
+
+.publicpreview:hover ~ .play-overlay,
+.play-overlay:hover {
+	visibility: visible;
+}
+
+
+/*# sourceMappingURL=webpack.files_music_player.eaaed9b88c43b6b3dff3.css.map*/

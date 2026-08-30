@@ -1,0 +1,2 @@
+window.addEventListener("DOMContentLoaded",function(){var e,n=null===(e=document.querySelector("#app-content"))||void 0===e?void 0:e.dataset;n&&new BroadcastChannel(n.identifier+"-scrobble-session-result").postMessage(Boolean(n.result))});
+//# sourceMappingURL=webpack.scrobble_getsession_result.6d7b921205b0ff7f26f4.js.map
