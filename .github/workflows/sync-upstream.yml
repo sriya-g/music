@@ -1,0 +1,32 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Every Sunday at 03:00 UTC
+  workflow_dispatch:   # Allows manual trigger via GitHub Actions UI
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync Upstream Master
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Fork
+        uses: actions/checkout@v4
+        with:
+          ref: listenbrainz-support
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch and Merge Upstream
+        run: |
+          git remote add upstream https://github.com/nc-music/music.git
+          git fetch upstream master
+          git merge upstream/master --no-edit -m "chore: sync upstream master"
+          git push origin listenbrainz-support
