@@ -122,7 +122,7 @@ export interface SearchResult<T> {
 const DIACRITIC_REG_EXP = /[\u0300-\u036f]/g;
 
 export class LibraryService {
-	#ignoredArticles : string[] = OCP.InitialState.loadState('music', 'ignored_articles', []);
+	#ignoredArticles : string[] = OCP.InitialState.loadState('music', 'ignored_articles', []) || [];
 	#collection : Artist[] = null;
 	#artistsIndex : { [id: number] : Artist } = {};
 	#albumsIndex : { [id: number] : Album } = {};
@@ -197,7 +197,11 @@ export class LibraryService {
 	}
 
 	#createArtistSortName(name : string) : string {
-		for (let article of this.#ignoredArticles) {
+		if (!name) {
+			return '';
+		}
+		const articles = this.#ignoredArticles || [];
+		for (let article of articles) {
 			if (name.toLowerCase().startsWith(article.toLowerCase() + ' ')) {
 				return name.substring(article.length + 1).trim();
 			}

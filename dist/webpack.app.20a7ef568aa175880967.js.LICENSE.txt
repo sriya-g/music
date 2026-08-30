@@ -1,26 +1,4 @@
 /*!
- * SPDX-FileCopyrightText: 2019 Nextcloud GmbH and Nextcloud contributors
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
-/*!
- * SPDX-FileCopyrightText: 2023 Nextcloud GmbH and Nextcloud contributors
- * SPDX-License-Identifier: AGPL-3.0-or-later
- */
-
-/*!
- * SPDX-FileCopyrightText: 2024 Nextcloud GmbH and Nextcloud contributors
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
-/*!
- * The buffer module from node.js, for the browser.
- *
- * @author   Feross Aboukhadijeh <https://feross.org>
- * @license  MIT
- */
-
-/*!
  * Toastify js 1.12.0
  * https://github.com/apvarun/toastify-js
  * @license MIT licensed
@@ -29,11 +7,11 @@
  */
 
 /*!
- * escape-html
- * Copyright(c) 2012-2013 TJ Holowaychuk
- * Copyright(c) 2015 Andreas Lubbe
- * Copyright(c) 2015 Tiancheng "Timothy" Gu
- * MIT Licensed
+ * long-press-event - v@version@
+ * Pure JavaScript long-press-event
+ * https://github.com/john-doherty/long-press-event
+ * @author John Doherty <www.johndoherty.info>
+ * @license MIT
  */
 
 /*! ../demux/demuxer-inline */
@@ -48,7 +26,7 @@
 
 /*! ./get-self-scope */
 
-/*! @license DOMPurify 3.4.11 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.11/LICENSE */
+/*! @license DOMPurify 3.4.13 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.13/LICENSE */
 
 /*! ModuleConcatenation bailout: Cannot concat with ./node_modules/eventemitter3/index.js (<- Module is not an ECMAScript module) */
 
@@ -102,15 +80,7 @@
 
 /*! exports provided: isFiniteNumber, MAX_SAFE_INTEGER */
 
-/*! http://mths.be/fromcodepoint v0.1.0 by @mathias */
-
-/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
-
 /*! no static exports found */
-
-/*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */
-
-/*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
 
 /*!**********************!*\
   !*** ./src/empty.js ***!
@@ -167,3 +137,16 @@
 /*!*****************************************************!*\
   !*** ./node_modules/url-toolkit/src/url-toolkit.js ***!
   \*****************************************************/
+
+/**
+ * @license AngularJS v1.8.3
+ * (c) 2010-2020 Google LLC. http://angularjs.org
+ * License: MIT
+ */
+
+/**
+ * Restful Resources service for AngularJS apps
+ * @version v1.6.1 - 2017-01-06 * @link https://github.com/mgonto/restangular
+ * @author Martin Gontovnikas <martin@gon.to>
+ * @license MIT License, http://www.opensource.org/licenses/MIT
+ */

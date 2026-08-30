@@ -55,7 +55,8 @@ class LibrarySettings {
 	public function getIgnoredArticles(string $userId) : array {
 		$default = '["The", "El", "La", "Los", "Las", "Le", "Les"]';
 		$value = $this->configManager->getUserValue($userId, $this->appName, 'ignored_articles', $default);
-		return \json_decode($value);
+		$decoded = \is_string($value) ? \json_decode($value, true) : null;
+		return \is_array($decoded) ? $decoded : ["The", "El", "La", "Los", "Las", "Le", "Les"];
 	}
 
 	public function setPath(string $userId, string $path) : bool {
