@@ -139,7 +139,7 @@ class ArtistBusinessLayer extends BusinessLayer {
 		$name = StringUtil::truncate($name, 256); // some DB setups can't truncate automatically to column max size
 		$hash = \hash('md5', \mb_strtolower($name ?? ''));
 
-		return $this->cachedGet($userId, $mbid ?? $hash, function () use ($name, $mbid, $hash, $userId) {
+		return $this->cachedGet($userId, "$hash|$mbid", function () use ($name, $mbid, $hash, $userId) {
 			$artist = new Artist();
 			$artist->setName($name);
 			$artist->setMbid($mbid);
