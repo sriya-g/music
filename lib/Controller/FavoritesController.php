@@ -20,6 +20,7 @@ use OCA\Music\BusinessLayer\PodcastChannelBusinessLayer;
 use OCA\Music\BusinessLayer\PodcastEpisodeBusinessLayer;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Http\ErrorResponse;
+use OCA\Music\Service\Scrobbling\IScrobbler;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -39,6 +40,7 @@ class FavoritesController extends Controller {
 		private PodcastEpisodeBusinessLayer $podcastEpisodeBusinessLayer,
 		private TrackBusinessLayer $trackBusinessLayer,
 		private string $userId,
+		private ?IScrobbler $scrobbler = null,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -59,7 +61,21 @@ class FavoritesController extends Controller {
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
 	public function setFavoriteTrack(int $id, string|int|bool|null $status) : JSONResponse {
-		return $this->setFavorite($this->trackBusinessLayer, $id, $status);
+		$response = $this->setFavorite($this->trackBusinessLayer, $id, $status);
+		if ($status !== null && $this->scrobbler !== null) {
+			$boolStatus = \filter_var($status, FILTER_VALIDATE_BOOLEAN);
+			try {
+				$track = $this->trackBusinessLayer->find($id, $this->userId);
+				if ($boolStatus) {
+					$this->scrobbler->loveTrack($track, $this->userId);
+				} else {
+					$this->scrobbler->unloveTrack($track, $this->userId);
+				}
+			} catch (\Throwable $e) {
+				// Scrobbling error should not fail the favorite request
+			}
+		}
+		return $response;
 	}
 
 	#[NoAdminRequired]

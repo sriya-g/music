@@ -5,8 +5,8 @@
   "admin_settings.js.map": "webpack.admin_settings.c08f30b2e9f4d825005d.js.map",
   "app.css": "webpack.app.1e94a3ea5a266e2f3ff1.css",
   "app.css.map": "webpack.app.1e94a3ea5a266e2f3ff1.css.map",
-  "app.js": "webpack.app.20a7ef568aa175880967.js",
-  "app.js.map": "webpack.app.20a7ef568aa175880967.js.map",
+  "app.js": "webpack.app.757d34a6f6db6ff797b2.js",
+  "app.js.map": "webpack.app.757d34a6f6db6ff797b2.js.map",
   "app.png": "img/a0b7f3f18d93f6730bb2.png",
   "app.svg": "img/6d457f8c5c617564c6ad.svg",
   "dashboard_music_widget.css": "webpack.dashboard_music_widget.e00598d3d90ba3ebb892.css",
@@ -73,7 +73,7 @@
   "webpack.766.8bbc27cbb58f51437878.js": "webpack.766.8bbc27cbb58f51437878.js",
   "webpack.766.8bbc27cbb58f51437878.js.map": "webpack.766.8bbc27cbb58f51437878.js.map",
   "webpack.admin_settings.c08f30b2e9f4d825005d.js.LICENSE.txt": "webpack.admin_settings.c08f30b2e9f4d825005d.js.LICENSE.txt",
-  "webpack.app.20a7ef568aa175880967.js.LICENSE.txt": "webpack.app.20a7ef568aa175880967.js.LICENSE.txt",
+  "webpack.app.757d34a6f6db6ff797b2.js.LICENSE.txt": "webpack.app.757d34a6f6db6ff797b2.js.LICENSE.txt",
   "webpack.dashboard_music_widget.29d58f0144f0cc0affb6.js.LICENSE.txt": "webpack.dashboard_music_widget.29d58f0144f0cc0affb6.js.LICENSE.txt",
   "webpack.files_music_player.dc381e56c484125b41f2.js.LICENSE.txt": "webpack.files_music_player.dc381e56c484125b41f2.js.LICENSE.txt"
 }

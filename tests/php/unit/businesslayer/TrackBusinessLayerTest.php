@@ -275,4 +275,17 @@ class TrackBusinessLayerTest extends TestCase {
 		$this->assertEquals([2], $result['remainingArtists']);
 		$this->assertEquals([$this->userId], $result['affectedUsers']);
 	}
+
+	public function testUpdatePlayCount() {
+		$trackId = 123;
+		$playCount = 42;
+
+		$this->mapper->expects($this->once())
+			->method('updatePlayCount')
+			->with($this->equalTo($trackId), $this->equalTo($this->userId), $this->equalTo($playCount))
+			->will($this->returnValue(true));
+
+		$result = $this->trackBusinessLayer->updatePlayCount($trackId, $this->userId, $playCount);
+		$this->assertTrue($result);
+	}
 }

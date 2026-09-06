@@ -25,6 +25,7 @@ return ['routes' => [
 	['name' => 'scrobbler#handleToken', 'url' => '/api/scrobbler/handleToken', 'verb' => 'GET'],
 	['name' => 'scrobbler#clearSession', 'url' => '/api/scrobbler/clearSession', 'verb' => 'POST'],
 	['name' => 'scrobbler#setToken', 'url' => '/api/scrobbler/setToken', 'verb' => 'POST'],
+	['name' => 'scrobbler#syncLastfmCounts', 'url' => '/api/scrobbler/syncLastfmCounts', 'verb' => 'POST'],
 
 	// Log
 	['name' => 'log#log', 'url' => '/api/log', 'verb' => 'POST'],

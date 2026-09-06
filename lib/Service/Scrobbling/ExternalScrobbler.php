@@ -59,6 +59,10 @@ class ExternalScrobbler implements IScrobbler {
 		$sessionValue = (string)$xml->session->key;
 
 		$this->saveApiSession($userId, $sessionValue);
+
+		if (isset($xml->session->name)) {
+			$this->config->setUserValue($userId, $this->appName, $this->identifier . '.username', (string)$xml->session->name);
+		}
 	}
 
 	/**
@@ -67,6 +71,7 @@ class ExternalScrobbler implements IScrobbler {
 	public function clearSession(string $userId) : void {
 		try {
 			$this->config->deleteUserValue($userId, $this->appName, $this->identifier . '.scrobbleSessionKey');
+			$this->config->deleteUserValue($userId, $this->appName, $this->identifier . '.username');
 		} catch (\InvalidArgumentException $e) {
 			$this->logger->error(
 				'Could not delete user config "' . $this->identifier . '.scrobbleSessionKey". ' . $e->getMessage()
@@ -82,6 +87,31 @@ class ExternalScrobbler implements IScrobbler {
 		}
 		$key = $this->crypto->decrypt($encryptedKey, $userId . $this->config->getSystemValue('secret'));
 		return $key;
+	}
+
+	public function getUsername(string $userId) : ?string {
+		$username = $this->config->getUserValue($userId, $this->appName, $this->identifier . '.username');
+		if (!empty($username)) {
+			return $username;
+		}
+
+		$sessionKey = $this->getApiSession($userId);
+		if (!$sessionKey) {
+			return null;
+		}
+
+		try {
+			$xml = $this->execRequest($this->generateMethodParams('user.getInfo', ['sk' => $sessionKey]));
+			if ($xml && (string)$xml['status'] === 'ok' && isset($xml->user->name)) {
+				$username = (string)$xml->user->name;
+				$this->config->setUserValue($userId, $this->appName, $this->identifier . '.username', $username);
+				return $username;
+			}
+		} catch (\Throwable $e) {
+			$this->logger->warning("Could not fetch {$this->name} username: " . $e->getMessage());
+		}
+
+		return null;
 	}
 
 	public function getName() : string {
@@ -171,6 +201,60 @@ class ExternalScrobbler implements IScrobbler {
 
 		if ((string)$xml['status'] !== 'ok') {
 			$this->logger->warning("Failed to set now playing track on {$this->name}, error: {$xml->error['code']} '{$xml->error}'");
+		}
+	}
+
+	public function loveTrack(Track $track, ?string $userId = null) : void {
+		$userId = $userId ?? $track->getUserId();
+		$sessionKey = $this->getApiSession($userId);
+		if (!$sessionKey) {
+			return;
+		}
+
+		if (empty($track->getArtistName()) || empty($track->getTitle())) {
+			$this->logger->info("Skip loving track {$track->getId()} with empty title or artist on {$this->name}");
+			return;
+		}
+
+		$params = [
+			'sk'     => $sessionKey,
+			'artist' => $track->getArtistName(),
+			'track'  => $track->getTitle(),
+		];
+
+		$xml = $this->execRequest($this->generateMethodParams('track.love', $params));
+
+		if ($xml === null) {
+			$this->logger->warning("Failed to love track on {$this->name}: empty or invalid response");
+		} elseif ((string)$xml['status'] !== 'ok') {
+			$this->logger->warning("Failed to love track on {$this->name}, error: {$xml->error['code']} '{$xml->error}'");
+		}
+	}
+
+	public function unloveTrack(Track $track, ?string $userId = null) : void {
+		$userId = $userId ?? $track->getUserId();
+		$sessionKey = $this->getApiSession($userId);
+		if (!$sessionKey) {
+			return;
+		}
+
+		if (empty($track->getArtistName()) || empty($track->getTitle())) {
+			$this->logger->info("Skip unloving track {$track->getId()} with empty title or artist on {$this->name}");
+			return;
+		}
+
+		$params = [
+			'sk'     => $sessionKey,
+			'artist' => $track->getArtistName(),
+			'track'  => $track->getTitle(),
+		];
+
+		$xml = $this->execRequest($this->generateMethodParams('track.unlove', $params));
+
+		if ($xml === null) {
+			$this->logger->warning("Failed to unlove track on {$this->name}: empty or invalid response");
+		} elseif ((string)$xml['status'] !== 'ok') {
+			$this->logger->warning("Failed to unlove track on {$this->name}, error: {$xml->error['code']} '{$xml->error}'");
 		}
 	}
 

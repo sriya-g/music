@@ -25,4 +25,8 @@ interface IScrobbler {
 
 	/** @see self::recordTrackPlayed for the parameters */
 	public function setNowPlaying(Track $track, ?\DateTime $timeOfPlay = null, ?string $client = null) : void;
+
+	public function loveTrack(Track $track, ?string $userId = null) : void;
+
+	public function unloveTrack(Track $track, ?string $userId = null) : void;
 }

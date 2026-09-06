@@ -47,4 +47,24 @@ class AggregateScrobbler implements IScrobbler {
 			}
 		}
 	}
+
+	public function loveTrack(Track $track, ?string $userId = null): void {
+		foreach ($this->scrobblers as $scrobbler) {
+			try {
+				$scrobbler->loveTrack($track, $userId);
+			} catch (\Throwable $e) {
+				$this->logger->error('Error loving track on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
+			}
+		}
+	}
+
+	public function unloveTrack(Track $track, ?string $userId = null): void {
+		foreach ($this->scrobblers as $scrobbler) {
+			try {
+				$scrobbler->unloveTrack($track, $userId);
+			} catch (\Throwable $e) {
+				$this->logger->error('Error unloving track on scrobbler ' . ($scrobbler instanceof ExternalScrobbler ? $scrobbler->getIdentifier() : \get_class($scrobbler)) . ': ' . $e->getMessage());
+			}
+		}
+	}
 }

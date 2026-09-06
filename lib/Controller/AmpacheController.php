@@ -1361,6 +1361,18 @@ class AmpacheController extends ApiController {
 		}
 
 		if ($modifiedCount > 0) {
+			if ($type === 'song') {
+				try {
+					$track = $this->trackBusinessLayer->find($id, $userId);
+					if ($flag) {
+						$this->scrobbler->loveTrack($track, $userId);
+					} else {
+						$this->scrobbler->unloveTrack($track, $userId);
+					}
+				} catch (\Throwable $e) {
+					// Scrobbling error should not fail the flag request
+				}
+			}
 			return ['success' => $message];
 		} else {
 			throw new AmpacheException("The $type $id was not found", 404);

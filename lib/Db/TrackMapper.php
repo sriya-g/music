@@ -581,6 +581,23 @@ class TrackMapper extends BaseMapper {
 	}
 
 	/**
+	 * Update play count of a track directly.
+	 * @return bool true if the track was found and updated, false otherwise
+	 */
+	public function updatePlayCount(int $trackId, string $userId, int $playCount) : bool {
+		$sql = 'UPDATE `*PREFIX*music_tracks`
+				SET `play_count` = ?
+				WHERE `user_id` = ? AND `id` = ?';
+		$params = [$playCount, $userId, $trackId];
+
+		$result = $this->execute($sql, $params);
+		$updated = ($result->rowCount() > 0);
+		$result->closeCursor();
+
+		return $updated;
+	}
+
+	/**
 	 * Marks tracks as dirty, ultimately requesting the user to rescan them
 	 * @param int[] $fileIds file IDs of the tracks to mark as dirty
 	 * @param string[]|null $userIds the target users; if omitted, the tracks matching the

@@ -776,6 +776,15 @@ class SubsonicController extends ApiController {
 		$this->podcastChannelBusinessLayer->setStarred($targetIds['podcast_channels'], $userId);
 		$this->podcastEpisodeBusinessLayer->setStarred($targetIds['podcast_episodes'], $userId);
 
+		foreach ($targetIds['tracks'] as $trackId) {
+			try {
+				$track = $this->trackBusinessLayer->find($trackId, $userId);
+				$this->scrobbler->loveTrack($track, $userId);
+			} catch (\Throwable $e) {
+				$this->logger->warning("Failed to love track {$trackId} on scrobblers: " . $e->getMessage());
+			}
+		}
+
 		return [];
 	}
 
@@ -789,6 +798,15 @@ class SubsonicController extends ApiController {
 		$this->artistBusinessLayer->unsetStarred($targetIds['artists'], $userId);
 		$this->podcastChannelBusinessLayer->unsetStarred($targetIds['podcast_channels'], $userId);
 		$this->podcastEpisodeBusinessLayer->unsetStarred($targetIds['podcast_episodes'], $userId);
+
+		foreach ($targetIds['tracks'] as $trackId) {
+			try {
+				$track = $this->trackBusinessLayer->find($trackId, $userId);
+				$this->scrobbler->unloveTrack($track, $userId);
+			} catch (\Throwable $e) {
+				$this->logger->warning("Failed to unlove track {$trackId} on scrobblers: " . $e->getMessage());
+			}
+		}
 
 		return [];
 	}

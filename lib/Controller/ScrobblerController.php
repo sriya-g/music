@@ -141,6 +141,34 @@ class ScrobblerController extends Controller {
 			: new JSONResponse(['error' => ['message' => $error]]);
 	}
 
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function syncLastfmCounts(
+		?string $username = null,
+		string $period = 'overall',
+		int $limit = 5000,
+		bool $createPlaylist = false
+	) : JSONResponse {
+		if (!$this->userId) {
+			return new JSONResponse(['error' => ['message' => $this->l10n->t('Not logged in')]], 401);
+		}
+
+		$lastfmService = \OC::$server->query(\OCA\Music\Service\LastfmService::class);
+		$result = $lastfmService->syncUserListenCounts(
+			$this->userId,
+			$username,
+			$period,
+			$limit,
+			$createPlaylist
+		);
+
+		if (!$result['success']) {
+			return new JSONResponse(['error' => ['message' => $result['message'] ?? 'Sync failed']], 400);
+		}
+
+		return new JSONResponse($result);
+	}
+
 	private function getExternalScrobbler(?string $serviceIdentifier) : ?ExternalScrobbler {
 		foreach ($this->externalScrobblers as $scrobbler) {
 			if ($scrobbler->getIdentifier() === $serviceIdentifier) {

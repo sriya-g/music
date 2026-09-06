@@ -18,6 +18,7 @@ use OCA\Files\Event\LoadAdditionalScriptsEvent;
 use OCA\Files_Sharing\Event\BeforeTemplateRenderedEvent;
 use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\BusinessLayer\AlbumBusinessLayer;
+use OCA\Music\BusinessLayer\ArtistBusinessLayer;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Dashboard\MusicWidget;
 use OCA\Music\Event\FileEventListener;
@@ -202,6 +203,7 @@ class Application extends App implements IBootstrap {
 					$this->get(Logger::class),
 					$this->get(IURLGenerator::class),
 					$this->get(AlbumBusinessLayer::class),
+					$this->get(ArtistBusinessLayer::class),
 					$this->get(ICrypto::class),
 					$this->get('appName')
 				)

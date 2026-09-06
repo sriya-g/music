@@ -372,6 +372,33 @@ angular.module('Music').controller('SettingsViewController', [
 							}, errHandler);
 					};
 				}
+
+				if (scrobbler.identifier === 'lastfm') {
+					scrobbler.syncLastfmCounts = function() {
+						scrobbler.syncing = true;
+						scrobbler.syncResult = '';
+						Restangular.all('scrobbler/syncLastfmCounts')
+							.post({createPlaylist: true})
+							.then(function(data) {
+								$timeout(function() {
+									scrobbler.syncing = false;
+									if (data?.success) {
+										scrobbler.syncResult = gettextCatalog.getString('Synced {{updated}} listen counts from Last.fm', {updated: data.updated});
+										OCA.Music.Dialogs.showNotification(
+											gettextCatalog.getString('Successfully updated {{updated}} track listen counts from Last.fm', {updated: data.updated})
+										);
+									} else {
+										scrobbler.syncResult = data?.message || gettextCatalog.getString('Sync failed');
+									}
+								});
+							}, function(error) {
+								$timeout(function() {
+									scrobbler.syncing = false;
+									scrobbler.syncResult = error?.data?.error?.message || error?.data?.message || gettextCatalog.getString('Sync failed');
+								});
+							});
+					};
+				}
 			});
 		}
 

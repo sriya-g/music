@@ -232,6 +232,11 @@
 			</div>
 			<button ng-show="scrobbler.configured" ng-disabled="scrobbler.hasSession" ng-click="scrobbler.generateScrobbleSession()" translate>Connect</button>
 			<button ng-show="scrobbler.configured" ng-disabled="!scrobbler.hasSession" ng-click="scrobbler.clearScrobbleSession()" translate>Disconnect</button>
+			<div ng-if="scrobbler.identifier === 'lastfm' && scrobbler.hasSession" style="margin-top: 10px;">
+				<button ng-click="scrobbler.syncLastfmCounts()" ng-disabled="scrobbler.syncing" translate>Sync listen counts from Last.fm</button>
+				<span class="icon-loading-small operation-in-progress" ng-show="scrobbler.syncing"></span>
+				<span ng-show="scrobbler.syncResult" style="margin-left: 10px;">{{ scrobbler.syncResult }}</span>
+			</div>
 		</div>
 		<div ng-if="scrobbler.identifier === 'listenbrainz'">
 			<div>

@@ -262,6 +262,13 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	}
 
 	/**
+	 * Update the play count of a track
+	 */
+	public function updatePlayCount(int $trackId, string $userId, int $playCount) : bool {
+		return $this->mapper->updatePlayCount($trackId, $userId, $playCount);
+	}
+
+	/**
 	 * Save the track to config as the "now playing" track with the provided timestamp
 	 * @param ?string $client Name of the application reporting the play, when it is known
 	 */
@@ -272,6 +279,14 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 			'client'     => $client
 		];
 		$this->cache->set($track->getUserId(), 'nowPlaying', \json_encode($data));
+	}
+
+	public function loveTrack(Track $track, ?string $userId = null) : void {
+		// No-op for local track business layer as starring is handled separately via setStarred()
+	}
+
+	public function unloveTrack(Track $track, ?string $userId = null) : void {
+		// No-op for local track business layer as starring is handled separately via unsetStarred()
 	}
 
 	/**
