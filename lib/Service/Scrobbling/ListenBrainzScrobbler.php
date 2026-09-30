@@ -195,30 +195,30 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		$additionalInfo['submission_client'] = 'Nextcloud Music';
 		$additionalInfo['submission_client_version'] = \OCA\Music\Utility\AppInfo::getVersion();
 
-		// MusicBrainz IDs
-		if (!empty($track->getMbid())) {
-			$additionalInfo['recording_mbid'] = $track->getMbid();
+		// MusicBrainz IDs (include only valid UUIDs; if missing or invalid, fall back to string metadata)
+		if (self::isValidMbid($track->getMbid())) {
+			$additionalInfo['recording_mbid'] = \trim((string)$track->getMbid());
 		}
-		if (!empty($track->getMbidRelTrack())) {
-			$additionalInfo['track_mbid'] = $track->getMbidRelTrack();
+		if (self::isValidMbid($track->getMbidRelTrack())) {
+			$additionalInfo['track_mbid'] = \trim((string)$track->getMbidRelTrack());
 		}
 		if ($album !== null) {
-			if (!empty($album->getMbid())) {
-				$additionalInfo['release_mbid'] = $album->getMbid();
+			if (self::isValidMbid($album->getMbid())) {
+				$additionalInfo['release_mbid'] = \trim((string)$album->getMbid());
 			}
-			if (!empty($album->getMbidGroup())) {
-				$additionalInfo['release_group_mbid'] = $album->getMbidGroup();
+			if (self::isValidMbid($album->getMbidGroup())) {
+				$additionalInfo['release_group_mbid'] = \trim((string)$album->getMbidGroup());
 			}
 		}
 
 		$artistMbid = null;
-		if ($track->getArtist() !== null && !empty($track->getArtist()->getMbid())) {
-			$artistMbid = $track->getArtist()->getMbid();
+		if ($track->getArtist() !== null && self::isValidMbid($track->getArtist()->getMbid())) {
+			$artistMbid = \trim((string)$track->getArtist()->getMbid());
 		} elseif (!empty($track->getArtistId())) {
 			try {
 				$artist = $this->artistBusinessLayer->find($track->getArtistId(), $userId);
-				if ($artist !== null && !empty($artist->getMbid())) {
-					$artistMbid = $artist->getMbid();
+				if ($artist !== null && self::isValidMbid($artist->getMbid())) {
+					$artistMbid = \trim((string)$artist->getMbid());
 				}
 			} catch (\Throwable $e) {
 				// Artist lookup failed or not found, proceed without artist MBID
@@ -253,12 +253,12 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		}
 
 		$recordingMbid = $track->getMbid();
-		if (empty($recordingMbid)) {
+		if (!self::isValidMbid($recordingMbid)) {
 			$recordingMbid = $this->lookupRecordingMbid($track->getTitle(), $track->getArtistName(), $sessionKey);
 		}
 
-		if (empty($recordingMbid)) {
-			$this->logger->warning("Could not determine recording MBID for track '{$track->getTitle()}' by '{$track->getArtistName()}' to submit feedback to ListenBrainz");
+		if (!self::isValidMbid($recordingMbid)) {
+			$this->logger->warning("Could not determine valid recording MBID for track '{$track->getTitle()}' by '{$track->getArtistName()}' to submit feedback to ListenBrainz");
 			return;
 		}
 
@@ -321,18 +321,76 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		}
 
 		$data = \json_decode((string)$responseString, true);
-		if (isset($data['recording_mbid']) && !empty($data['recording_mbid'])) {
+		if (isset($data['recording_mbid']) && self::isValidMbid((string)$data['recording_mbid'])) {
 			return (string)$data['recording_mbid'];
 		}
 
 		return null;
 	}
 
-	private function submitListen(string $sessionKey, array $payloadData) : void {
+	private const MBID_KEYS = [
+		'recording_mbid',
+		'track_mbid',
+		'release_mbid',
+		'release_group_mbid',
+		'artist_mbids',
+		'work_mbids',
+	];
+
+	public static function isValidMbid(?string $mbid) : bool {
+		if ($mbid === null || $mbid === '') {
+			return false;
+		}
+		$trimmed = \trim($mbid);
+		if ($trimmed === '00000000-0000-0000-0000-000000000000') {
+			return false;
+		}
+		return \preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $trimmed) === 1;
+	}
+
+	public function hasMbidsInPayload(array $payloadData) : bool {
+		if (!isset($payloadData['payload']) || !\is_array($payloadData['payload'])) {
+			return false;
+		}
+		foreach ($payloadData['payload'] as $item) {
+			$additionalInfo = $item['track_metadata']['additional_info'] ?? [];
+			if (\is_array($additionalInfo)) {
+				foreach (self::MBID_KEYS as $key) {
+					if (!empty($additionalInfo[$key])) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	public function stripMbidsFromPayload(array $payloadData) : array {
+		if (!isset($payloadData['payload']) || !\is_array($payloadData['payload'])) {
+			return $payloadData;
+		}
+		foreach ($payloadData['payload'] as $idx => $item) {
+			if (isset($item['track_metadata']['additional_info']) && \is_array($item['track_metadata']['additional_info'])) {
+				foreach (self::MBID_KEYS as $key) {
+					unset($payloadData['payload'][$idx]['track_metadata']['additional_info'][$key]);
+				}
+				if (empty($payloadData['payload'][$idx]['track_metadata']['additional_info'])) {
+					unset($payloadData['payload'][$idx]['track_metadata']['additional_info']);
+				}
+			}
+		}
+		return $payloadData;
+	}
+
+	/**
+	 * @param array<string, mixed> $payloadData
+	 * @return array{0: int, 1: string|false, 2: string}
+	 */
+	protected function execSubmitListen(string $sessionKey, array $payloadData) : array {
 		$ch = \curl_init();
 		if (!$ch) {
 			$this->logger->error('Failed to initialize a curl handle, is the php curl extension installed?');
-			return;
+			return [0, false, 'Unable to initialize a curl handle'];
 		}
 		\curl_setopt($ch, \CURLOPT_URL, 'https://api.listenbrainz.org/1/submit-listens');
 		\curl_setopt($ch, \CURLOPT_CONNECTTIMEOUT, 10);
@@ -345,9 +403,22 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		]);
 		\curl_setopt($ch, \CURLOPT_POSTFIELDS, \json_encode($payloadData));
 		$responseString = \curl_exec($ch);
-		$httpCode = \curl_getinfo($ch, \CURLINFO_HTTP_CODE);
+		$httpCode = (int)\curl_getinfo($ch, \CURLINFO_HTTP_CODE);
 		$curlError = \curl_error($ch);
 		\curl_close($ch);
+
+		return [$httpCode, $responseString, $curlError];
+	}
+
+	protected function submitListen(string $sessionKey, array $payloadData) : void {
+		[$httpCode, $responseString, $curlError] = $this->execSubmitListen($sessionKey, $payloadData);
+
+		// If submission failed and payload contained MBIDs, fall back to scrobbling with only track title/artist/album strings
+		if (($responseString === false || $httpCode !== 200) && $this->hasMbidsInPayload($payloadData)) {
+			$this->logger->info("ListenBrainz rejected listen with MBIDs (HTTP {$httpCode}: {$responseString}). Retrying without MBIDs, falling back to title/artist/album strings.");
+			$fallbackPayload = $this->stripMbidsFromPayload($payloadData);
+			[$httpCode, $responseString, $curlError] = $this->execSubmitListen($sessionKey, $fallbackPayload);
+		}
 
 		if ($responseString === false || $httpCode !== 200) {
 			$this->logger->warning("Failed to submit listen to ListenBrainz. HTTP Code: {$httpCode}, cURL Error: {$curlError}, Response: " . (string)$responseString);
