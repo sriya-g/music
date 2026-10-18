@@ -26,7 +26,7 @@ use OCP\IConfig;
 
 class LastfmService {
 
-	private const LASTFM_URL = 'http://ws.audioscrobbler.com/2.0/';
+	private const LASTFM_URL = 'https://ws.audioscrobbler.com/2.0/';
 
 	private string $apiKey;
 
@@ -296,6 +296,17 @@ class LastfmService {
 			}
 		};
 
+		@\set_time_limit(300);
+
+		$apiKey = $this->getApiKey();
+		if (empty($apiKey)) {
+			$log("Last.fm API key is not configured");
+			return [
+				'success' => false,
+				'message' => "Last.fm API key is not configured. Please set 'music.lastfm_api_key' in your Nextcloud config."
+			];
+		}
+
 		if (empty($username)) {
 			// Try getting username from config
 			$username = $this->config->getUserValue($userId, 'music', 'lastfm.username');
@@ -303,12 +314,31 @@ class LastfmService {
 
 		if (empty($username)) {
 			// Try getting from ExternalScrobbler
-			$app = \OC::$server->query(\OCA\Music\AppInfo\Application::class);
-			$scrobblers = $app->get('externalScrobblers');
-			foreach ($scrobblers as $scrobbler) {
-				if ($scrobbler instanceof Scrobbling\ExternalScrobbler && $scrobbler->getIdentifier() === 'lastfm') {
-					$username = $scrobbler->getUsername($userId);
-					break;
+			try {
+				/** @var \OCA\Music\AppInfo\Application $app */
+				$app = \OC::$server->query(\OCA\Music\AppInfo\Application::class);
+				$scrobblers = $app->get('externalScrobblers');
+				if (\is_array($scrobblers)) {
+					foreach ($scrobblers as $scrobbler) {
+						if ($scrobbler instanceof Scrobbling\ExternalScrobbler && $scrobbler->getIdentifier() === 'lastfm') {
+							$username = $scrobbler->getUsername($userId);
+							break;
+						}
+					}
+				}
+			} catch (\Throwable) {
+				try {
+					$scrobblers = \OC::$server->query('externalScrobblers');
+					if (\is_array($scrobblers)) {
+						foreach ($scrobblers as $scrobbler) {
+							if ($scrobbler instanceof Scrobbling\ExternalScrobbler && $scrobbler->getIdentifier() === 'lastfm') {
+								$username = $scrobbler->getUsername($userId);
+								break;
+							}
+						}
+					}
+				} catch (\Throwable) {
+					// Fallback failed
 				}
 			}
 		}
@@ -410,6 +440,17 @@ class LastfmService {
 				];
 			}
 
+			if (isset($response['connection_ok']) && $response['connection_ok'] === false) {
+				$statusCode = $response['status_code'] ?? 0;
+				$statusMsg = $response['status_msg'] ?? 'Unknown network error';
+				$errorMsg = "HTTP {$statusCode}: {$statusMsg}";
+				$log("Last.fm connection error: {$errorMsg}");
+				return [
+					'success' => false,
+					'message' => "Failed to connect to Last.fm ({$errorMsg})"
+				];
+			}
+
 			$tracks = $response['toptracks']['track'] ?? [];
 			if (empty($tracks)) {
 				break;
@@ -483,6 +524,13 @@ class LastfmService {
 			if (isset($lovedResponse['error'])) {
 				$errorMsg = $lovedResponse['message'] ?? "Error code {$lovedResponse['error']}";
 				$log("Last.fm API error fetching loved tracks: {$errorMsg}");
+				break;
+			}
+
+			if (isset($lovedResponse['connection_ok']) && $lovedResponse['connection_ok'] === false) {
+				$statusCode = $lovedResponse['status_code'] ?? 0;
+				$statusMsg = $lovedResponse['status_msg'] ?? 'Unknown network error';
+				$log("Last.fm connection error fetching loved tracks: HTTP {$statusCode}: {$statusMsg}");
 				break;
 			}
 

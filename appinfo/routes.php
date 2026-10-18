@@ -50,6 +50,8 @@ return ['routes' => [
 	['name' => 'musicApi#similarArtists',	'url' => '/api/artists/{artistId}/similar',	'verb' => 'GET'],
 	['name' => 'musicApi#albumDetails',		'url' => '/api/albums/{albumId}/details',	'verb' => 'GET'],
 	['name' => 'musicApi#setPlayingTrack',	'url' => '/api/tracks/{trackId}/playing',	'verb' => 'POST'],
+	['name' => 'musicApi#clearPlayingTrack',	'url' => '/api/tracks/{trackId}/playing',	'verb' => 'DELETE'],
+	['name' => 'musicApi#clearPlayingTrack',	'url' => '/api/tracks/playing',			'verb' => 'DELETE'],
 	['name' => 'musicApi#scrobble',			'url' => '/api/tracks/{trackId}/scrobble',	'verb' => 'POST'],
 
 	// Search API

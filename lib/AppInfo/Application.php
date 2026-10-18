@@ -194,8 +194,8 @@ class Application extends App implements IBootstrap {
 					$this->get(ICrypto::class),
 					'Last.fm',
 					'lastfm',
-					'http://ws.audioscrobbler.com/2.0/',
-					'http://www.last.fm/api/auth/',
+					'https://ws.audioscrobbler.com/2.0/',
+					'https://www.last.fm/api/auth/',
 					$this->get('appName')
 				),
 				new ListenBrainzScrobbler(

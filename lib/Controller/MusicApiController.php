@@ -276,14 +276,25 @@ class MusicApiController extends Controller {
 
 	#[NoAdminRequired]
 	#[NoCSRFRequired]
-	public function setPlayingTrack(int $trackId) : JSONResponse {
+	public function setPlayingTrack(int $trackId, ?int $position = null) : JSONResponse {
 		try {
 			$track = $this->trackBusinessLayer->find($trackId, $this->user());
-			$this->scrobbler->setNowPlaying($track, null, 'nc-music');
+			$timeOfPlay = null;
+			if ($position !== null && $position > 0) {
+				$timeOfPlay = new \DateTime('@' . (\time() - $position));
+			}
+			$this->scrobbler->setNowPlaying($track, $timeOfPlay, 'nc-music');
 			return new JSONResponse(['success' => true]);
 		} catch (BusinessLayerException $e) {
 			return new ErrorResponse(Http::STATUS_NOT_FOUND);
 		}
+	}
+
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function clearPlayingTrack(?int $trackId = null) : JSONResponse {
+		$this->trackBusinessLayer->clearNowPlaying($this->user());
+		return new JSONResponse(['success' => true]);
 	}
 
 	#[NoAdminRequired]

@@ -113,12 +113,15 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 	});
 	onPlayerEvent('play', function() {
 		$rootScope.playing = true;
+		publishNowPlaying();
 	});
 	onPlayerEvent('pause', function() {
 		$rootScope.playing = false;
+		clearNowPlaying();
 	});
 	onPlayerEvent('stop', function() {
 		$rootScope.playing = false;
+		clearNowPlaying();
 	});
 
 	function onEnd() {
@@ -156,7 +159,20 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 	function publishNowPlaying() {
 		if ($scope.currentTrack?.type === 'song') {
 			nowPlayingLatestUpdateTime = Date.now();
-			Restangular.one('tracks', $scope.currentTrack.id).all('playing').post();
+			const positionSec = Math.floor(($scope.player.playPosition() || 0) / 1000);
+			Restangular.one('tracks', $scope.currentTrack.id).all('playing').post({position: positionSec});
+		}
+	}
+
+	/**
+	 * Clear the "Now playing" status on the server when playback is paused or stopped.
+	 */
+	function clearNowPlaying() {
+		nowPlayingLatestUpdateTime = null;
+		if ($scope.currentTrack?.id) {
+			Restangular.one('tracks', $scope.currentTrack.id).all('playing').remove();
+		} else {
+			Restangular.one('tracks').all('playing').remove();
 		}
 	}
 

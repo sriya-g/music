@@ -169,7 +169,12 @@ class DiscordPresenceDaemon extends Command {
 					if ($isPlaying) {
 						$notifiedWaiting[$userId] = false;
 						$currentTrackId = $this->discordPresenceService->getCurrentTrackId($userId);
-						if ($currentTrackId !== $track->getId()) {
+						$currentTimeOfPlay = $this->discordPresenceService->getCurrentTimeOfPlay($userId);
+						$needsUpdate = ($currentTrackId !== $track->getId()) ||
+						               ($currentTimeOfPlay === null) ||
+						               (\abs($timeOfPlay - $currentTimeOfPlay) > 5);
+
+						if ($needsUpdate) {
 							$output->writeln(
 								"[" . \date('Y-m-d H:i:s') . "] <info>[{$userId}]</info> Playing: " .
 								"{$track->getTitle()} (ID: {$track->getId()})"

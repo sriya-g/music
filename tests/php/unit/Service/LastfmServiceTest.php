@@ -58,4 +58,35 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 		$this->assertEquals('track feat guest', LastfmService::normalizeStringLoose('Track (feat. Guest Artist)'));
 		$this->assertEquals('dont stop believin', LastfmService::normalizeStringLoose("Don't Stop Believin'"));
 	}
+
+	public function testSyncUserListenCountsMissingApiKey() {
+		$config = $this->getMockBuilder(IConfig::class)->getMock();
+		$config->expects($this->any())
+			->method('getSystemValue')
+			->with('music.lastfm_api_key', '')
+			->will($this->returnValue(''));
+
+		$service = new LastfmService(
+			$config,
+			$this->albumBusinessLayer,
+			$this->artistBusinessLayer,
+			$this->trackBusinessLayer,
+			$this->logger
+		);
+
+		$result = $service->syncUserListenCounts('user1', 'lastfm_user');
+		$this->assertFalse($result['success']);
+		$this->assertStringContainsString('API key', $result['message']);
+	}
+
+	public function testSyncUserListenCountsMissingUsername() {
+		$this->config->expects($this->any())
+			->method('getUserValue')
+			->with('user1', 'music', 'lastfm.username')
+			->will($this->returnValue(null));
+
+		$result = $this->service->syncUserListenCounts('user1', null);
+		$this->assertFalse($result['success']);
+		$this->assertStringContainsString('username', $result['message']);
+	}
 }

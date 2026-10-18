@@ -409,7 +409,14 @@ angular.module('Music').controller('SettingsViewController', [
 							}, function(error) {
 								$timeout(function() {
 									scrobbler.syncing = false;
-									scrobbler.syncResult = error?.data?.error?.message || error?.data?.message || gettextCatalog.getString('Sync failed');
+									var errorMsg = error?.data?.error?.message || error?.data?.message;
+									if (!errorMsg && typeof error?.data === 'string' && error.data.trim().length > 0 && error.data.trim().length < 200) {
+										errorMsg = error.data.trim();
+									}
+									if (!errorMsg && error?.status) {
+										errorMsg = gettextCatalog.getString('Sync failed (HTTP {{status}})', {status: error.status});
+									}
+									scrobbler.syncResult = errorMsg || gettextCatalog.getString('Sync failed');
 								});
 							});
 					};

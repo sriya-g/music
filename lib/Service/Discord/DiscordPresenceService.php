@@ -298,6 +298,7 @@ class DiscordPresenceService {
 		$success = $client->sendOp(3, $payload);
 		if ($success) {
 			$session['currentTrackId'] = $track->getId();
+			$session['timeOfPlay'] = $timeOfPlay;
 			$this->logger?->info("Updated Discord presence for user {$userId}: {$track->getTitle()} by {$artistName}");
 		}
 
@@ -318,6 +319,7 @@ class DiscordPresenceService {
 		]);
 
 		$this->sessions[$userId]['currentTrackId'] = null;
+		$this->sessions[$userId]['timeOfPlay'] = null;
 		$this->logger?->info("Cleared Discord presence for user {$userId}");
 		return $success;
 	}
@@ -380,6 +382,10 @@ class DiscordPresenceService {
 
 	public function getCurrentTrackId(string $userId): ?int {
 		return $this->sessions[$userId]['currentTrackId'] ?? null;
+	}
+
+	public function getCurrentTimeOfPlay(string $userId): ?int {
+		return $this->sessions[$userId]['timeOfPlay'] ?? null;
 	}
 
 	private function processExternalAsset(string $imageUrl, string $clientId, string $token, string $userId): string {

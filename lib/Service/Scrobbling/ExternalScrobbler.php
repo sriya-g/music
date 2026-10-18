@@ -106,6 +106,10 @@ class ExternalScrobbler implements IScrobbler {
 				$username = (string)$xml->user->name;
 				$this->config->setUserValue($userId, $this->appName, $this->identifier . '.username', $username);
 				return $username;
+			} elseif ($xml && (string)$xml['status'] !== 'ok') {
+				$this->logger->warning("Could not fetch {$this->name} username, error: {$xml->error['code']} '{$xml->error}'");
+			} else {
+				$this->logger->warning("Could not fetch {$this->name} username: empty or invalid response");
 			}
 		} catch (\Throwable $e) {
 			$this->logger->warning("Could not fetch {$this->name} username: " . $e->getMessage());
@@ -331,11 +335,13 @@ class ExternalScrobbler implements IScrobbler {
 		}
 		\curl_setopt($ch, \CURLOPT_URL, $this->endpoint);
 		\curl_setopt($ch, \CURLOPT_CONNECTTIMEOUT, 10);
+		\curl_setopt($ch, \CURLOPT_FOLLOWLOCATION, true);
 		\curl_setopt($ch, \CURLOPT_POST, true);
 		\curl_setopt($ch, \CURLOPT_RETURNTRANSFER, true);
 		\curl_setopt($ch, \CURLOPT_POSTFIELDS, \http_build_query($params));
 		/** @var string $xmlString */
 		$xmlString = \curl_exec($ch) ?: '';
+		\curl_close($ch);
 		/** @var \SimpleXMLElement|false $xml */
 		$xml = \simplexml_load_string($xmlString);
 		return $xml ?: null;
