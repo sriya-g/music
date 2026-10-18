@@ -20,6 +20,8 @@ class DiscordGatewayClient {
 	private $socket = null;
 	private string $readBuffer = '';
 	private ?int $lastSequence = null;
+	private ?int $lastCloseCode = null;
+	private string $lastCloseReason = '';
 
 	public function __construct(
 		private ?Logger $logger = null,
@@ -199,7 +201,16 @@ class DiscordGatewayClient {
 				// Ping -> send Pong
 				@\fwrite($this->socket, $this->encodeFrame($rawPayload, 10));
 			} elseif ($opcode === 8) {
-				// Close
+				// Close frame
+				$code = null;
+				$reason = '';
+				if (\strlen($rawPayload) >= 2) {
+					$code = \unpack('n', \substr($rawPayload, 0, 2))[1];
+					$reason = \substr($rawPayload, 2);
+				}
+				$this->lastCloseCode = $code;
+				$this->lastCloseReason = $reason;
+				$this->logger?->warning("Discord gateway closed connection. Code: {$code}, Reason: {$reason}");
 				$this->disconnect();
 				break;
 			} elseif ($opcode === 1) {
@@ -215,6 +226,14 @@ class DiscordGatewayClient {
 		}
 
 		return $messages;
+	}
+
+	public function getLastCloseCode(): ?int {
+		return $this->lastCloseCode;
+	}
+
+	public function getLastCloseReason(): string {
+		return $this->lastCloseReason;
 	}
 
 	public function getLastSequence(): ?int {

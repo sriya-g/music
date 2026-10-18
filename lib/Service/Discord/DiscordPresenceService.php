@@ -27,6 +27,12 @@ class DiscordPresenceService {
 	/** @var array<string, string> */
 	private array $assetCache = [];
 
+	/** @var array<string, string> */
+	private array $lastAuthError = [];
+
+	/** @var array<string, array<string, mixed>|null> */
+	private array $discordUserInfo = [];
+
 	public function __construct(
 		private CoverArtResolver $coverArtResolver,
 		private SpotifyLinkResolver $spotifyLinkResolver,
@@ -47,8 +53,10 @@ class DiscordPresenceService {
 			return true;
 		}
 
+		$this->lastAuthError[$userId] = null;
 		$client = new DiscordGatewayClient($this->logger);
 		if (!$client->connect()) {
+			$this->lastAuthError[$userId] = "Could not establish SSL connection to Discord Gateway";
 			$this->logger?->warning("Could not connect to Discord Gateway for user {$userId}");
 			return false;
 		}
@@ -56,31 +64,71 @@ class DiscordPresenceService {
 		// Wait briefly for Op 10 Hello from Discord
 		$heartbeatInterval = 41250;
 		$startTime = \microtime(true);
+		$gotHello = false;
 		while (\microtime(true) - $startTime < 4.0) {
 			$messages = $client->readMessages();
 			foreach ($messages as $msg) {
 				if (isset($msg['op']) && $msg['op'] === 10 && isset($msg['d']['heartbeat_interval'])) {
 					$heartbeatInterval = (int)$msg['d']['heartbeat_interval'];
+					$gotHello = true;
 					break 2;
 				}
 			}
 			\usleep(50000); // 50ms
 		}
 
-		// Send Op 2 Identify
+		if (!$gotHello) {
+			$code = $client->getLastCloseCode();
+			$reason = $client->getLastCloseReason();
+			$err = $code ? "Gateway closed (Code {$code}: {$reason})" : "Timeout waiting for Hello from Gateway";
+			$this->lastAuthError[$userId] = $err;
+			$this->logger?->warning("Could not connect to Discord Gateway for user {$userId}: {$err}");
+			$client->disconnect();
+			return false;
+		}
+
+		// Send Op 2 Identify (mimicking official Discord client for user token support)
 		$identifyPayload = [
 			'token' => $token,
 			'intents' => 0,
 			'properties' => [
-				'os' => 'linux',
-				'browser' => 'Nextcloud Music',
-				'device' => 'Nextcloud Music',
+				'os' => 'Windows 10',
+				'browser' => 'Discord Client',
+				'device' => 'Discord Client',
 			],
 		];
 
 		if (!$client->sendOp(2, $identifyPayload)) {
+			$this->lastAuthError[$userId] = "Failed to send identify payload";
 			$this->logger?->warning("Failed to send identify payload to Discord for user {$userId}");
 			$client->disconnect();
+			return false;
+		}
+
+		// Wait briefly for Discord's authentication response (READY event or close frame)
+		$startTime = \microtime(true);
+		$authenticated = false;
+		while (\microtime(true) - $startTime < 4.0) {
+			if (!$client->isConnected()) {
+				break;
+			}
+			$messages = $client->readMessages();
+			foreach ($messages as $msg) {
+				if (isset($msg['op']) && $msg['op'] === 0 && ($msg['t'] ?? '') === 'READY') {
+					$authenticated = true;
+					$this->discordUserInfo[$userId] = $msg['d']['user'] ?? null;
+					break 2;
+				}
+			}
+			\usleep(50000); // 50ms
+		}
+
+		if (!$authenticated && !$client->isConnected()) {
+			$code = $client->getLastCloseCode();
+			$reason = $client->getLastCloseReason();
+			$err = $code ? "Authentication failed (Code {$code}: {$reason})" : "Connection closed by Discord after Identify";
+			$this->lastAuthError[$userId] = $err;
+			$this->logger?->error("Discord authentication failed for user {$userId}: {$err}");
 			return false;
 		}
 
@@ -95,7 +143,8 @@ class DiscordPresenceService {
 			'currentTrackId' => null,
 		];
 
-		$this->logger?->info("Discord Gateway session established for user {$userId}");
+		$username = $this->discordUserInfo[$userId]['username'] ?? $userId;
+		$this->logger?->info("Discord Gateway session established for user {$userId} as {$username}");
 		return true;
 	}
 
@@ -186,6 +235,12 @@ class DiscordPresenceService {
 
 		// Process external asset with Discord
 		$largeImage = $this->processExternalAsset($coverArtUrl, $clientId, $token, $userId);
+		if (!\str_starts_with($largeImage, 'mp:') && !empty($coverArtUrl) && $coverArtUrl !== CoverArtResolver::DEFAULT_FALLBACK_IMAGE) {
+			$largeImage = $this->processExternalAsset(CoverArtResolver::DEFAULT_FALLBACK_IMAGE, $clientId, $token, $userId);
+		}
+		if (!\str_starts_with($largeImage, 'mp:')) {
+			$largeImage = ''; // Discord Gateway rejects raw URLs in assets.large_image
+		}
 
 		$duration = $track->getLength();
 		if ($duration <= 0) {
@@ -252,6 +307,20 @@ class DiscordPresenceService {
 		$this->sessions[$userId]['currentTrackId'] = null;
 		$this->logger?->info("Cleared Discord presence for user {$userId}");
 		return $success;
+	}
+
+	public function sendRawPresence(string $userId, array $activity): bool {
+		if (!$this->isUserConnected($userId)) {
+			return false;
+		}
+
+		$client = $this->sessions[$userId]['client'];
+		return $client->sendOp(3, [
+			'since' => \time() * 1000,
+			'activities' => [$activity],
+			'status' => 'online',
+			'afk' => false,
+		]);
 	}
 
 	public function tickUser(string $userId): void {
@@ -351,7 +420,15 @@ class DiscordPresenceService {
 			}
 		}
 
-		return $imageUrl;
+		return '';
+	}
+
+	public function getLastAuthError(string $userId): ?string {
+		return $this->lastAuthError[$userId] ?? null;
+	}
+
+	public function getDiscordUserInfo(string $userId): ?array {
+		return $this->discordUserInfo[$userId] ?? null;
 	}
 
 	private function truncateText(string $text, int $maxLength): string {

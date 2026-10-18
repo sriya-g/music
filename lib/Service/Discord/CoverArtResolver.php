@@ -19,7 +19,7 @@ use OCA\Music\Db\Track;
 
 class CoverArtResolver {
 
-	public const DEFAULT_FALLBACK_IMAGE = 'https://raw.githubusercontent.com/nc-music/music/master/img/music.svg';
+	public const DEFAULT_FALLBACK_IMAGE = 'https://raw.githubusercontent.com/nextcloud/server/master/core/img/logo/logo.png';
 
 	/** @var array<string, string> In-memory cache for fast lookups */
 	private array $memoryCache = [];
