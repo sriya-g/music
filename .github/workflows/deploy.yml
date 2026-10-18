@@ -25,11 +25,15 @@ jobs:
           script: |
             set -e
             echo "==> Updating Music app..."
-            cd /var/lib/docker/volumes/nextcloud_aio_nextcloud/_data/custom_apps/music
+            # Fetch latest commits and reset to clean state using docker container
+            docker run --rm \
+              -v nextcloud_aio_nextcloud:/volume \
+              -w /volume/custom_apps/music \
+              alpine/git \
+              sh -c "git config --global --add safe.directory /volume/custom_apps/music && git fetch origin listenbrainz-support && git reset --hard origin/listenbrainz-support"
 
-            # Fetch latest commits and reset to clean state
-            git fetch origin listenbrainz-support
-            git reset --hard origin/listenbrainz-support
+            # Ensure proper www-data ownership
+            docker exec nextcloud-aio-nextcloud chown -R www-data:www-data /var/www/html/custom_apps/music
 
             # Complete any pending app migrations/upgrades and enable
             docker exec --user www-data nextcloud-aio-nextcloud php occ upgrade --no-interaction
