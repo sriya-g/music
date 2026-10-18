@@ -52,4 +52,19 @@ class TrackTest extends \PHPUnit\Framework\TestCase {
 			'uri'     => 'someUrl'
 		], $track->toShivaApi($this->urlGenerator, $this->l10n));
 	}
+
+	public function testSetStarred() {
+		$track = new Track();
+		$this->assertNull($track->getStarred());
+
+		$date = new \DateTime('2026-10-18 12:00:00');
+		$track->setStarred($date);
+		$this->assertEquals('2026-10-18 12:00:00', $track->getStarred());
+
+		$track->setStarred('2026-10-18 13:00:00');
+		$this->assertEquals('2026-10-18 13:00:00', $track->getStarred());
+
+		$track->setStarred(null);
+		$this->assertNull($track->getStarred());
+	}
 }
