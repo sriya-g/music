@@ -31,9 +31,11 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\UseSession;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\HintException;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IURLGenerator;
+use OCP\Security\ICrypto;
 use OCP\Security\ISecureRandom;
 
 class SettingController extends Controller {
@@ -58,6 +60,8 @@ class SettingController extends Controller {
 		private Logger $logger,
 		private array $externalScrobblers,
 		private IL10N $l10n,
+		private IConfig $config,
+		private ICrypto $crypto,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -117,8 +121,71 @@ class SettingController extends Controller {
 			'ampacheKeys'     => $this->ampacheUserMapper->getAll($this->user()),
 			'appVersion'      => AppInfo::getVersion(),
 			'user'            => $this->user(),
-			'scrobblers'      => $this->getScrobbleAuth()
+			'scrobblers'      => $this->getScrobbleAuth(),
+			'discord'         => $this->getDiscordSettings(),
 		]);
+	}
+
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function saveDiscordSettings(
+		string $clientId = '',
+		string $userToken = '',
+		bool $caaEnabled = true,
+		string $activityName = 'Default',
+		string $customActivityName = 'Nextcloud Music',
+		bool $spotifyLinks = false,
+	) : JSONResponse {
+		$userId = $this->user();
+		$this->config->setUserValue($userId, 'music', 'discord.clientId', \trim($clientId));
+
+		if (!empty(\trim($userToken))) {
+			$encryptedToken = $this->crypto->encrypt(\trim($userToken), $userId . $this->config->getSystemValue('secret'));
+			$this->config->setUserValue($userId, 'music', 'discord.userToken', $encryptedToken);
+		}
+
+		$this->config->setUserValue($userId, 'music', 'discord.caaEnabled', $caaEnabled ? 'true' : 'false');
+		$this->config->setUserValue($userId, 'music', 'discord.activityName', $activityName);
+		$this->config->setUserValue($userId, 'music', 'discord.customActivityName', $customActivityName);
+		$this->config->setUserValue($userId, 'music', 'discord.spotifyLinks', $spotifyLinks ? 'true' : 'false');
+
+		return new JSONResponse([
+			'success' => true,
+			'discord' => $this->getDiscordSettings(),
+		]);
+	}
+
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function clearDiscordSettings() : JSONResponse {
+		$userId = $this->user();
+		$this->config->deleteUserValue($userId, 'music', 'discord.clientId');
+		$this->config->deleteUserValue($userId, 'music', 'discord.userToken');
+		$this->config->deleteUserValue($userId, 'music', 'discord.caaEnabled');
+		$this->config->deleteUserValue($userId, 'music', 'discord.activityName');
+		$this->config->deleteUserValue($userId, 'music', 'discord.customActivityName');
+		$this->config->deleteUserValue($userId, 'music', 'discord.spotifyLinks');
+
+		return new JSONResponse([
+			'success' => true,
+			'discord' => $this->getDiscordSettings(),
+		]);
+	}
+
+	private function getDiscordSettings() : array {
+		$userId = $this->user();
+		$clientId = (string)$this->config->getUserValue($userId, 'music', 'discord.clientId', '');
+		$hasToken = !empty($this->config->getUserValue($userId, 'music', 'discord.userToken', ''));
+
+		return [
+			'configured'         => !empty($clientId) && $hasToken,
+			'clientId'           => $clientId,
+			'hasToken'           => $hasToken,
+			'caaEnabled'         => $this->config->getUserValue($userId, 'music', 'discord.caaEnabled', 'true') === 'true',
+			'activityName'       => (string)$this->config->getUserValue($userId, 'music', 'discord.activityName', 'Default'),
+			'customActivityName' => (string)$this->config->getUserValue($userId, 'music', 'discord.customActivityName', 'Nextcloud Music'),
+			'spotifyLinks'       => $this->config->getUserValue($userId, 'music', 'discord.spotifyLinks', 'false') === 'true',
+		];
 	}
 
 	#[NoAdminRequired]

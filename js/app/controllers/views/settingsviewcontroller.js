@@ -417,6 +417,53 @@ angular.module('Music').controller('SettingsViewController', [
 			});
 		}
 
+		function initDiscordConfig(discordSettings) {
+			$scope.discordConfig = {
+				clientId: discordSettings?.clientId || '',
+				userToken: '',
+				caaEnabled: discordSettings?.caaEnabled ?? true,
+				activityName: discordSettings?.activityName || 'Default',
+				customActivityName: discordSettings?.customActivityName || 'Nextcloud Music',
+				spotifyLinks: discordSettings?.spotifyLinks ?? false,
+			};
+		}
+
+		$scope.saveDiscordSettings = function() {
+			$scope.discordSaving = true;
+			$scope.discordMessage = '';
+			Restangular.all('settings/discord').post($scope.discordConfig).then(function(res) {
+				$scope.discordSaving = false;
+				if (res?.success) {
+					$scope.settings.discord = res.discord;
+					$scope.discordConfig.userToken = '';
+					$scope.discordMessage = gettextCatalog.getString('Discord settings saved successfully');
+					OCA.Music.Dialogs.showNotification(gettextCatalog.getString('Discord settings saved successfully'));
+				} else {
+					$scope.discordMessage = gettextCatalog.getString('Failed to save Discord settings');
+				}
+			}, function(err) {
+				$scope.discordSaving = false;
+				$scope.discordMessage = err?.data?.message || gettextCatalog.getString('Failed to save Discord settings');
+			});
+		};
+
+		$scope.clearDiscordSettings = function() {
+			$scope.discordSaving = true;
+			$scope.discordMessage = '';
+			Restangular.all('settings/discord').remove().then(function(res) {
+				$scope.discordSaving = false;
+				if (res?.success) {
+					$scope.settings.discord = res.discord;
+					initDiscordConfig(res.discord);
+					$scope.discordMessage = gettextCatalog.getString('Discord disconnected');
+					OCA.Music.Dialogs.showNotification(gettextCatalog.getString('Discord disconnected'));
+				}
+			}, function(err) {
+				$scope.discordSaving = false;
+				$scope.discordMessage = err?.data?.message || gettextCatalog.getString('Failed to disconnect Discord');
+			});
+		};
+
 		$scope.copyToClipboard = function(elementId) {
 			let range = document.createRange();
 			range.selectNode(document.getElementById(elementId));
@@ -439,6 +486,7 @@ angular.module('Music').controller('SettingsViewController', [
 				savedExcludedPaths = _.clone(value.excludedPaths);
 				$scope.ignoredArticles = value.ignoredArticles.join(' ');
 				setupScrobblerActions($scope.settings.scrobblers);
+				initDiscordConfig($scope.settings.discord);
 				$rootScope.$emit('viewActivated', THIS_VIEW_ID);
 			});
 		});

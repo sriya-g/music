@@ -147,6 +147,8 @@ return ['routes' => [
 	['name' => 'setting#removeUserKey',		'url' => '/api/settings/user/keys/{id}',			'verb' => 'DELETE'],
 	['name' => 'setting#createUserKeyCors',	'url' => '/api/settings/userkey/generate',			'verb' => 'POST'], # external API, keep inconsistent url to maintain compatibility
 	['name' => 'setting#setScrobblerCredentials', 'url' => '/api/settings/scrobbler_credentials/{serviceIdentifier}', 'verb' => 'POST'],
+	['name' => 'setting#saveDiscordSettings', 'url' => '/api/settings/discord', 'verb' => 'POST'],
+	['name' => 'setting#clearDiscordSettings', 'url' => '/api/settings/discord', 'verb' => 'DELETE'],
 
 	// Ampache API https://ampache.org/api/
 	['name' => 'ampache#xmlApi',			'url' => '/ampache/server/xml.server.php',	'verb' => 'GET'],

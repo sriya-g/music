@@ -251,6 +251,73 @@
 		</div>
 	</div>
 
+	<h2 translate>Discord Rich Presence Integration</h2>
+	<div>
+		<p translate>Displays your currently playing track in your Discord status via the server-side presence daemon.</p>
+		<p ng-show="settings.discord.configured" style="color: green;">
+			<strong>✓ <span translate>Discord Rich Presence is configured.</span></strong>
+		</p>
+		<p ng-show="!settings.discord.configured" translate>
+			To connect with Discord, create an application on the <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a> to obtain a Client ID, and enter your Discord User Token.
+		</p>
+
+		<div style="margin-bottom: 12px;">
+			<div class="label-container">
+				<label for="discord-client-id" translate>Application Client ID</label>:
+			</div>
+			<input type="text" id="discord-client-id" ng-model="discordConfig.clientId" placeholder="123456789012345678" style="width: 300px; max-width: 100%;" />
+		</div>
+
+		<div style="margin-bottom: 12px;">
+			<div class="label-container">
+				<label for="discord-user-token" translate>Discord User Token</label>:
+			</div>
+			<input type="password" id="discord-user-token" ng-model="discordConfig.userToken" placeholder="{{ settings.discord.hasToken ? '••••••••••••••••' : 'Enter user token' }}" style="width: 300px; max-width: 100%;" />
+			<p><em translate>Warning: Keep your user token private. The token is encrypted when stored on the server.</em></p>
+		</div>
+
+		<div style="margin-bottom: 12px;">
+			<div class="label-container">
+				<label for="discord-activity-name" translate>Activity name display</label>:
+			</div>
+			<select id="discord-activity-name" ng-model="discordConfig.activityName">
+				<option value="Default" translate>Default (Nextcloud Music)</option>
+				<option value="Track" translate>Track title</option>
+				<option value="Artist" translate>Artist</option>
+				<option value="Album" translate>Album</option>
+				<option value="Custom" translate>Custom name</option>
+			</select>
+		</div>
+
+		<div style="margin-bottom: 12px;" ng-show="discordConfig.activityName === 'Custom'">
+			<div class="label-container">
+				<label for="discord-custom-activity-name" translate>Custom activity name</label>:
+			</div>
+			<input type="text" id="discord-custom-activity-name" ng-model="discordConfig.customActivityName" placeholder="Nextcloud Music" style="width: 300px; max-width: 100%;" />
+		</div>
+
+		<div style="margin-bottom: 8px;">
+			<input type="checkbox" id="discord-caa" ng-model="discordConfig.caaEnabled" />
+			<label for="discord-caa" translate>Use artwork from Cover Art Archive (for MusicBrainz-tagged music; falls back to default icon)</label>
+		</div>
+
+		<div style="margin-bottom: 12px;">
+			<input type="checkbox" id="discord-spotify" ng-model="discordConfig.spotifyLinks" />
+			<label for="discord-spotify" translate>Enable Spotify link-through via ListenBrainz Labs</label>
+		</div>
+
+		<div style="margin-top: 10px;">
+			<button ng-click="saveDiscordSettings()" ng-disabled="discordSaving" translate>Save Discord settings</button>
+			<button ng-show="settings.discord.configured" ng-click="clearDiscordSettings()" ng-disabled="discordSaving" translate>Disconnect Discord</button>
+			<span class="icon-loading-small operation-in-progress" ng-show="discordSaving"></span>
+			<span ng-show="discordMessage" style="margin-left: 10px;">{{ discordMessage }}</span>
+		</div>
+
+		<p style="margin-top: 10px;">
+			<em><span translate>Note: To broadcast your presence, run the background daemon on the server:</span> <code>php occ music:discord-presence</code></em>
+		</p>
+	</div>
+
 	<h2 translate>Admin</h2>
 	<div>
 		<p translate
