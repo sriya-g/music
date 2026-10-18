@@ -27,10 +27,11 @@ jobs:
             echo "==> Updating Music app..."
             # Fetch latest commits and reset to clean state using docker container
             docker run --rm \
+              --entrypoint sh \
               -v nextcloud_aio_nextcloud:/volume \
               -w /volume/custom_apps/music \
               alpine/git \
-              sh -c "git config --global --add safe.directory /volume/custom_apps/music && git fetch origin listenbrainz-support && git reset --hard origin/listenbrainz-support"
+              -c "git config --global --add safe.directory /volume/custom_apps/music && git fetch origin listenbrainz-support && git reset --hard origin/listenbrainz-support"
 
             # Ensure proper www-data ownership
             docker exec nextcloud-aio-nextcloud chown -R www-data:www-data /var/www/html/custom_apps/music
