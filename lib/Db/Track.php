@@ -226,6 +226,14 @@ class Track extends Entity {
 		$this->lyrics = $lyrics;
 	}
 
+	public function setStarred(\DateTime|string|null $starred) : void {
+		if ($starred instanceof \DateTime) {
+			$this->starred = $starred->format('Y-m-d H:i:s');
+		} else {
+			$this->starred = $starred;
+		}
+	}
+
 	public function getPath() : ?string {
 		return ($this->folderPath ?? '') . '/' . $this->filename;
 	}

@@ -560,7 +560,7 @@ class LastfmService {
 						$lovedMatchedTrackIds[$trackId] = true;
 						if (empty($libTrack->getStarred())) {
 							$trackIdsToStar[$trackId] = $trackId;
-							$libTrack->setStarred(new \DateTime());
+							$libTrack->setStarred((new \DateTime())->format('Y-m-d H:i:s'));
 						}
 					}
 				}

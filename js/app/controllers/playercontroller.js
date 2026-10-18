@@ -171,9 +171,8 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 		nowPlayingLatestUpdateTime = null;
 		if ($scope.currentTrack?.id) {
 			Restangular.one('tracks', $scope.currentTrack.id).all('playing').remove();
-		} else {
-			Restangular.one('tracks').all('playing').remove();
 		}
+		Restangular.one('tracks').all('playing').remove();
 	}
 
 	$scope.$watch('currentTrack', function(newTrack) {
@@ -391,6 +390,7 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 	$scope.pause = function() {
 		if ($scope.currentTrack !== null) {
 			$scope.player.pause();
+			clearNowPlaying();
 		}
 	};
 
@@ -405,6 +405,7 @@ function ($scope, $rootScope, playQueueService, Audio, gettextCatalog, Restangul
 	$scope.stop = function() {
 		scrobbleCurrentTrackIfAppropriate();
 		$scope.player.stop();
+		clearNowPlaying();
 		$scope.currentTrack = null;
 		$rootScope.playing = false;
 		$rootScope.started = false;
