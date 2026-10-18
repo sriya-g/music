@@ -78,19 +78,6 @@ class AlbumMapper extends BaseMapper {
 			$params = \array_merge($params, $albumIds);
 		}
 
-		$sql .= ' UNION SELECT DISTINCT `track`.`album_id`, `ar`.`id` AS `artist_id`
-				FROM `*PREFIX*music_tracks` `track`
-				JOIN `*PREFIX*music_artists` `ar`
-				ON `ar`.`user_id` = `track`.`user_id`
-				AND `ar`.`mbid` IS NOT NULL AND `ar`.`mbid` != \'\'
-				AND `track`.`artist_mbids` LIKE ' . $this->sqlConcat("'%|'", '`ar`.`mbid`', "'|%'") . '
-				WHERE `track`.`user_id` = ? ';
-		$params[] = $userId;
-		if ($albumIds !== null) {
-			$sql .= 'AND `track`.`album_id` IN ' . $this->questionMarks(\count($albumIds));
-			$params = \array_merge($params, $albumIds);
-		}
-
 		$result = $this->execute($sql, $params);
 		$artistIds = [];
 		while ($row = $result->fetch()) {
@@ -308,7 +295,6 @@ class AlbumMapper extends BaseMapper {
 	 * @return Album[]
 	 */
 	public function findAllByArtist(int $artistId, string $userId, ?int $limit = null, ?int $offset = null) : array {
-		$featuredCond = 'EXISTS (SELECT 1 FROM `*PREFIX*music_artists` `ar` WHERE `ar`.`id` = ? AND `ar`.`mbid` IS NOT NULL AND `ar`.`mbid` != \'\' AND `track`.`artist_mbids` LIKE ' . $this->sqlConcat("'%|'", '`ar`.`mbid`', "'|%'") . ')';
 		$sql = $this->selectEntities(
 				'`*PREFIX*music_albums`.`id` IN (
 					SELECT DISTINCT `album`.`id`
@@ -317,10 +303,10 @@ class AlbumMapper extends BaseMapper {
 						UNION
 					SELECT DISTINCT `track`.`album_id`
 					FROM `*PREFIX*music_tracks` `track`
-					WHERE `track`.`artist_id` = ? OR `track`.`composer_id` = ? OR ' . $featuredCond . '
+					WHERE `track`.`artist_id` = ? OR `track`.`composer_id` = ?
 				) AND `*PREFIX*music_albums`.`user_id` = ?',
 				'ORDER BY LOWER(`*PREFIX*music_albums`.`name`)');
-		$params = [$artistId, $artistId, $artistId, $artistId, $userId];
+		$params = [$artistId, $artistId, $artistId, $userId];
 		return $this->findEntities($sql, $params, $limit, $offset);
 	}
 
@@ -513,17 +499,16 @@ class AlbumMapper extends BaseMapper {
 	 * @return integer
 	 */
 	public function countByArtist(int $artistId) : int {
-		$featuredCond = 'EXISTS (SELECT 1 FROM `*PREFIX*music_artists` `ar` WHERE `ar`.`id` = ? AND `ar`.`mbid` IS NOT NULL AND `ar`.`mbid` != \'\' AND `track`.`artist_mbids` LIKE ' . $this->sqlConcat("'%|'", '`ar`.`mbid`', "'|%'") . ')';
-		$sql = "SELECT COUNT(*) AS count FROM (
+		$sql = 'SELECT COUNT(*) AS count FROM (
 					SELECT DISTINCT `track`.`album_id`
 					FROM `*PREFIX*music_tracks` `track`
-					WHERE `track`.`artist_id` = ? OR $featuredCond
+					WHERE `track`.`artist_id` = ?
 						UNION
 					SELECT `album`.`id`
 					FROM `*PREFIX*music_albums` `album`
 					WHERE `album`.`album_artist_id` = ?
-				) tmp";
-		$params = [$artistId, $artistId, $artistId];
+				) tmp';
+		$params = [$artistId, $artistId];
 		$result = $this->execute($sql, $params);
 		$row = $result->fetch();
 		$result->closeCursor();

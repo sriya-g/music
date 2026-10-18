@@ -84,12 +84,11 @@ class TrackMapper extends BaseMapper {
 	 */
 	public function findAllByArtist(array $artistIds, string $userId, ?int $limit = null, ?int $offset = null) : array {
 		$questionMarks = $this->questionMarks(\count($artistIds));
-		$featuredCond = 'EXISTS (SELECT 1 FROM `*PREFIX*music_artists` `ar` WHERE `ar`.`id` IN ' . $questionMarks . ' AND `ar`.`mbid` IS NOT NULL AND `ar`.`mbid` != \'\' AND `*PREFIX*music_tracks`.`artist_mbids` LIKE ' . $this->sqlConcat("'%|'", '`ar`.`mbid`', "'|%'") . ')';
 		$sql = $this->selectUserEntities(
-			"`artist_id` IN $questionMarks OR `composer_id` IN $questionMarks OR `album_id` IN (SELECT `id` from `*PREFIX*music_albums` WHERE `album_artist_id` IN $questionMarks) OR $featuredCond",
+			"`artist_id` IN $questionMarks OR `composer_id` IN $questionMarks OR `album_id` IN (SELECT `id` from `*PREFIX*music_albums` WHERE `album_artist_id` IN $questionMarks)",
 			'ORDER BY LOWER(`title`)'
 		);
-		$params = \array_merge([$userId], $artistIds, $artistIds, $artistIds, $artistIds);
+		$params = \array_merge([$userId], $artistIds, $artistIds, $artistIds);
 		return $this->findEntities($sql, $params, $limit, $offset);
 	}
 
