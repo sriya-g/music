@@ -16,32 +16,39 @@ use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Service\Discord\DiscordPresenceService;
 use OCP\IConfig;
+use OCP\IUserManager;
 use OCP\Security\ICrypto;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class DiscordPresenceDaemon extends BaseCommand {
+class DiscordPresenceDaemon extends Command {
 
 	private const DEFAULT_IDLE_TIMEOUT = 10;
 
 	public function __construct(
-		\OCP\IUserManager $userManager,
-		\OCP\IGroupManager $groupManager,
+		private IUserManager $userManager,
 		private IConfig $config,
 		private ICrypto $crypto,
 		private TrackBusinessLayer $trackBusinessLayer,
 		private DiscordPresenceService $discordPresenceService,
 		private Logger $logger,
 	) {
-		parent::__construct($userManager, $groupManager);
+		parent::__construct();
 	}
 
-	protected function doConfigure(): void {
+	protected function configure(): void {
 		$this
 			->setName('music:discord-presence')
 			->setAliases(['music:discord-rpc'])
 			->setDescription('Run the Discord Rich Presence daemon for Nextcloud Music')
+			->addOption(
+				'user',
+				'u',
+				InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+				'Specify targeted user(s)'
+			)
 			->addOption(
 				'poll-interval',
 				'p',
@@ -59,15 +66,12 @@ class DiscordPresenceDaemon extends BaseCommand {
 	}
 
 	protected function execute(InputInterface $input, OutputInterface $output): int {
-		$targetUsers = [];
-		try {
-			self::ensureUsersGiven($input);
-			$argUsers = $this->getArgumentUsers($input);
-			$groupUsers = $this->getArgumentGroupUsers($input);
-			$targetUsers = \array_unique(\array_merge($argUsers, $groupUsers));
-		} catch (\InvalidArgumentException $e) {
-			// If no specific users specified, we check all users with Discord config
-			$targetUsers = [];
+		$targetUsers = (array)($input->getOption('user') ?: []);
+		foreach ($targetUsers as $user) {
+			if (!$this->userManager->userExists($user)) {
+				$output->writeln("<error>User {$user} does not exist!</error>");
+				return 1;
+			}
 		}
 
 		$pollInterval = (int)$input->getOption('poll-interval');
