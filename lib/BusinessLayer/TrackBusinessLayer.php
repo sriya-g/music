@@ -343,6 +343,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 	 * @param ?string $comment the comment of the track
 	 * @param ?string $mbid the MusicBrainz Recording Id of the track
 	 * @param ?string $mbidRelTrack the MusicBrainz Release Track Id of the track
+	 * @param ?string[] $artistMbids Array of MusicBrainz Artist IDs for the track
 	 * @return Track The added/updated track
 	 */
 	public function addOrUpdateTrack(
@@ -350,7 +351,8 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 			int $fileId, string $mimetype, string $userId, ?int $recordLabelId = null, ?int $length = null, ?int $bitrate = null,
 			?int $sampleRate = null, ?int $bpm = null, ?int $composerId = null, ?string $comment = null, ?string $mbid = null, 
 			?string $mbidRelTrack = null, ?float $replaygainAlbumGain = null, ?float $replaygainAlbumPeak = null,
-			?float $replaygainTrackGain = null, ?float $replaygainTrackPeak = null, ?float $r128AlbumGain = null, ?float $r128TrackGain = null) : Track {
+			?float $replaygainTrackGain = null, ?float $replaygainTrackPeak = null, ?float $r128AlbumGain = null, ?float $r128TrackGain = null,
+			?array $artistMbids = null) : Track {
 		$track = new Track();
 		$track->setTitle(StringUtil::truncate($title, 256)); // some DB setups can't truncate automatically to column max size
 		$track->setNumber($number);
@@ -379,6 +381,7 @@ class TrackBusinessLayer extends BusinessLayer implements IScrobbler {
 		$track->setReplaygainTrackPeak($replaygainTrackPeak);
 		$track->setR128AlbumGain($r128AlbumGain);
 		$track->setR128TrackGain($r128TrackGain);
+		$track->setArtistMbidsFromArray($artistMbids);
 		return $this->mapper->updateOrInsert($track);
 	}
 

@@ -50,6 +50,7 @@ class Version030200Date20260828195000 extends SimpleMigrationStep {
 		self::addColumnIfMissing($tracks, 'replaygain_track_peak', Types::FLOAT,   ['notnull' => false]);
 		self::addColumnIfMissing($tracks, 'r128_album_gain',       Types::FLOAT,   ['notnull' => false]);
 		self::addColumnIfMissing($tracks, 'r128_track_gain',       Types::FLOAT,   ['notnull' => false]);
+		self::addColumnIfMissing($tracks, 'artist_mbids',          Types::TEXT,    ['notnull' => false]);
 
 		self::addIndexIfMissing($tracks, 'music_tracks_composer_id_idx', ['composer_id']);
 		self::addIndexIfMissing($tracks, 'music_tracks_label_id_idx', ['record_label_id']);

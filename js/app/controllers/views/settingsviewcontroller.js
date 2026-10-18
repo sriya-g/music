@@ -383,9 +383,24 @@ angular.module('Music').controller('SettingsViewController', [
 								$timeout(function() {
 									scrobbler.syncing = false;
 									if (data?.success) {
-										scrobbler.syncResult = gettextCatalog.getString('Synced {{updated}} listen counts from Last.fm', {updated: data.updated});
+										if (Array.isArray(data.starred_track_ids)) {
+											data.starred_track_ids.forEach(function(trackId) {
+												const track = libraryService.getTrack(trackId);
+												if (track) {
+													track.favorite = true;
+												}
+											});
+										}
+										const lovedUpdated = data.loved_updated || 0;
+										scrobbler.syncResult = gettextCatalog.getString(
+											'Synced {{updated}} listen counts and {{lovedUpdated}} loved tracks from Last.fm',
+											{updated: data.updated, lovedUpdated: lovedUpdated}
+										);
 										OCA.Music.Dialogs.showNotification(
-											gettextCatalog.getString('Successfully updated {{updated}} track listen counts from Last.fm', {updated: data.updated})
+											gettextCatalog.getString(
+												'Successfully updated {{updated}} track listen counts and {{lovedUpdated}} loved tracks from Last.fm',
+												{updated: data.updated, lovedUpdated: lovedUpdated}
+											)
 										);
 									} else {
 										scrobbler.syncResult = data?.message || gettextCatalog.getString('Sync failed');

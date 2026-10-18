@@ -200,7 +200,8 @@ class Scanner extends PublicEmitter {
 				$artistId, $albumId, $fileId, $mimetype, $userId, $recordLabelId, $meta['length'], $meta['bitrate'],
 				$meta['sample_rate'], $meta['bpm'], $composerId, $meta['comment'], $meta['mb_recording_id'],
 				$meta['mb_release_track_id'], $meta['replaygain_album_gain'], $meta['replaygain_album_peak'],
-				$meta['replaygain_track_gain'], $meta['replaygain_track_peak'], $meta['r128_album_gain'], $meta['r128_track_gain']);
+				$meta['replaygain_track_gain'], $meta['replaygain_track_peak'], $meta['r128_album_gain'], $meta['r128_track_gain'],
+				$meta['mb_artist_ids'] ?? null);
 
 		// if present, use the embedded album art as cover for the respective album
 		if (!empty($meta['picture'])) {
@@ -335,9 +336,28 @@ class Scanner extends PublicEmitter {
 		$meta['mb_release_track_id'] = self::normalizeMbid(
 			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Release Track Id', 'musicbrainz_releasetrackid'])
 		);
-		$meta['mb_artist_id'] = self::normalizeMbid(
-			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Artist Id', 'musicbrainz_artistid'])
-		);
+
+		$rawArtistMbids = ExtractorGetID3::getAllOfTags($fileInfo, ['MusicBrainz Artist Id', 'musicbrainz_artistid', 'MUSICBRAINZ_ARTISTID']);
+		$artistMbids = [];
+		foreach ($rawArtistMbids as $raw) {
+			$parts = \preg_split('/[\/;,\\\0\s]+/', $raw);
+			if ($parts) {
+				foreach ($parts as $part) {
+					$normalized = self::normalizeMbid($part);
+					if ($normalized !== null && self::isValidMbid($normalized)) {
+						$artistMbids[] = $normalized;
+					}
+				}
+			}
+		}
+		$meta['mb_artist_ids'] = \array_values(\array_unique($artistMbids));
+
+		if (\count($meta['mb_artist_ids']) === 1) {
+			$meta['mb_artist_id'] = $meta['mb_artist_ids'][0];
+		} else {
+			$meta['mb_artist_id'] = null;
+		}
+
 		$meta['mb_release_artist_id'] = self::normalizeMbid(
 			ExtractorGetID3::getFirstOfTags($fileInfo, ['MusicBrainz Album Artist Id', 'musicbrainz_albumartistid'])
 		);
@@ -943,6 +963,17 @@ class Scanner extends PublicEmitter {
 			$mbid = null; // empty or whitespace-only string will get converted to null
 		}
 		return $mbid;
+	}
+
+	public static function isValidMbid(?string $mbid) : bool {
+		if ($mbid === null || $mbid === '') {
+			return false;
+		}
+		$trimmed = \trim($mbid);
+		if ($trimmed === '00000000-0000-0000-0000-000000000000') {
+			return false;
+		}
+		return \preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $trimmed) === 1;
 	}
 
 	/**

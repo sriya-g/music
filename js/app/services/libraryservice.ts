@@ -41,10 +41,12 @@ export interface Track extends BaseTrack {
 	title : string;
 	album : Album;
 	artistId : number;
+	artistIds? : number[];
 	composerId : number|null;
 	number : number|null;
 	disk : number;
 	artist : Artist;
+	artists? : Artist[];
 	composer : Artist|null;
 	folder : Folder;
 	genre : Genre;
@@ -239,6 +241,11 @@ export class LibraryService {
 				album.tracks = this.#sortByDiskNumberAndTitle(album.tracks);
 				_.forEach(album.tracks, (track) => {
 					track.artist = this.getArtist(track.artistId);
+					if (track.artistIds && track.artistIds.length > 0) {
+						track.artists = track.artistIds.map((id : number) => this.getArtist(id)).filter(Boolean);
+					} else {
+						track.artists = track.artist ? [track.artist] : [];
+					}
 					track.album = album;
 					track.type = 'song';
 					track.favorite = false;
@@ -787,7 +794,10 @@ export class LibraryService {
 		return this.#podcastChannels?.length ?? 0;
 	}
 	findTracksByArtist(artistId : number) : Track[] {
-		return _(this.#tracksInAlphaOrder).filter(e => e.track.artistId == artistId).map('track').value();
+		return _(this.#tracksInAlphaOrder)
+			.filter(e => e.track.artistId == artistId || (e.track.artistIds && e.track.artistIds.includes(Number(artistId))))
+			.map('track')
+			.value();
 	}
 	findTracksByComposer(composerId : number) : Track[] {
 		return _(this.#tracksInAlphaOrder).filter(e => e.track.composerId == composerId).map('track').value();

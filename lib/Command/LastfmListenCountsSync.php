@@ -33,7 +33,7 @@ class LastfmListenCountsSync extends BaseCommand {
 		$this
 			->setName('music:lastfm-sync-counts')
 			->setAliases(['music:lastfm-listen-counts'])
-			->setDescription('Sync Last.fm listen counts into Nextcloud Music for "most listened"')
+			->setDescription('Sync Last.fm listen counts and loved tracks into Nextcloud Music')
 			->addOption(
 				'username',
 				'u',
@@ -95,7 +95,7 @@ class LastfmListenCountsSync extends BaseCommand {
 		bool $createPlaylist,
 		bool $onlyIfGreater
 	) : void {
-		$output->writeln("Syncing Last.fm listen counts for user <info>$userId</info>...");
+		$output->writeln("Syncing Last.fm listen counts and loved tracks for user <info>$userId</info>...");
 
 		$logCallback = function(string $msg) use ($output) {
 			$output->writeln("  <comment>$msg</comment>");
@@ -113,7 +113,10 @@ class LastfmListenCountsSync extends BaseCommand {
 			);
 
 			if ($result['success']) {
-				$output->writeln("  <info>Success:</info> Fetched {$result['total_fetched']} tracks, matched {$result['matched']}, updated {$result['updated']} play counts.");
+				$lovedFetched = $result['loved_fetched'] ?? 0;
+				$lovedMatched = $result['loved_matched'] ?? 0;
+				$lovedUpdated = $result['loved_updated'] ?? 0;
+				$output->writeln("  <info>Success:</info> Fetched {$result['total_fetched']} top tracks (matched {$result['matched']}, updated {$result['updated']} play counts); fetched {$lovedFetched} loved tracks (matched {$lovedMatched}, starred {$lovedUpdated}).");
 				if (!empty($result['playlist_id'])) {
 					$output->writeln("  <info>Playlist:</info> Updated 'Most Listened (Last.fm)' (ID {$result['playlist_id']})");
 				}

@@ -137,6 +137,30 @@ class ExtractorGetID3 {
 				unset($metadata['comments']['text']);
 			}
 
+			// Also collect all TXXX frames directly to preserve frames with identical descriptions (e.g. multiple MusicBrainz Artist Id frames)
+			foreach (['TXXX', 'TXX'] as $txxxFrameKey) {
+				if (!empty($metadata['id3v2'][$txxxFrameKey]) && \is_array($metadata['id3v2'][$txxxFrameKey])) {
+					foreach ($metadata['id3v2'][$txxxFrameKey] as $txxx) {
+						$desc = $txxx['description'] ?? null;
+						$data = $txxx['data'] ?? null;
+						if (\is_string($desc) && $desc !== '' && \is_string($data) && $data !== '') {
+							$values = \explode("\0", $data);
+							foreach ($values as $val) {
+								$val = \trim($val);
+								if ($val !== '') {
+									if (!isset($metadata['comments'][$desc])) {
+										$metadata['comments'][$desc] = [];
+									}
+									if (!\in_array($val, $metadata['comments'][$desc], true)) {
+										$metadata['comments'][$desc][] = $val;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			if (isset($metadata['error'])) {
 				foreach ($metadata['error'] as $error) {
 					$this->logger->debug('getID3 error occurred');
@@ -188,6 +212,32 @@ class ExtractorGetID3 {
 			}
 		}
 		return $defaultValue;
+	}
+
+	/**
+	 * Given an array of tag names, find matching tags and return all values collected across them.
+	 *
+	 * @param string[] $tags
+	 * @return string[]
+	 */
+	public static function getAllOfTags(array $fileInfo, array $tags) : array {
+		$values = [];
+		foreach ($tags as $tag) {
+			if (!empty($fileInfo['comments'][$tag])) {
+				$raw = $fileInfo['comments'][$tag];
+				if (!\is_array($raw)) {
+					$raw = [$raw];
+				}
+				foreach ($raw as $val) {
+					if (\is_string($val)) {
+						\mb_substitute_character(0xFFFD);
+						$val = \mb_convert_encoding($val, 'UTF-8', 'UTF-8');
+						$values[] = $val;
+					}
+				}
+			}
+		}
+		return $values;
 	}
 
 	/**

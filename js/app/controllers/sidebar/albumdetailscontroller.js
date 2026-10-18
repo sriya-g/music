@@ -47,7 +47,7 @@ angular.module('Music').controller('AlbumDetailsController', [
 						setImageUrl(url);
 					}
 
-					$scope.featuredArtists = _($scope.album.tracks).map('artist').uniq().sortBy('name').value();
+					$scope.featuredArtists = _($scope.album.tracks).map(t => t.artists || (t.artist ? [t.artist] : [])).flatten().filter(Boolean).uniqBy('id').sortBy('name').value();
 
 					// Because of the asynchronous nature of the REST queries, it is possible that the
 					// current album has already changed again by the time we get the result. If that has
@@ -159,6 +159,10 @@ angular.module('Music').controller('AlbumDetailsController', [
 
 		$scope.showArtist = function() {
 			$rootScope.$emit('showArtistDetails', $scope.album.artist.id);
+		};
+
+		$scope.showArtistDetails = function(artistId) {
+			$rootScope.$emit('showArtistDetails', artistId);
 		};
 	}
 ]);

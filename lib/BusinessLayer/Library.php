@@ -22,7 +22,7 @@ use OCP\IURLGenerator;
 
 class Library {
 
-	public const DB_SCHEMA_VERSION = '3.2.0-beta2'; // the version of Music app which last modified the database schema of the library tables
+	public const DB_SCHEMA_VERSION = '3.2.0-beta4'; // the version of Music app which last modified the database schema of the library tables
 
 	public function __construct(
 		private AlbumBusinessLayer $albumBusinessLayer,
@@ -69,13 +69,34 @@ class Library {
 		$entities = $this->getTracksAlbumsAndArtists($userId);
 		$coverHashes = $this->coverService->getAllCachedAlbumCoverHashes($userId);
 
+		// Build lookup from MBID to artist IDs in library
+		$artistIdByMbid = [];
+		foreach ($entities['artists'] as $artist) {
+			$mbid = $artist->getMbid();
+			if (!empty($mbid)) {
+				// If multiple artists share an MBID, prefer the one with own albums
+				if (!isset($artistIdByMbid[$mbid]) || $artist->getOwnAlbumCount() > 0) {
+					$artistIdByMbid[$mbid] = $artist->getId();
+				}
+			}
+		}
+
 		// Create a multi-level dictionary of tracks where each track can be found
 		// by addressing like $trackDict[artistId][albumId][ordinal]. The tracks are
 		// in the dictionary in the "toCollection" format.
 		$trackDict = [];
 		foreach ($entities['tracks'] as $track) {
+			$trackMbids = $track->getArtistMbidsAsArray();
+			$resolvedArtistIds = [$track->getArtistId()];
+			foreach ($trackMbids as $mbid) {
+				if (isset($artistIdByMbid[$mbid])) {
+					$resolvedArtistIds[] = $artistIdByMbid[$mbid];
+				}
+			}
+			$resolvedArtistIds = \array_values(\array_unique($resolvedArtistIds));
+
 			$trackDict[$track->getAlbum()->getAlbumArtistId()][$track->getAlbumId()][]
-				= $track->toCollection();
+				= $track->toCollection($resolvedArtistIds);
 		}
 
 		// Then create the actual collection by iterating over the previously created

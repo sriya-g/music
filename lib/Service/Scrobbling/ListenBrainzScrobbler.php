@@ -211,21 +211,27 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			}
 		}
 
-		$artistMbid = null;
-		if ($track->getArtist() !== null && self::isValidMbid($track->getArtist()->getMbid())) {
-			$artistMbid = \trim((string)$track->getArtist()->getMbid());
-		} elseif (!empty($track->getArtistId())) {
-			try {
-				$artist = $this->artistBusinessLayer->find($track->getArtistId(), $userId);
-				if ($artist !== null && self::isValidMbid($artist->getMbid())) {
-					$artistMbid = \trim((string)$artist->getMbid());
+		$artistMbids = $track->getArtistMbidsAsArray();
+		if (empty($artistMbids)) {
+			$artistMbid = null;
+			if ($track->getArtist() !== null && self::isValidMbid($track->getArtist()->getMbid())) {
+				$artistMbid = \trim((string)$track->getArtist()->getMbid());
+			} elseif (!empty($track->getArtistId())) {
+				try {
+					$artist = $this->artistBusinessLayer->find($track->getArtistId(), $userId);
+					if ($artist !== null && self::isValidMbid($artist->getMbid())) {
+						$artistMbid = \trim((string)$artist->getMbid());
+					}
+				} catch (\Throwable $e) {
+					// Artist lookup failed or not found, proceed without artist MBID
 				}
-			} catch (\Throwable $e) {
-				// Artist lookup failed or not found, proceed without artist MBID
+			}
+			if (!empty($artistMbid)) {
+				$artistMbids = [$artistMbid];
 			}
 		}
-		if (!empty($artistMbid)) {
-			$additionalInfo['artist_mbids'] = [$artistMbid];
+		if (!empty($artistMbids)) {
+			$additionalInfo['artist_mbids'] = \array_values(\array_unique(\array_filter($artistMbids, [self::class, 'isValidMbid'])));
 		}
 
 		return $additionalInfo;

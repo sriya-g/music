@@ -238,6 +238,22 @@ class LastfmService {
 		]);
 	}
 
+	/**
+	 * Get user loved tracks from Last.fm
+	 * @param string $username Last.fm username
+	 * @param int $limit Max items per page (up to 1000)
+	 * @param int $page Page number
+	 * @return array
+	 */
+	public function getUserLovedTracks(string $username, int $limit = 1000, int $page = 1) : array {
+		return $this->getInfoFromLastFm([
+			'method' => 'user.getLovedTracks',
+			'user'   => $username,
+			'limit'  => (string)$limit,
+			'page'   => (string)$page,
+		]);
+	}
+
 	public static function normalizeString(string $str) : string {
 		$str = \mb_strtolower(\trim($str));
 		$str = (string)\preg_replace('/\s+/', ' ', $str);
@@ -253,7 +269,7 @@ class LastfmService {
 	}
 
 	/**
-	 * Sync Last.fm listen counts (playcount) into Nextcloud Music for the user.
+	 * Sync Last.fm listen counts (playcount) and loved tracks into Nextcloud Music for the user.
 	 *
 	 * @param string $userId Nextcloud user ID
 	 * @param string|null $username Optional Last.fm username (falls back to connected Last.fm account)
@@ -305,7 +321,7 @@ class LastfmService {
 			];
 		}
 
-		$log("Starting listen counts sync for user '{$userId}' using Last.fm user '{$username}' (period: {$period})");
+		$log("Starting listen counts and loved tracks sync for user '{$userId}' using Last.fm user '{$username}' (period: {$period})");
 
 		// Fetch all local tracks for the user
 		$localTracks = $this->trackBusinessLayer->findAll($userId);
@@ -317,6 +333,10 @@ class LastfmService {
 				'total_fetched' => 0,
 				'matched' => 0,
 				'updated' => 0,
+				'loved_fetched' => 0,
+				'loved_matched' => 0,
+				'loved_updated' => 0,
+				'starred_track_ids' => [],
 				'message' => 'No tracks in local library.'
 			];
 		}
@@ -347,6 +367,25 @@ class LastfmService {
 				$tracksByNameLoose[$keyLoose][] = $track;
 			}
 		}
+
+		$findMatches = function(?string $mbid, string $artist, string $title) use (&$tracksByMbid, &$tracksByName, &$tracksByNameLoose) : array {
+			$matched = [];
+			if ($mbid && isset($tracksByMbid[$mbid])) {
+				$matched = $tracksByMbid[$mbid];
+			}
+			if (empty($matched)) {
+				$key = self::normalizeString($artist) . '|' . self::normalizeString($title);
+				if (isset($tracksByName[$key])) {
+					$matched = $tracksByName[$key];
+				} else {
+					$keyLoose = self::normalizeStringLoose($artist) . '|' . self::normalizeStringLoose($title);
+					if (isset($tracksByNameLoose[$keyLoose])) {
+						$matched = $tracksByNameLoose[$keyLoose];
+					}
+				}
+			}
+			return $matched;
+		};
 
 		$page = 1;
 		$totalFetched = 0;
@@ -390,22 +429,7 @@ class LastfmService {
 					continue;
 				}
 
-				// Find match in local library
-				$matched = [];
-				if ($mbid && isset($tracksByMbid[$mbid])) {
-					$matched = $tracksByMbid[$mbid];
-				}
-				if (empty($matched)) {
-					$key = self::normalizeString($artist) . '|' . self::normalizeString($title);
-					if (isset($tracksByName[$key])) {
-						$matched = $tracksByName[$key];
-					} else {
-						$keyLoose = self::normalizeStringLoose($artist) . '|' . self::normalizeStringLoose($title);
-						if (isset($tracksByNameLoose[$keyLoose])) {
-							$matched = $tracksByNameLoose[$keyLoose];
-						}
-					}
-				}
+				$matched = $findMatches($mbid, $artist, $title);
 
 				if (!empty($matched)) {
 					foreach ($matched as $libTrack) {
@@ -442,6 +466,82 @@ class LastfmService {
 		$matchedCount = \count($matchedTrackIds);
 		$log("Fetched {$totalFetched} top tracks from Last.fm, matched {$matchedCount} in local library, updated {$updatedCount} play counts");
 
+		// Sync loved tracks from Last.fm
+		$lovedPage = 1;
+		$lovedFetched = 0;
+		$lovedMatchedTrackIds = [];
+		$trackIdsToStar = [];
+
+		do {
+			$lovedLimit = \min(1000, $maxTracks - $lovedFetched);
+			if ($lovedLimit <= 0) {
+				break;
+			}
+
+			$lovedResponse = $this->getUserLovedTracks($username, $lovedLimit, $lovedPage);
+
+			if (isset($lovedResponse['error'])) {
+				$errorMsg = $lovedResponse['message'] ?? "Error code {$lovedResponse['error']}";
+				$log("Last.fm API error fetching loved tracks: {$errorMsg}");
+				break;
+			}
+
+			$lovedTracks = $lovedResponse['lovedtracks']['track'] ?? [];
+			if (empty($lovedTracks)) {
+				break;
+			}
+			if (isset($lovedTracks['name'])) {
+				$lovedTracks = [$lovedTracks];
+			}
+
+			foreach ($lovedTracks as $lastfmTrack) {
+				$lovedFetched++;
+				$title = (string)($lastfmTrack['name'] ?? '');
+				$artist = (string)($lastfmTrack['artist']['name'] ?? $lastfmTrack['artist']['#text'] ?? '');
+				$mbid = !empty($lastfmTrack['mbid']) ? (string)$lastfmTrack['mbid'] : null;
+
+				if (empty($title)) {
+					continue;
+				}
+
+				$matched = $findMatches($mbid, $artist, $title);
+
+				if (!empty($matched)) {
+					foreach ($matched as $libTrack) {
+						$trackId = $libTrack->getId();
+						$lovedMatchedTrackIds[$trackId] = true;
+						if (empty($libTrack->getStarred())) {
+							$trackIdsToStar[$trackId] = $trackId;
+							$libTrack->setStarred(new \DateTime());
+						}
+					}
+				}
+
+				if ($lovedFetched >= $maxTracks) {
+					break;
+				}
+			}
+
+			$lovedTotalPages = (int)($lovedResponse['lovedtracks']['@attr']['totalPages'] ?? 1);
+			$lovedPage++;
+			if ($lovedPage > $lovedTotalPages || $lovedFetched >= $maxTracks) {
+				break;
+			}
+			\usleep(200000);
+		} while (true);
+
+		$starredTrackIds = \array_values($trackIdsToStar);
+		$lovedUpdatedCount = \count($starredTrackIds);
+		$lovedMatchedCount = \count($lovedMatchedTrackIds);
+
+		if (!empty($starredTrackIds)) {
+			foreach (\array_chunk($starredTrackIds, 500) as $chunk) {
+				$this->trackBusinessLayer->setStarred($chunk, $userId);
+			}
+		}
+
+		$log("Fetched {$lovedFetched} loved tracks from Last.fm, matched {$lovedMatchedCount} in local library, starred {$lovedUpdatedCount} new tracks");
+
 		$playlistId = null;
 		if ($createPlaylist && !empty($orderedMatchedTrackIds)) {
 			try {
@@ -477,8 +577,12 @@ class LastfmService {
 			'total_fetched' => $totalFetched,
 			'matched' => $matchedCount,
 			'updated' => $updatedCount,
+			'loved_fetched' => $lovedFetched,
+			'loved_matched' => $lovedMatchedCount,
+			'loved_updated' => $lovedUpdatedCount,
+			'starred_track_ids' => $starredTrackIds,
 			'playlist_id' => $playlistId,
-			'message' => "Successfully synced listen counts: {$updatedCount} updated ({$matchedCount} matched from {$totalFetched} Last.fm tracks)."
+			'message' => "Successfully synced listen counts and loved tracks: {$updatedCount} listen counts updated ({$matchedCount} matched from {$totalFetched} Last.fm top tracks), {$lovedUpdatedCount} loved tracks starred ({$lovedMatchedCount} matched from {$lovedFetched} Last.fm loved tracks)."
 		];
 	}
 

@@ -49,7 +49,8 @@ class LastfmListenCountsSync extends TimedJob {
 				try {
 					$result = $lastfmService->syncUserListenCounts($userId);
 					if ($result['success']) {
-						$logger->info("Last.fm listen counts sync for user {$userId}: fetched {$result['total_fetched']}, matched {$result['matched']}, updated {$result['updated']}");
+						$lovedUpdated = $result['loved_updated'] ?? 0;
+						$logger->info("Last.fm listen counts sync for user {$userId}: fetched {$result['total_fetched']}, matched {$result['matched']}, updated {$result['updated']}, starred {$lovedUpdated} loved tracks");
 					} else {
 						$logger->warning("Last.fm listen counts sync skipped/failed for user {$userId}: " . ($result['message'] ?? 'Unknown reason'));
 					}

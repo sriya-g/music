@@ -81,6 +81,8 @@ use OCP\IURLGenerator;
  * @method void setR128AlbumGain(?float $gain)
  * @method ?float getR128TrackGain()
  * @method void setR128TrackGain(?float $gain)
+ * @method ?string getArtistMbids()
+ * @method void setArtistMbids(?string $artistMbids)
  *
  * @method string getFilename()
  * @method int getSize()
@@ -123,6 +125,7 @@ class Track extends Entity {
 	public ?float $replaygainTrackPeak = null;
 	public ?float $r128AlbumGain = null;
 	public ?float $r128TrackGain = null;
+	public ?string $artistMbids = null; // Pipe-delimited list of artist MBIDs, e.g. |mbid1|mbid2|
 
 	// not from the music_tracks table but still part of the standard content of this entity:
 	public string $filename = '';
@@ -169,6 +172,26 @@ class Track extends Entity {
 		$this->addType('replaygainTrackPeak', 'float');
 		$this->addType('r128AlbumGain', 'float');
 		$this->addType('r128TrackGain', 'float');
+		$this->addType('artistMbids', 'string');
+	}
+
+	/** @return string[] */
+	public function getArtistMbidsAsArray() : array {
+		if (empty($this->artistMbids)) {
+			return [];
+		}
+		$parts = \explode('|', \trim($this->artistMbids, '|'));
+		return \array_values(\array_filter($parts, fn($s) => $s !== ''));
+	}
+
+	/** @param string[]|null $mbids */
+	public function setArtistMbidsFromArray(?array $mbids) : void {
+		if (empty($mbids)) {
+			$this->artistMbids = null;
+		} else {
+			$clean = \array_values(\array_unique(\array_filter($mbids, fn($s) => !empty($s))));
+			$this->artistMbids = empty($clean) ? null : '|' . \implode('|', $clean) . '|';
+		}
 	}
 
 	public function getAlbum() : ?Album {
@@ -246,8 +269,8 @@ class Track extends Entity {
 		return $this->getGenreName() ?: Genre::unknownNameString($l10n);
 	}
 
-	public function toCollection() : array {
-		return [
+	public function toCollection(?array $additionalArtistIds = null) : array {
+		$data = [
 			'title'      => $this->getTitle(),
 			'number'     => $this->getNumber(),
 			'disk'       => $this->getDisk(),
@@ -257,6 +280,10 @@ class Track extends Entity {
 			'files'      => [$this->getMimetype() => $this->getFileId()],
 			'id'         => $this->getId(),
 		];
+		if (!empty($additionalArtistIds)) {
+			$data['artistIds'] = $additionalArtistIds;
+		}
+		return $data;
 	}
 
 	/**
