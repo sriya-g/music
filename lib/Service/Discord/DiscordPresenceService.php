@@ -255,21 +255,34 @@ class DiscordPresenceService {
 			'name' => $this->truncateText($activityName, 128),
 			'type' => 2, // Listening to
 			'details' => $this->truncateText($track->getTitle(), 128),
-			'state' => $this->truncateText($artistName, 128),
 			'status_display_type' => 0,
 			'timestamps' => [
 				'start' => $startMs,
-				'end' => $endMs,
-			],
-			'assets' => [
-				'large_image' => $largeImage,
-				'large_text' => $this->truncateText($albumName, 128),
 			],
 		];
 
+		if ($endMs > $startMs) {
+			$activity['timestamps']['end'] = $endMs;
+		}
+
+		if (!empty(\trim($artistName))) {
+			$activity['state'] = $this->truncateText($artistName, 128);
+		}
+
+		if (!empty($largeImage) && \str_starts_with($largeImage, 'mp:')) {
+			$activity['assets'] = [
+				'large_image' => $largeImage,
+			];
+			if (!empty(\trim($albumName))) {
+				$activity['assets']['large_text'] = $this->truncateText($albumName, 128);
+			}
+			if (!empty($spotifyUrls['trackUrl'])) {
+				$activity['assets']['large_url'] = $this->truncateUrl($spotifyUrls['trackUrl']);
+			}
+		}
+
 		if (!empty($spotifyUrls['trackUrl'])) {
 			$activity['details_url'] = $this->truncateUrl($spotifyUrls['trackUrl']);
-			$activity['assets']['large_url'] = $this->truncateUrl($spotifyUrls['trackUrl']);
 		}
 		if (!empty($spotifyUrls['artistUrl'])) {
 			$activity['state_url'] = $this->truncateUrl($spotifyUrls['artistUrl']);
