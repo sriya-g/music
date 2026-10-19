@@ -706,7 +706,7 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 	 * @param bool $allTypes If true, deletes any playlist older than $days. If false, only deletes auto-generated/periodic playlists.
 	 * @param bool $dryRun If true, only reports playlists without deleting them.
 	 * @param callable|null $logCallback Optional progress logger
-	 * @return array{deleted_playlists: array, deleted_files: array}
+	 * @return array{deleted_playlists: array}
 	 */
 	public function cleanupOldPlaylists(
 		string $userId,
@@ -724,7 +724,6 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 
 		$playlistBusinessLayer = \OC::$server->query(PlaylistBusinessLayer::class);
 		$deletedPlaylists = [];
-		$deletedFiles = [];
 
 		try {
 			$allPlaylists = $playlistBusinessLayer->findAll($userId);
@@ -804,67 +803,8 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 						'tracks' => $trackCount,
 						'age_days' => $ageDays,
 					];
-
-					// Clean up M3U file in ListenBrainz folder if present
-					try {
-						$userFolder = \OC::$server->getUserFolder($userId);
-						if ($userFolder->nodeExists('ListenBrainz')) {
-							$lbFolder = $userFolder->get('ListenBrainz');
-							if ($lbFolder instanceof \OCP\Files\Folder) {
-								$cleanTitle = \str_replace(' (ListenBrainz)', '', $playlistName);
-								$sanitizedTitle = \preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $cleanTitle);
-								$m3uFilename = $sanitizedTitle . ".m3u";
-								if ($lbFolder->nodeExists($m3uFilename)) {
-									if ($dryRun) {
-										$log("[Dry Run] Would delete M3U file ListenBrainz/{$m3uFilename}");
-									} else {
-										$lbFolder->get($m3uFilename)->delete();
-										$log("Deleted old M3U file ListenBrainz/{$m3uFilename}");
-									}
-									$deletedFiles[] = "ListenBrainz/{$m3uFilename}";
-								}
-							}
-						}
-					} catch (\Throwable $e) {
-						// Ignore file cleanup errors
-					}
 				}
 			}
-		}
-
-		// Also clean up any lingering/orphaned M3U files in ListenBrainz folder older than $days
-		try {
-			$userFolder = \OC::$server->getUserFolder($userId);
-			if ($userFolder->nodeExists('ListenBrainz')) {
-				$lbFolder = $userFolder->get('ListenBrainz');
-				if ($lbFolder instanceof \OCP\Files\Folder) {
-					$nodes = $lbFolder->getDirectoryListing();
-					foreach ($nodes as $node) {
-						if ($node instanceof \OCP\Files\File && \str_ends_with($node->getName(), '.m3u')) {
-							$fileName = $node->getName();
-							$fileDate = null;
-							if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $fileName, $matches)) {
-								$fileDate = \strtotime($matches[1]);
-							} else {
-								$fileDate = $node->getMTime();
-							}
-
-							if ($fileDate !== null && $fileDate > 0 && ($now - $fileDate > $cutoffSeconds)) {
-								$ageDays = \round(($now - $fileDate) / 86400, 1);
-								if ($dryRun) {
-									$log("[Dry Run] Would delete old M3U file ListenBrainz/{$fileName} (age {$ageDays} days)");
-								} else {
-									$node->delete();
-									$log("Deleted old M3U file ListenBrainz/{$fileName} (age {$ageDays} days)");
-								}
-								$deletedFiles[] = "ListenBrainz/{$fileName}";
-							}
-						}
-					}
-				}
-			}
-		} catch (\Throwable $e) {
-			// Ignore directory listing errors
 		}
 
 		// Clean up orphaned config keys
@@ -887,7 +827,6 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 
 		return [
 			'deleted_playlists' => $deletedPlaylists,
-			'deleted_files' => $deletedFiles,
 		];
 	}
 }

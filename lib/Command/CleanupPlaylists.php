@@ -117,10 +117,9 @@ class CleanupPlaylists extends BaseCommand {
 		if ($listenBrainzScrobbler) {
 			$result = $listenBrainzScrobbler->cleanupOldPlaylists($userId, $days, $allTypes, $dryRun, $logCallback);
 			$deletedPlCount = \count($result['deleted_playlists']);
-			$deletedFilesCount = \count($result['deleted_files']);
 
-			if ($deletedPlCount > 0 || $deletedFilesCount > 0) {
-				$output->writeln("  <info>Result:</info> Removed {$deletedPlCount} old playlist(s) and {$deletedFilesCount} old M3U file(s).");
+			if ($deletedPlCount > 0) {
+				$output->writeln("  <info>Result:</info> Removed {$deletedPlCount} old playlist(s) from the music server.");
 			} else {
 				$output->writeln("  <info>Result:</info> No playlists older than {$days} days found to clean up.");
 			}
