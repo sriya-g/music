@@ -528,10 +528,34 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 		$trackBusinessLayer = \OC::$server->query(\OCA\Music\BusinessLayer\TrackBusinessLayer::class);
 
 		foreach ($allPlaylists as $mbid => $lbPlaylist) {
+			$title = $lbPlaylist['playlist']['title'] ?? '';
+			$dateStr = $lbPlaylist['playlist']['date'] ?? '';
+
+			// Check if this is a periodic playlist (Daily/Weekly) older than 7 days
+			$isDailyOrWeekly = false;
+			if (\stripos($title, 'Daily Jams') !== false ||
+				\stripos($title, 'Weekly Jams') !== false ||
+				\stripos($title, 'Weekly Exploration') !== false) {
+				$isDailyOrWeekly = true;
+			}
+
+			if ($isDailyOrWeekly) {
+				$playlistDate = null;
+				if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $title, $matches)) {
+					$playlistDate = \strtotime($matches[1]);
+				} elseif (!empty($dateStr)) {
+					$playlistDate = \strtotime($dateStr);
+				}
+
+				if ($playlistDate !== null && $playlistDate > 0 && (\time() - $playlistDate > 7 * 86400)) {
+					$this->logger->info("ListenBrainz playlist sync: skipping week-old periodic playlist '{$title}' ({$mbid})");
+					continue;
+				}
+			}
+
 			// Sleep 500ms to respect rate limits
 			\usleep(500000);
 
-			$title = $lbPlaylist['playlist']['title'];
 			$this->logger->warning("ListenBrainz playlist sync: fetching details for playlist '{$title}' ({$mbid})");
 
 			// Fetch the full playlist details including tracks
@@ -668,62 +692,192 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			$playlistBusinessLayer->setTracks($ncTrackIds, $ncPlaylist->getId(), $userId);
 		}
 
-		// Clean up old daily/weekly playlists
-		$keys = $this->config->getUserKeys($userId, 'music');
-		foreach ($keys as $key) {
-			if (\strpos($key, 'listenbrainz.playlist.') === 0) {
-				$playlistId = (int)$this->config->getUserValue($userId, 'music', $key, '0');
-				if ($playlistId <= 0) {
-					$this->config->deleteUserValue($userId, 'music', $key);
-					continue;
-				}
+		// Clean up old daily/weekly playlists (> 7 days old)
+		$this->cleanupOldPlaylists($userId, 7, false);
 
-				try {
-					$ncPlaylist = $playlistBusinessLayer->find($playlistId, $userId);
-				} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
-					$this->config->deleteUserValue($userId, 'music', $key);
-					continue;
-				}
+		$this->logger->warning("ListenBrainz playlist sync completed for user {$userId}");
+	}
 
-				$playlistName = $ncPlaylist->getName() ?? '';
-				
-				// Check if it is a daily/weekly playlist
-				$isDailyOrWeekly = false;
-				if (\strpos($playlistName, '(ListenBrainz)') !== false) {
-					if (\strpos($playlistName, 'Daily Jams') !== false ||
-						\strpos($playlistName, 'Weekly Jams') !== false ||
-						\strpos($playlistName, 'Weekly Exploration') !== false) {
-						$isDailyOrWeekly = true;
-					}
-				}
+	/**
+	 * Clean up playlists older than $days (default 7 days).
+	 *
+	 * @param string $userId Nextcloud user ID
+	 * @param int $days Number of days threshold (default 7)
+	 * @param bool $allTypes If true, deletes any playlist older than $days. If false, only deletes auto-generated/periodic playlists.
+	 * @param bool $dryRun If true, only reports playlists without deleting them.
+	 * @param callable|null $logCallback Optional progress logger
+	 * @return array{deleted_playlists: array, deleted_files: array}
+	 */
+	public function cleanupOldPlaylists(
+		string $userId,
+		int $days = 7,
+		bool $allTypes = false,
+		bool $dryRun = false,
+		?callable $logCallback = null
+	) : array {
+		$log = function(string $msg) use ($logCallback) {
+			$this->logger->info("[Playlist Cleanup] " . $msg);
+			if ($logCallback !== null) {
+				$logCallback($msg);
+			}
+		};
 
-				if ($isDailyOrWeekly) {
-					$playlistDate = null;
-					// Try to parse the date from the title (e.g. 2026-07-06)
-					if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $playlistName, $matches)) {
-						$playlistDate = \strtotime($matches[1]);
+		$playlistBusinessLayer = \OC::$server->query(PlaylistBusinessLayer::class);
+		$deletedPlaylists = [];
+		$deletedFiles = [];
+
+		try {
+			$allPlaylists = $playlistBusinessLayer->findAll($userId);
+		} catch (\Throwable $e) {
+			$log("Failed to fetch playlists for user {$userId}: " . $e->getMessage());
+			return ['deleted_playlists' => [], 'deleted_files' => []];
+		}
+
+		$now = \time();
+		$cutoffSeconds = $days * 86400;
+		$userKeys = $this->config->getUserKeys($userId, 'music');
+
+		foreach ($allPlaylists as $playlist) {
+			$playlistName = $playlist->getName() ?? '';
+			$playlistId = $playlist->getId();
+
+			$isEligible = $allTypes;
+			if (!$isEligible) {
+				if (\stripos($playlistName, '(ListenBrainz)') !== false ||
+					\stripos($playlistName, 'Daily Jams') !== false ||
+					\stripos($playlistName, 'Weekly Jams') !== false ||
+					\stripos($playlistName, 'Weekly Exploration') !== false ||
+					\preg_match('/\b\d{4}-\d{2}-\d{2}\b/', $playlistName)) {
+					$isEligible = true;
+				}
+			}
+
+			if (!$isEligible) {
+				continue;
+			}
+
+			// Determine date of playlist
+			$playlistDate = null;
+			if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $playlistName, $matches)) {
+				$playlistDate = \strtotime($matches[1]);
+			}
+
+			if ($playlistDate === null || $playlistDate <= 0) {
+				$createdStr = $playlist->getCreated();
+				if ($createdStr instanceof \DateTimeInterface) {
+					$playlistDate = $createdStr->getTimestamp();
+				} elseif (\is_string($createdStr) && !empty($createdStr)) {
+					$playlistDate = \strtotime($createdStr);
+				}
+			}
+
+			if ($playlistDate !== null && $playlistDate > 0) {
+				$ageSeconds = $now - $playlistDate;
+				if ($ageSeconds > $cutoffSeconds) {
+					$ageDays = \round($ageSeconds / 86400, 1);
+					$trackCount = $playlist->getTrackCount();
+
+					if ($dryRun) {
+						$log("[Dry Run] Would delete playlist '{$playlistName}' (ID {$playlistId}, {$trackCount} tracks, age {$ageDays} days)");
 					} else {
-						// Fallback to creation date
-						$createdStr = $ncPlaylist->getCreated();
-						if ($createdStr) {
-							if ($createdStr instanceof \DateTimeInterface) {
-								$playlistDate = $createdStr->getTimestamp();
-							} else {
-								$playlistDate = \strtotime((string)$createdStr);
+						try {
+							$playlistBusinessLayer->delete($playlistId, $userId);
+							$log("Deleted old playlist '{$playlistName}' (ID {$playlistId}, {$trackCount} tracks, age {$ageDays} days)");
+						} catch (\Throwable $e) {
+							$log("Failed to delete playlist '{$playlistName}' (ID {$playlistId}): " . $e->getMessage());
+							continue;
+						}
+
+						// Clean up config keys pointing to this playlist ID
+						foreach ($userKeys as $key) {
+							if (\strpos($key, 'listenbrainz.playlist.') === 0) {
+								if ((int)$this->config->getUserValue($userId, 'music', $key, '0') === $playlistId) {
+									$this->config->deleteUserValue($userId, 'music', $key);
+								}
 							}
 						}
 					}
 
-					if ($playlistDate !== null && $playlistDate > 0) {
-						$ageSeconds = \time() - $playlistDate;
-						if ($ageSeconds > 7 * 86400) {
-							// More than 7 days old, delete it!
-							try {
-								$playlistBusinessLayer->delete($playlistId, $userId);
-								$this->logger->warning("ListenBrainz playlist sync: deleted old daily/weekly playlist '{$playlistName}' (ID {$playlistId})");
-							} catch (\Throwable $e) {
-								$this->logger->warning("ListenBrainz playlist sync: failed to delete old playlist '{$playlistName}': " . $e->getMessage());
+					$deletedPlaylists[] = [
+						'id' => $playlistId,
+						'name' => $playlistName,
+						'tracks' => $trackCount,
+						'age_days' => $ageDays,
+					];
+
+					// Clean up M3U file in ListenBrainz folder if present
+					try {
+						$userFolder = \OC::$server->getUserFolder($userId);
+						if ($userFolder->nodeExists('ListenBrainz')) {
+							$lbFolder = $userFolder->get('ListenBrainz');
+							if ($lbFolder instanceof \OCP\Files\Folder) {
+								$cleanTitle = \str_replace(' (ListenBrainz)', '', $playlistName);
+								$sanitizedTitle = \preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $cleanTitle);
+								$m3uFilename = $sanitizedTitle . ".m3u";
+								if ($lbFolder->nodeExists($m3uFilename)) {
+									if ($dryRun) {
+										$log("[Dry Run] Would delete M3U file ListenBrainz/{$m3uFilename}");
+									} else {
+										$lbFolder->get($m3uFilename)->delete();
+										$log("Deleted old M3U file ListenBrainz/{$m3uFilename}");
+									}
+									$deletedFiles[] = "ListenBrainz/{$m3uFilename}";
+								}
 							}
+						}
+					} catch (\Throwable $e) {
+						// Ignore file cleanup errors
+					}
+				}
+			}
+		}
+
+		// Also clean up any lingering/orphaned M3U files in ListenBrainz folder older than $days
+		try {
+			$userFolder = \OC::$server->getUserFolder($userId);
+			if ($userFolder->nodeExists('ListenBrainz')) {
+				$lbFolder = $userFolder->get('ListenBrainz');
+				if ($lbFolder instanceof \OCP\Files\Folder) {
+					$nodes = $lbFolder->getDirectoryListing();
+					foreach ($nodes as $node) {
+						if ($node instanceof \OCP\Files\File && \str_ends_with($node->getName(), '.m3u')) {
+							$fileName = $node->getName();
+							$fileDate = null;
+							if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $fileName, $matches)) {
+								$fileDate = \strtotime($matches[1]);
+							} else {
+								$fileDate = $node->getMTime();
+							}
+
+							if ($fileDate !== null && $fileDate > 0 && ($now - $fileDate > $cutoffSeconds)) {
+								$ageDays = \round(($now - $fileDate) / 86400, 1);
+								if ($dryRun) {
+									$log("[Dry Run] Would delete old M3U file ListenBrainz/{$fileName} (age {$ageDays} days)");
+								} else {
+									$node->delete();
+									$log("Deleted old M3U file ListenBrainz/{$fileName} (age {$ageDays} days)");
+								}
+								$deletedFiles[] = "ListenBrainz/{$fileName}";
+							}
+						}
+					}
+				}
+			}
+		} catch (\Throwable $e) {
+			// Ignore directory listing errors
+		}
+
+		// Clean up orphaned config keys
+		if (!$dryRun) {
+			foreach ($userKeys as $key) {
+				if (\strpos($key, 'listenbrainz.playlist.') === 0) {
+					$plId = (int)$this->config->getUserValue($userId, 'music', $key, '0');
+					if ($plId <= 0) {
+						$this->config->deleteUserValue($userId, 'music', $key);
+					} else {
+						try {
+							$playlistBusinessLayer->find($plId, $userId);
+						} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
 							$this->config->deleteUserValue($userId, 'music', $key);
 						}
 					}
@@ -731,6 +885,9 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			}
 		}
 
-		$this->logger->warning("ListenBrainz playlist sync completed for user {$userId}");
+		return [
+			'deleted_playlists' => $deletedPlaylists,
+			'deleted_files' => $deletedFiles,
+		];
 	}
 }

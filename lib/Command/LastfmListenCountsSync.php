@@ -61,6 +61,13 @@ class LastfmListenCountsSync extends BaseCommand {
 				'Also create or update a "Most Listened (Last.fm)" playlist'
 			)
 			->addOption(
+				'playlist-limit',
+				null,
+				InputOption::VALUE_REQUIRED,
+				'Maximum number of tracks in the "Most Listened (Last.fm)" playlist',
+				'200'
+			)
+			->addOption(
 				'force',
 				null,
 				InputOption::VALUE_NONE,
@@ -73,15 +80,16 @@ class LastfmListenCountsSync extends BaseCommand {
 		$period = (string)$input->getOption('period');
 		$limit = (int)$input->getOption('limit');
 		$createPlaylist = (bool)$input->getOption('create-playlist');
+		$playlistLimit = (int)$input->getOption('playlist-limit');
 		$onlyIfGreater = !(bool)$input->getOption('force');
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $username, $period, $limit, $createPlaylist, $onlyIfGreater) {
-				$this->syncForUser($user->getUID(), $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater);
+			$this->userManager->callForAllUsers(function($user) use ($output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit) {
+				$this->syncForUser($user->getUID(), $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit);
 			});
 		} else {
 			foreach ($users as $userId) {
-				$this->syncForUser($userId, $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater);
+				$this->syncForUser($userId, $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit);
 			}
 		}
 	}
@@ -93,7 +101,8 @@ class LastfmListenCountsSync extends BaseCommand {
 		string $period,
 		int $limit,
 		bool $createPlaylist,
-		bool $onlyIfGreater
+		bool $onlyIfGreater,
+		int $playlistLimit = 200
 	) : void {
 		$output->writeln("Syncing Last.fm listen counts and loved tracks for user <info>$userId</info>...");
 
@@ -109,7 +118,8 @@ class LastfmListenCountsSync extends BaseCommand {
 				$limit,
 				$createPlaylist,
 				$onlyIfGreater,
-				$logCallback
+				$logCallback,
+				$playlistLimit
 			);
 
 			if ($result['success']) {
@@ -118,7 +128,8 @@ class LastfmListenCountsSync extends BaseCommand {
 				$lovedUpdated = $result['loved_updated'] ?? 0;
 				$output->writeln("  <info>Success:</info> Fetched {$result['total_fetched']} top tracks (matched {$result['matched']}, updated {$result['updated']} play counts); fetched {$lovedFetched} loved tracks (matched {$lovedMatched}, starred {$lovedUpdated}).");
 				if (!empty($result['playlist_id'])) {
-					$output->writeln("  <info>Playlist:</info> Updated 'Most Listened (Last.fm)' (ID {$result['playlist_id']})");
+					$plCount = $result['playlist_track_count'] ?? 0;
+					$output->writeln("  <info>Playlist:</info> Updated 'Most Listened (Last.fm)' (ID {$result['playlist_id']}) with {$plCount} tracks (limited to top {$playlistLimit})");
 				}
 			} else {
 				$output->writeln("  <error>Failed: " . ($result['message'] ?? 'Unknown error') . "</error>");

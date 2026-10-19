@@ -89,4 +89,31 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 		$this->assertFalse($result['success']);
 		$this->assertStringContainsString('username', $result['message']);
 	}
+
+	public function testLimitMostListenedPlaylistNotFound() {
+		$this->config->expects($this->any())
+			->method('getUserValue')
+			->with('user1', 'music', 'lastfm.playlist.most_listened', '0')
+			->will($this->returnValue('0'));
+
+		// Mock server container for PlaylistBusinessLayer
+		$playlistBL = $this->getMockBuilder(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class)
+			->disableOriginalConstructor()
+			->getMock();
+		$playlistBL->expects($this->any())
+			->method('findAllByName')
+			->with('Most Listened (Last.fm)', 'user1')
+			->will($this->returnValue([]));
+
+		$container = $this->getMockBuilder(\OCP\IContainer::class)->getMock();
+		$container->expects($this->any())
+			->method('query')
+			->with(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class)
+			->will($this->returnValue($playlistBL));
+		\OC::$server = $container;
+
+		$result = $this->service->limitMostListenedPlaylist('user1', 200);
+		$this->assertFalse($result['found']);
+		$this->assertEquals(0, $result['new_count']);
+	}
 }

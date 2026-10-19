@@ -54,6 +54,8 @@ class LastfmListenCountsSync extends TimedJob {
 					} else {
 						$logger->warning("Last.fm listen counts sync skipped/failed for user {$userId}: " . ($result['message'] ?? 'Unknown reason'));
 					}
+					// Ensure existing "Most Listened (Last.fm)" playlist stays trimmed to top 200 songs
+					$lastfmService->limitMostListenedPlaylist($userId, 200);
 				} catch (\Throwable $e) {
 					$logger->error("Last.fm listen counts sync failed for user {$userId}: " . $e->getMessage(), ['exception' => $e]);
 				}

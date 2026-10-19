@@ -278,6 +278,7 @@ class LastfmService {
 	 * @param bool $createPlaylist Whether to create/update a "Most Listened (Last.fm)" playlist
 	 * @param bool $onlyIfGreater Update only if Last.fm play count is greater than current play count
 	 * @param callable|null $logCallback Optional callback for progress logging fn(string $msg)
+	 * @param int $playlistLimit Maximum number of tracks in the playlist (default 200)
 	 * @return array Result summary
 	 */
 	public function syncUserListenCounts(
@@ -287,7 +288,8 @@ class LastfmService {
 		int $maxTracks = 5000,
 		bool $createPlaylist = false,
 		bool $onlyIfGreater = true,
-		?callable $logCallback = null
+		?callable $logCallback = null,
+		int $playlistLimit = 200
 	) : array {
 		$log = function(string $msg) use ($logCallback) {
 			$this->logger->info("[Last.fm Sync] " . $msg);
@@ -611,9 +613,11 @@ class LastfmService {
 					$this->config->setUserValue($userId, 'music', $configKey, (string)$playlist->getId());
 				}
 
-				$playlistBusinessLayer->setTracks($orderedMatchedTrackIds, $playlist->getId(), $userId);
+				$playlistTracks = \array_slice($orderedMatchedTrackIds, 0, $playlistLimit);
+				$playlistBusinessLayer->setTracks($playlistTracks, $playlist->getId(), $userId);
 				$playlistId = $playlist->getId();
-				$log("Created/updated playlist 'Most Listened (Last.fm)' (ID: {$playlistId}) with {$matchedCount} tracks");
+				$playlistTrackCount = \count($playlistTracks);
+				$log("Created/updated playlist 'Most Listened (Last.fm)' (ID: {$playlistId}) with {$playlistTrackCount} tracks");
 			} catch (\Throwable $e) {
 				$log("Failed to create/update playlist: " . $e->getMessage());
 			}
@@ -630,7 +634,68 @@ class LastfmService {
 			'loved_updated' => $lovedUpdatedCount,
 			'starred_track_ids' => $starredTrackIds,
 			'playlist_id' => $playlistId,
+			'playlist_track_count' => $playlistTrackCount ?? 0,
 			'message' => "Successfully synced listen counts and loved tracks: {$updatedCount} listen counts updated ({$matchedCount} matched from {$totalFetched} Last.fm top tracks), {$lovedUpdatedCount} loved tracks starred ({$lovedMatchedCount} matched from {$lovedFetched} Last.fm loved tracks)."
+		];
+	}
+
+	/**
+	 * Ensure the "Most Listened (Last.fm)" playlist for the user is limited to the top $limit tracks.
+	 *
+	 * @param string $userId Nextcloud user ID
+	 * @param int $limit Max tracks (default 200)
+	 * @return array{found: bool, playlist_id: ?int, previous_count: int, new_count: int}
+	 */
+	public function limitMostListenedPlaylist(string $userId, int $limit = 200) : array {
+		$playlistBusinessLayer = \OC::$server->query(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class);
+		$configKey = 'lastfm.playlist.most_listened';
+		$playlistId = (int)$this->config->getUserValue($userId, 'music', $configKey, '0');
+		$playlist = null;
+
+		if ($playlistId > 0) {
+			try {
+				$playlist = $playlistBusinessLayer->find($playlistId, $userId);
+			} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+				$playlist = null;
+			}
+		}
+
+		// Fallback: search by name
+		if (!$playlist) {
+			$matching = $playlistBusinessLayer->findAllByName('Most Listened (Last.fm)', $userId);
+			if (!empty($matching)) {
+				$playlist = $matching[0];
+				$playlistId = $playlist->getId();
+				$this->config->setUserValue($userId, 'music', $configKey, (string)$playlistId);
+			}
+		}
+
+		if (!$playlist) {
+			return [
+				'found' => false,
+				'playlist_id' => null,
+				'previous_count' => 0,
+				'new_count' => 0,
+			];
+		}
+
+		$currentTracks = $playlist->getTrackIdsAsArray();
+		$previousCount = \count($currentTracks);
+
+		if ($previousCount > $limit) {
+			$trimmedTracks = \array_slice($currentTracks, 0, $limit);
+			$playlistBusinessLayer->setTracks($trimmedTracks, $playlist->getId(), $userId);
+			$newCount = \count($trimmedTracks);
+			$this->logger->info("Trimmed 'Most Listened (Last.fm)' playlist (ID {$playlistId}) from {$previousCount} to {$newCount} tracks");
+		} else {
+			$newCount = $previousCount;
+		}
+
+		return [
+			'found' => true,
+			'playlist_id' => $playlistId,
+			'previous_count' => $previousCount,
+			'new_count' => $newCount,
 		];
 	}
 

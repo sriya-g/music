@@ -54,6 +54,7 @@
 	</repair-steps>
 	<commands>
 		<command>OCA\Music\Command\Cleanup</command>
+		<command>OCA\Music\Command\CleanupPlaylists</command>
 		<command>OCA\Music\Command\DiscordPresenceDaemon</command>
 		<command>OCA\Music\Command\LastfmListenCountsSync</command>
 		<command>OCA\Music\Command\ListenBrainzPlaylistSync</command>
