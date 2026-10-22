@@ -16,6 +16,7 @@ use OCA\Music\BackgroundJob\Cleanup;
 use OCA\Music\BackgroundJob\PodcastUpdateCheck;
 use OCA\Music\BackgroundJob\ListenBrainzPlaylistSync;
 use OCA\Music\BackgroundJob\LastfmListenCountsSync;
+use OCA\Music\BackgroundJob\LastfmPlaylistSync;
 use OCP\BackgroundJob\IJobList;
 use OCP\Migration\IOutput;
 use OCP\Migration\IRepairStep;
@@ -37,6 +38,7 @@ class RegisterBackgroundJobs implements IRepairStep {
 		$jobList->add(PodcastUpdateCheck::class);
 		$jobList->add(ListenBrainzPlaylistSync::class);
 		$jobList->add(LastfmListenCountsSync::class);
+		$jobList->add(LastfmPlaylistSync::class);
 
 		// remove legacy job registrations possibly made by older versions of the Music app
 		$jobList->remove('OC\BackgroundJob\Legacy\RegularJob', ['OCA\Music\Backgroundjob\Cleanup', 'run']);

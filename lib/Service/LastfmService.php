@@ -16,12 +16,16 @@ use OCA\Music\AppFramework\BusinessLayer\BusinessLayerException;
 use OCA\Music\AppFramework\Core\Logger;
 use OCA\Music\BusinessLayer\AlbumBusinessLayer;
 use OCA\Music\BusinessLayer\ArtistBusinessLayer;
+use OCA\Music\BusinessLayer\PlaylistBusinessLayer;
 use OCA\Music\BusinessLayer\TrackBusinessLayer;
 use OCA\Music\Db\Artist;
 use OCA\Music\Db\MatchMode;
 use OCA\Music\Db\Track;
+use OCA\Music\Utility\FilesUtil;
 use OCA\Music\Utility\HttpUtil;
 use OCA\Music\Utility\StringUtil;
+use OCP\Files\File;
+use OCP\Files\Folder;
 use OCP\IConfig;
 
 class LastfmService {
@@ -36,8 +40,16 @@ class LastfmService {
 		private ArtistBusinessLayer $artistBusinessLayer,
 		private TrackBusinessLayer $trackBusinessLayer,
 		private Logger $logger,
+		private ?PlaylistBusinessLayer $playlistBusinessLayer = null,
 	) {
 		$this->apiKey = (string)$config->getSystemValue('music.lastfm_api_key', '');
+	}
+
+	private function getPlaylistBusinessLayer() : PlaylistBusinessLayer {
+		if ($this->playlistBusinessLayer !== null) {
+			return $this->playlistBusinessLayer;
+		}
+		return \OC::$server->query(PlaylistBusinessLayer::class);
 	}
 
 	/**
@@ -595,7 +607,7 @@ class LastfmService {
 		$playlistId = null;
 		if ($createPlaylist && !empty($orderedMatchedTrackIds)) {
 			try {
-				$playlistBusinessLayer = \OC::$server->query(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class);
+				$playlistBusinessLayer = $this->getPlaylistBusinessLayer();
 				$configKey = 'lastfm.playlist.most_listened';
 				$existingPlaylistId = (int)$this->config->getUserValue($userId, 'music', $configKey, '0');
 				$playlist = null;
@@ -640,6 +652,450 @@ class LastfmService {
 	}
 
 	/**
+	 * Fetch tracks from a Last.fm station endpoint (e.g. recommended or mix).
+	 *
+	 * @param string $stationUrl
+	 * @return array<int, array{title: string, artist: string, duration: int}>
+	 */
+	public function fetchStationTracks(string $stationUrl) : array {
+		$ch = \curl_init();
+		if (!$ch) {
+			$this->logger->error("LastfmService: Failed to initialize curl handle for {$stationUrl}");
+			return [];
+		}
+
+		\curl_setopt($ch, \CURLOPT_URL, $stationUrl);
+		\curl_setopt($ch, \CURLOPT_CONNECTTIMEOUT, 15);
+		\curl_setopt($ch, \CURLOPT_TIMEOUT, 30);
+		\curl_setopt($ch, \CURLOPT_RETURNTRANSFER, true);
+		\curl_setopt($ch, \CURLOPT_USERAGENT, 'NextcloudMusicApp/1.0');
+		\curl_setopt($ch, \CURLOPT_HTTPHEADER, [
+			'Accept: application/json',
+		]);
+
+		$response = \curl_exec($ch);
+		$httpCode = \curl_getinfo($ch, \CURLINFO_HTTP_CODE);
+		$curlError = \curl_error($ch);
+		\curl_close($ch);
+
+		if ($response === false || $httpCode !== 200) {
+			$this->logger->warning("LastfmService: Failed to fetch station from {$stationUrl} (HTTP {$httpCode}, cURL Error: {$curlError})");
+			return [];
+		}
+
+		$data = \json_decode((string)$response, true);
+		if (!isset($data['playlist']) || !\is_array($data['playlist'])) {
+			$this->logger->warning("LastfmService: Station response from {$stationUrl} contains no 'playlist' array");
+			return [];
+		}
+
+		$tracks = [];
+		foreach ($data['playlist'] as $item) {
+			$title = (string)($item['name'] ?? $item['_name'] ?? '');
+			$artists = $item['artists'] ?? [];
+			$artist = '';
+			if (\is_array($artists) && !empty($artists)) {
+				$firstArtist = $artists[0];
+				$artist = (string)($firstArtist['name'] ?? $firstArtist['_name'] ?? '');
+			}
+
+			if (empty($title) || empty($artist)) {
+				continue;
+			}
+
+			$duration = isset($item['duration']) && \is_numeric($item['duration']) && $item['duration'] > 0
+				? (int)$item['duration']
+				: -1;
+
+			$tracks[] = [
+				'title' => $title,
+				'artist' => $artist,
+				'duration' => $duration,
+			];
+		}
+
+		return $tracks;
+	}
+
+	/**
+	 * Save playlist as M3U file in the user's ListenBrainz folder, reusing ListenBrainz playlist logic.
+	 *
+	 * @param string $userId
+	 * @param string $title Playlist title (without extension)
+	 * @param array<int, array{title: string, artist: string, duration: int, track_id: ?int}> $tracks
+	 * @return bool
+	 */
+	public function savePlaylistToListenBrainzFolder(string $userId, string $title, array $tracks) : bool {
+		try {
+			$userFolder = \OC::$server->getUserFolder($userId);
+			if (!$userFolder->nodeExists('ListenBrainz')) {
+				$userFolder->newFolder('ListenBrainz');
+			}
+			$lbFolder = $userFolder->get('ListenBrainz');
+			if ($lbFolder instanceof Folder) {
+				$sanitizedTitle = (string)\preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $title);
+				$m3uFilename = $sanitizedTitle . '.m3u';
+
+				$file = $lbFolder->nodeExists($m3uFilename)
+					? $lbFolder->get($m3uFilename)
+					: $lbFolder->newFile($m3uFilename);
+
+				if ($file instanceof File) {
+					$m3uContent = "#EXTM3U\n#EXTENC: UTF-8\n";
+
+					foreach ($tracks as $item) {
+						$trackTitle = $item['title'] ?? '';
+						$artistName = $item['artist'] ?? '';
+						if (empty($trackTitle) || empty($artistName)) {
+							continue;
+						}
+
+						$durationSec = isset($item['duration']) && $item['duration'] > 0 ? (int)$item['duration'] : -1;
+						$trackId = $item['track_id'] ?? null;
+
+						$written = false;
+						if ($trackId !== null && $trackId > 0) {
+							try {
+								$foundTrack = $this->trackBusinessLayer->find($trackId, $userId);
+								$nodes = $userFolder->getById($foundTrack->getFileId());
+								if (\count($nodes) > 0) {
+									$trackRelPath = FilesUtil::relativePath($lbFolder->getPath(), $nodes[0]->getPath());
+									$m3uContent .= "#EXTINF:{$durationSec},{$artistName} - {$trackTitle}\n";
+									$m3uContent .= $trackRelPath . "\n";
+									$written = true;
+								}
+							} catch (\Throwable) {
+							}
+						}
+
+						if (!$written) {
+							$m3uContent .= "#EXTINF:{$durationSec},{$artistName} - {$trackTitle}\n";
+							$m3uContent .= 'missing/' . \sprintf('%s - %s.mp3', $artistName, $trackTitle) . "\n";
+						}
+					}
+
+					$file->putContent($m3uContent);
+					$this->logger->info("Last.fm playlist sync: saved M3U playlist to ListenBrainz/{$m3uFilename}");
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			$this->logger->warning('Last.fm playlist sync: failed to save M3U playlist: ' . $e->getMessage());
+		}
+		return false;
+	}
+
+	/**
+	 * Sync Last.fm station playlists (recommendations and mix) weekly for the user.
+	 * Also saves M3U playlists to the ListenBrainz folder and creates/updates playlists in Nextcloud.
+	 *
+	 * @param string $userId Nextcloud user ID
+	 * @param string|null $username Optional Last.fm username
+	 * @param bool $force Force sync even if synced within the last 7 days
+	 * @param callable|null $logCallback Optional progress logger fn(string $msg)
+	 * @return array Result summary
+	 */
+	public function syncStationPlaylists(
+		string $userId,
+		?string $username = null,
+		bool $force = false,
+		?callable $logCallback = null
+	) : array {
+		$log = $logCallback ?? fn(string $msg) => $this->logger->info($msg);
+
+		// Check weekly interval unless force is specified
+		$lastSyncKey = 'lastfm.playlist.last_station_sync';
+		$lastSync = (int)$this->config->getUserValue($userId, 'music', $lastSyncKey, '0');
+		$now = \time();
+
+		if (!$force && $lastSync > 0 && ($now - $lastSync < 7 * 86400)) {
+			$ageDays = \round(($now - $lastSync) / 86400, 1);
+			$msg = "Station playlists were already synced {$ageDays} days ago for user {$userId} (threshold: 7 days). Skipping.";
+			$log($msg);
+			return [
+				'success' => true,
+				'skipped' => true,
+				'username' => $username,
+				'message' => $msg,
+			];
+		}
+
+		if (empty($username)) {
+			$username = $this->config->getUserValue($userId, 'music', 'lastfm.username');
+		}
+
+		if (empty($username)) {
+			try {
+				/** @var \OCA\Music\AppInfo\Application $app */
+				$app = \OC::$server->query(\OCA\Music\AppInfo\Application::class);
+				$scrobblers = $app->get('externalScrobblers');
+				if (\is_array($scrobblers)) {
+					foreach ($scrobblers as $scrobbler) {
+						if ($scrobbler instanceof Scrobbling\ExternalScrobbler && $scrobbler->getIdentifier() === 'lastfm') {
+							$username = $scrobbler->getUsername($userId);
+							break;
+						}
+					}
+				}
+			} catch (\Throwable) {
+			}
+		}
+
+		if (empty($username)) {
+			$msg = "No Last.fm username found for user {$userId}. Please specify a username or connect Last.fm in Settings.";
+			$log($msg);
+			return [
+				'success' => false,
+				'skipped' => false,
+				'message' => $msg,
+			];
+		}
+
+		$date = (new \DateTime())->format('Y-m-d');
+		$stations = [
+			'recommended' => [
+				'title' => "Recommendations {$date}",
+				'url' => "https://www.last.fm/player/station/user/{$username}/recommended",
+				'config_key' => "lastfm.playlist.recommended.{$date}",
+			],
+			'mix' => [
+				'title' => "Mix {$date}",
+				'url' => "https://www.last.fm/player/station/user/{$username}/mix",
+				'config_key' => "lastfm.playlist.mix.{$date}",
+			],
+		];
+
+		$playlistBusinessLayer = $this->getPlaylistBusinessLayer();
+		$syncedPlaylists = [];
+
+		foreach ($stations as $stationType => $stationInfo) {
+			$title = $stationInfo['title'];
+			$url = $stationInfo['url'];
+			$configKey = $stationInfo['config_key'];
+
+			$log("Fetching Last.fm station tracks from {$url}...");
+			$stationTracks = $this->fetchStationTracks($url);
+			$totalTracks = \count($stationTracks);
+
+			if ($totalTracks === 0) {
+				$log("No tracks found or failed to fetch station for {$stationType}.");
+				continue;
+			}
+
+			$log("Found {$totalTracks} tracks in Last.fm station '{$title}'. Matching against local music library...");
+
+			$ncTrackIds = [];
+			$tracksForM3u = [];
+
+			foreach ($stationTracks as $stTrack) {
+				$trackTitle = $stTrack['title'];
+				$artistName = $stTrack['artist'];
+				$durationSec = $stTrack['duration'];
+
+				$matchedTrackId = null;
+				$foundTracks = $this->trackBusinessLayer->findAllByNameArtistOrAlbum($trackTitle, $artistName, null, $userId);
+
+				if (empty($foundTracks)) {
+					// Loose match fallback: strip remaster/live/version suffix
+					$cleanTitle = (string)\preg_replace('/\s*[-–]\s*(remaster(ed)?|live|single|edit|version).*/i', '', $trackTitle);
+					$cleanTitle = (string)\preg_replace('/\s*[\(\[][^\)\]]*(remaster|live|version|edit|feat|ft\.)[^\)\]]*[\)\]]/i', '', $cleanTitle);
+					$cleanTitle = \trim($cleanTitle);
+					if (!empty($cleanTitle) && $cleanTitle !== $trackTitle) {
+						$foundTracks = $this->trackBusinessLayer->findAllByNameArtistOrAlbum($cleanTitle, $artistName, null, $userId);
+					}
+				}
+
+				if (!empty($foundTracks)) {
+					$matchedTrackId = $foundTracks[0]->getId();
+					$ncTrackIds[] = $matchedTrackId;
+				}
+
+				$tracksForM3u[] = [
+					'title' => $trackTitle,
+					'artist' => $artistName,
+					'duration' => $durationSec,
+					'track_id' => $matchedTrackId,
+				];
+			}
+
+			$matchedCount = \count($ncTrackIds);
+			$log("Matched {$matchedCount} of {$totalTracks} tracks in local library for '{$title}'.");
+
+			// 1. Save M3U file in user's ListenBrainz folder
+			$savedM3u = $this->savePlaylistToListenBrainzFolder($userId, $title, $tracksForM3u);
+			$m3uFilename = ((string)\preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $title)) . '.m3u';
+
+			// 2. Create or update Nextcloud music server playlist
+			$playlistName = $title . ' (Last.fm)';
+			$existingId = (int)$this->config->getUserValue($userId, 'music', $configKey, '0');
+			$ncPlaylist = null;
+
+			if ($existingId > 0) {
+				try {
+					$ncPlaylist = $playlistBusinessLayer->find($existingId, $userId);
+				} catch (\OCP\AppFramework\Db\DoesNotExistException) {
+					$ncPlaylist = null;
+				}
+			}
+
+			if (!$ncPlaylist) {
+				$matching = $playlistBusinessLayer->findAllByName($playlistName, $userId);
+				if (!empty($matching)) {
+					$ncPlaylist = $matching[0];
+					$this->config->setUserValue($userId, 'music', $configKey, (string)$ncPlaylist->getId());
+				}
+			}
+
+			if (!$ncPlaylist) {
+				$ncPlaylist = $playlistBusinessLayer->create($playlistName, $userId);
+				$this->config->setUserValue($userId, 'music', $configKey, (string)$ncPlaylist->getId());
+				$log("Created Nextcloud playlist '{$playlistName}' (ID {$ncPlaylist->getId()})");
+			} else {
+				if ($ncPlaylist->getName() !== $playlistName) {
+					$playlistBusinessLayer->rename($playlistName, $ncPlaylist->getId(), $userId);
+				}
+				$log("Updating Nextcloud playlist '{$playlistName}' (ID {$ncPlaylist->getId()})");
+			}
+
+			$playlistBusinessLayer->setTracks($ncTrackIds, $ncPlaylist->getId(), $userId);
+
+			$syncedPlaylists[$stationType] = [
+				'playlist_id' => $ncPlaylist->getId(),
+				'name' => $playlistName,
+				'total_tracks' => $totalTracks,
+				'matched_tracks' => $matchedCount,
+				'm3u_file' => "ListenBrainz/{$m3uFilename}",
+				'm3u_saved' => $savedM3u,
+			];
+		}
+
+		// Update last sync timestamp
+		$this->config->setUserValue($userId, 'music', $lastSyncKey, (string)$now);
+
+		// Clean up week-old station playlists
+		$this->cleanupOldStationPlaylists($userId, 7, false, $logCallback);
+
+		$syncedCount = \count($syncedPlaylists);
+		$msg = "Successfully synced {$syncedCount} Last.fm station playlist(s) for user {$userId}.";
+		$log($msg);
+
+		return [
+			'success' => true,
+			'skipped' => false,
+			'username' => $username,
+			'date' => $date,
+			'playlists' => $syncedPlaylists,
+			'message' => $msg,
+		];
+	}
+
+	/**
+	 * Clean up Last.fm station playlists older than $days (default 7 days).
+	 *
+	 * @param string $userId Nextcloud user ID
+	 * @param int $days Number of days threshold (default 7)
+	 * @param bool $dryRun If true, only reports playlists without deleting them
+	 * @param callable|null $logCallback Optional progress logger fn(string $msg)
+	 * @return array{deleted_playlists: array}
+	 */
+	public function cleanupOldStationPlaylists(
+		string $userId,
+		int $days = 7,
+		bool $dryRun = false,
+		?callable $logCallback = null
+	) : array {
+		$playlistBusinessLayer = $this->getPlaylistBusinessLayer();
+		$log = $logCallback ?? fn(string $msg) => $this->logger->info($msg);
+
+		try {
+			$allPlaylists = $playlistBusinessLayer->findAll($userId);
+		} catch (\Throwable $e) {
+			$log("Failed to fetch playlists for user {$userId}: " . $e->getMessage());
+			return ['deleted_playlists' => []];
+		}
+
+		$now = \time();
+		$cutoffSeconds = $days * 86400;
+		$deletedPlaylists = [];
+
+		foreach ($allPlaylists as $playlist) {
+			$playlistName = $playlist->getName() ?? '';
+			$playlistId = $playlist->getId();
+
+			// Only clean up Last.fm station playlists (Recommendations / Mix with a date)
+			$isStationPlaylist = (
+				\strpos($playlistName, '(Last.fm)') !== false &&
+				(\strpos($playlistName, 'Recommendations') !== false || \strpos($playlistName, 'Mix') !== false) &&
+				\preg_match('/\b\d{4}-\d{2}-\d{2}\b/', $playlistName)
+			);
+
+			if (!$isStationPlaylist) {
+				continue;
+			}
+
+			$playlistDate = null;
+			if (\preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $playlistName, $matches)) {
+				$playlistDate = \strtotime($matches[1]);
+			}
+
+			if ($playlistDate !== null && $playlistDate > 0) {
+				$ageSeconds = $now - $playlistDate;
+				if ($ageSeconds > $cutoffSeconds) {
+					$ageDays = \round($ageSeconds / 86400, 1);
+					$trackCount = $playlist->getTrackCount();
+
+					if ($dryRun) {
+						$log("[Dry Run] Would delete old Last.fm playlist '{$playlistName}' (ID {$playlistId}, {$trackCount} tracks, age {$ageDays} days)");
+						$deletedPlaylists[] = [
+							'id' => $playlistId,
+							'name' => $playlistName,
+							'tracks' => $trackCount,
+							'age_days' => $ageDays,
+						];
+					} else {
+						try {
+							$playlistBusinessLayer->delete($playlistId, $userId);
+							$log("Deleted old Last.fm playlist '{$playlistName}' (ID {$playlistId}, {$trackCount} tracks, age {$ageDays} days)");
+							$deletedPlaylists[] = [
+								'id' => $playlistId,
+								'name' => $playlistName,
+								'tracks' => $trackCount,
+								'age_days' => $ageDays,
+							];
+						} catch (\Throwable $e) {
+							$log("Failed to delete playlist '{$playlistName}' (ID {$playlistId}): " . $e->getMessage());
+						}
+					}
+				}
+			}
+		}
+
+		// Clean up orphaned config keys
+		if (!$dryRun) {
+			try {
+				$userKeys = $this->config->getUserKeys($userId, 'music');
+				foreach ($userKeys as $key) {
+					if (\strpos($key, 'lastfm.playlist.recommended.') === 0 || \strpos($key, 'lastfm.playlist.mix.') === 0) {
+						$plId = (int)$this->config->getUserValue($userId, 'music', $key, '0');
+						if ($plId <= 0) {
+							$this->config->deleteUserValue($userId, 'music', $key);
+						} else {
+							try {
+								$playlistBusinessLayer->find($plId, $userId);
+							} catch (\OCP\AppFramework\Db\DoesNotExistException) {
+								$this->config->deleteUserValue($userId, 'music', $key);
+							}
+						}
+					}
+				}
+			} catch (\Throwable) {
+			}
+		}
+
+		return ['deleted_playlists' => $deletedPlaylists];
+	}
+
+	/**
 	 * Ensure the "Most Listened (Last.fm)" playlist for the user is limited to the top $limit tracks.
 	 *
 	 * @param string $userId Nextcloud user ID
@@ -647,7 +1103,7 @@ class LastfmService {
 	 * @return array{found: bool, playlist_id: ?int, previous_count: int, new_count: int}
 	 */
 	public function limitMostListenedPlaylist(string $userId, int $limit = 200) : array {
-		$playlistBusinessLayer = \OC::$server->query(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class);
+		$playlistBusinessLayer = $this->getPlaylistBusinessLayer();
 		$configKey = 'lastfm.playlist.most_listened';
 		$playlistId = (int)$this->config->getUserValue($userId, 'music', $configKey, '0');
 		$playlist = null;

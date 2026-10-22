@@ -55,7 +55,7 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 	public function testNormalizeStringLoose() {
 		$this->assertEquals('comfortably numb', LastfmService::normalizeStringLoose('Comfortably Numb (2011 Remastered Version)'));
 		$this->assertEquals('song title', LastfmService::normalizeStringLoose('Song Title [Live at Wembley]'));
-		$this->assertEquals('track feat guest', LastfmService::normalizeStringLoose('Track (feat. Guest Artist)'));
+		$this->assertEquals('track', LastfmService::normalizeStringLoose('Track (feat. Guest Artist)'));
 		$this->assertEquals('dont stop believin', LastfmService::normalizeStringLoose("Don't Stop Believin'"));
 	}
 
@@ -115,5 +115,168 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 		$result = $this->service->limitMostListenedPlaylist('user1', 200);
 		$this->assertFalse($result['found']);
 		$this->assertEquals(0, $result['new_count']);
+	}
+
+	public function testSavePlaylistToListenBrainzFolder() {
+		$userId = 'user1';
+		$title = 'Recommendations 2026-10-22';
+		$tracks = [
+			[
+				'title' => 'Song A',
+				'artist' => 'Artist A',
+				'duration' => 200,
+				'track_id' => 1,
+			],
+			[
+				'title' => 'Song B',
+				'artist' => 'Artist B',
+				'duration' => -1,
+				'track_id' => null,
+			],
+		];
+
+		// Mock track 1 in TrackBusinessLayer
+		$track1 = new \OCA\Music\Db\Track();
+		$track1->setId(1);
+		$track1->setTitle('Song A');
+		$track1->setFileId(101);
+
+		$this->trackBusinessLayer->expects($this->any())
+			->method('find')
+			->with(1, $userId)
+			->will($this->returnValue($track1));
+
+		// Mock Folder and File
+		$fileMock = $this->getMockBuilder(\OCP\Files\File::class)->getMock();
+		$writtenContent = '';
+		$fileMock->expects($this->once())
+			->method('putContent')
+			->will($this->returnCallback(function($content) use (&$writtenContent) {
+				$writtenContent = $content;
+				return true;
+			}));
+
+		$lbFolderMock = $this->getMockBuilder(\OCP\Files\Folder::class)->getMock();
+		$lbFolderMock->expects($this->any())->method('getPath')->will($this->returnValue('/user1/files/ListenBrainz'));
+		$lbFolderMock->expects($this->any())->method('nodeExists')->with('Recommendations 2026-10-22.m3u')->will($this->returnValue(false));
+		$lbFolderMock->expects($this->once())->method('newFile')->with('Recommendations 2026-10-22.m3u')->will($this->returnValue($fileMock));
+
+		$musicFileNode = $this->getMockBuilder(\OCP\Files\File::class)->getMock();
+		$musicFileNode->expects($this->any())->method('getPath')->will($this->returnValue('/user1/files/Music/Artist A/Song A.mp3'));
+
+		$userFolderMock = $this->getMockBuilder(\OCP\Files\Folder::class)->getMock();
+		$userFolderMock->expects($this->any())->method('nodeExists')->with('ListenBrainz')->will($this->returnValue(true));
+		$userFolderMock->expects($this->any())->method('get')->with('ListenBrainz')->will($this->returnValue($lbFolderMock));
+		$userFolderMock->expects($this->any())->method('getById')->with(101)->will($this->returnValue([$musicFileNode]));
+
+		$serverMock = $this->getMockBuilder(\OCP\IServerContainer::class)->getMock();
+		$serverMock->expects($this->any())->method('getUserFolder')->with($userId)->will($this->returnValue($userFolderMock));
+		\OC::$server = $serverMock;
+
+		$success = $this->service->savePlaylistToListenBrainzFolder($userId, $title, $tracks);
+		$this->assertTrue($success);
+		$this->assertStringContainsString("#EXTM3U\n#EXTENC: UTF-8", $writtenContent);
+		$this->assertStringContainsString("#EXTINF:200,Artist A - Song A", $writtenContent);
+		$this->assertStringContainsString("../Music/Artist A/Song A.mp3", $writtenContent);
+		$this->assertStringContainsString("#EXTINF:-1,Artist B - Song B", $writtenContent);
+		$this->assertStringContainsString("missing/Artist B - Song B.mp3", $writtenContent);
+	}
+
+	public function testSyncStationPlaylistsWeeklySkip() {
+		$userId = 'user1';
+		$now = \time();
+		$twoDaysAgo = $now - (2 * 86400);
+
+		$this->config->expects($this->any())
+			->method('getUserValue')
+			->will($this->returnCallback(function($u, $app, $key, $default = null) use ($twoDaysAgo) {
+				if ($key === 'lastfm.playlist.last_station_sync') {
+					return (string)$twoDaysAgo;
+				}
+				if ($key === 'lastfm.username') {
+					return 'testuser';
+				}
+				return $default;
+			}));
+
+		$result = $this->service->syncStationPlaylists($userId, null, false);
+		$this->assertTrue($result['success']);
+		$this->assertTrue($result['skipped']);
+		$this->assertStringContainsString('threshold: 7 days', $result['message']);
+	}
+
+	public function testSyncStationPlaylistsMissingUsername() {
+		$userId = 'user1';
+
+		$this->config->expects($this->any())
+			->method('getUserValue')
+			->will($this->returnCallback(function($u, $app, $key, $default = null) {
+				if ($key === 'lastfm.playlist.last_station_sync') {
+					return '0';
+				}
+				if ($key === 'lastfm.username') {
+					return null;
+				}
+				return $default;
+			}));
+
+		$result = $this->service->syncStationPlaylists($userId, null, true);
+		$this->assertFalse($result['success']);
+		$this->assertStringContainsString('username', $result['message']);
+	}
+
+	public function testCleanupOldStationPlaylists() {
+		$userId = 'user1';
+		$now = \time();
+		$tenDaysAgo = (new \DateTime())->setTimestamp($now - 10 * 86400)->format('Y-m-d');
+		$twoDaysAgo = (new \DateTime())->setTimestamp($now - 2 * 86400)->format('Y-m-d');
+
+		$oldPlaylist = \OCA\Music\Db\Playlist::fromRow([
+			'id' => 10,
+			'name' => "Recommendations {$tenDaysAgo} (Last.fm)",
+			'track_ids' => '1,2,3',
+		]);
+
+		$recentPlaylist = \OCA\Music\Db\Playlist::fromRow([
+			'id' => 20,
+			'name' => "Mix {$twoDaysAgo} (Last.fm)",
+			'track_ids' => '4,5',
+		]);
+
+		$unrelatedPlaylist = \OCA\Music\Db\Playlist::fromRow([
+			'id' => 30,
+			'name' => 'Most Listened (Last.fm)',
+			'track_ids' => '6,7,8',
+		]);
+
+		$playlistBL = $this->getMockBuilder(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class)
+			->disableOriginalConstructor()
+			->getMock();
+		$playlistBL->expects($this->any())
+			->method('findAll')
+			->with($userId)
+			->will($this->returnValue([$oldPlaylist, $recentPlaylist, $unrelatedPlaylist]));
+
+		// Only oldPlaylist (ID 10) should be deleted!
+		$playlistBL->expects($this->once())
+			->method('delete')
+			->with(10, $userId);
+
+		$container = $this->getMockBuilder(\OCP\IServerContainer::class)->getMock();
+		$container->expects($this->any())
+			->method('query')
+			->with(\OCA\Music\BusinessLayer\PlaylistBusinessLayer::class)
+			->will($this->returnValue($playlistBL));
+		\OC::$server = $container;
+
+		$this->config->expects($this->any())
+			->method('getUserKeys')
+			->with($userId, 'music')
+			->will($this->returnValue(["lastfm.playlist.recommended.{$tenDaysAgo}", "lastfm.playlist.mix.{$twoDaysAgo}"]));
+
+		$result = $this->service->cleanupOldStationPlaylists($userId, 7, false);
+		$this->assertCount(1, $result['deleted_playlists']);
+		$this->assertEquals(10, $result['deleted_playlists'][0]['id']);
+		$this->assertEquals("Recommendations {$tenDaysAgo} (Last.fm)", $result['deleted_playlists'][0]['name']);
 	}
 }

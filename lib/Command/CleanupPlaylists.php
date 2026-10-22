@@ -108,11 +108,20 @@ class CleanupPlaylists extends BaseCommand {
 			}
 		}
 
-		// 2. Try to use ListenBrainzScrobbler::cleanupOldPlaylists if available
-		$listenBrainzScrobbler = $this->getListenBrainzScrobbler();
 		$logCallback = function(string $msg) use ($output) {
 			$output->writeln("  <comment>{$msg}</comment>");
 		};
+
+		// Also clean up old Last.fm station playlists (Recommendations / Mix)
+		$lastfmCleanup = $this->lastfmService->cleanupOldStationPlaylists($userId, $days, $dryRun, $logCallback);
+		$deletedLastfmCount = \count($lastfmCleanup['deleted_playlists']);
+		if ($deletedLastfmCount > 0) {
+			$actionWord = $dryRun ? 'Would remove' : 'Removed';
+			$output->writeln("  <info>Last.fm Station Playlists:</info> {$actionWord} {$deletedLastfmCount} old station playlist(s).");
+		}
+
+		// 2. Try to use ListenBrainzScrobbler::cleanupOldPlaylists if available
+		$listenBrainzScrobbler = $this->getListenBrainzScrobbler();
 
 		if ($listenBrainzScrobbler) {
 			$result = $listenBrainzScrobbler->cleanupOldPlaylists($userId, $days, $allTypes, $dryRun, $logCallback);

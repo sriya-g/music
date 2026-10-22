@@ -41,6 +41,12 @@ class ListenBrainzScrobblerTest extends \PHPUnit\Framework\TestCase {
 		$this->artistBusinessLayer = $this->getMockBuilder(ArtistBusinessLayer::class)->disableOriginalConstructor()->getMock();
 		$this->crypto = $this->getMockBuilder(ICrypto::class)->getMock();
 
+		$appManager = $this->getMockBuilder(\OCP\App\IAppManager::class)->getMock();
+		$appManager->expects($this->any())->method('getAppVersion')->will($this->returnValue('1.0.0'));
+		$container = $this->getMockBuilder(\OCP\IContainer::class)->getMock();
+		$container->expects($this->any())->method('query')->with(\OCP\App\IAppManager::class)->will($this->returnValue($appManager));
+		\OC::$server = $container;
+
 		$this->scrobbler = new ListenBrainzScrobbler(
 			$this->config,
 			$this->logger,

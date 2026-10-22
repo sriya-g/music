@@ -57,6 +57,7 @@
 		<command>OCA\Music\Command\CleanupPlaylists</command>
 		<command>OCA\Music\Command\DiscordPresenceDaemon</command>
 		<command>OCA\Music\Command\LastfmListenCountsSync</command>
+		<command>OCA\Music\Command\LastfmPlaylistSync</command>
 		<command>OCA\Music\Command\ListenBrainzPlaylistSync</command>
 		<command>OCA\Music\Command\PlaylistExport</command>
 		<command>OCA\Music\Command\PlaylistImport</command>

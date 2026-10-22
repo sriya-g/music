@@ -72,6 +72,12 @@ class LastfmListenCountsSync extends BaseCommand {
 				null,
 				InputOption::VALUE_NONE,
 				'Update play counts even if local play count is higher'
+			)
+			->addOption(
+				'sync-station-playlists',
+				null,
+				InputOption::VALUE_NONE,
+				'Also sync recommendation and mix playlists from Last.fm'
 			);
 	}
 
@@ -82,14 +88,15 @@ class LastfmListenCountsSync extends BaseCommand {
 		$createPlaylist = (bool)$input->getOption('create-playlist');
 		$playlistLimit = (int)$input->getOption('playlist-limit');
 		$onlyIfGreater = !(bool)$input->getOption('force');
+		$syncStations = (bool)$input->getOption('sync-station-playlists');
 
 		if ($input->getOption('all')) {
-			$this->userManager->callForAllUsers(function($user) use ($output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit) {
-				$this->syncForUser($user->getUID(), $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit);
+			$this->userManager->callForAllUsers(function($user) use ($output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit, $syncStations) {
+				$this->syncForUser($user->getUID(), $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit, $syncStations);
 			});
 		} else {
 			foreach ($users as $userId) {
-				$this->syncForUser($userId, $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit);
+				$this->syncForUser($userId, $output, $username, $period, $limit, $createPlaylist, $onlyIfGreater, $playlistLimit, $syncStations);
 			}
 		}
 	}
@@ -102,7 +109,8 @@ class LastfmListenCountsSync extends BaseCommand {
 		int $limit,
 		bool $createPlaylist,
 		bool $onlyIfGreater,
-		int $playlistLimit = 200
+		int $playlistLimit = 200,
+		bool $syncStations = false
 	) : void {
 		$output->writeln("Syncing Last.fm listen counts and loved tracks for user <info>$userId</info>...");
 
@@ -130,6 +138,16 @@ class LastfmListenCountsSync extends BaseCommand {
 				if (!empty($result['playlist_id'])) {
 					$plCount = $result['playlist_track_count'] ?? 0;
 					$output->writeln("  <info>Playlist:</info> Updated 'Most Listened (Last.fm)' (ID {$result['playlist_id']}) with {$plCount} tracks (limited to top {$playlistLimit})");
+				}
+
+				if ($syncStations) {
+					$output->writeln("  <info>Station Playlists:</info> Syncing recommendations and mix...");
+					$stationResult = $this->lastfmService->syncStationPlaylists($userId, $username, true, $logCallback);
+					if ($stationResult['success']) {
+						$output->writeln("  <info>Station Playlists:</info> " . ($stationResult['message'] ?? 'Synced.'));
+					} else {
+						$output->writeln("  <error>Station Playlists Failed: " . ($stationResult['message'] ?? 'Unknown error') . "</error>");
+					}
 				}
 			} else {
 				$output->writeln("  <error>Failed: " . ($result['message'] ?? 'Unknown error') . "</error>");
