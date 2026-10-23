@@ -30,6 +30,10 @@ class LastfmListenCountsSync extends TimedJob {
 		$this->setInterval(86400);
 	}
 
+	/**
+	 * @param mixed $arguments
+	 * @return void
+	 */
 	public function run($arguments) {
 		$app = \OC::$server->query(Application::class);
 		$logger = $app->get(Logger::class);
@@ -56,6 +60,18 @@ class LastfmListenCountsSync extends TimedJob {
 					}
 					// Ensure existing "Most Listened (Last.fm)" playlist stays trimmed to top 200 songs
 					$lastfmService->limitMostListenedPlaylist($userId, 200);
+
+					// Also sync station playlists daily (Recommendations and Mix)
+					$stationResult = $lastfmService->syncStationPlaylists($userId);
+					if ($stationResult['success']) {
+						if (!empty($stationResult['skipped'])) {
+							$logger->info("Last.fm station playlists skipped for user {$userId}: " . ($stationResult['message'] ?? ''));
+						} else {
+							$logger->info("Last.fm station playlists synced for user {$userId}: " . ($stationResult['message'] ?? ''));
+						}
+					} else {
+						$logger->warning("Last.fm station playlists sync failed for user {$userId}: " . ($stationResult['message'] ?? ''));
+					}
 				} catch (\Throwable $e) {
 					$logger->error("Last.fm listen counts sync failed for user {$userId}: " . $e->getMessage(), ['exception' => $e]);
 				}

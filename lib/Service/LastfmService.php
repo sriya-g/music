@@ -786,12 +786,12 @@ class LastfmService {
 	}
 
 	/**
-	 * Sync Last.fm station playlists (recommendations and mix) weekly for the user.
+	 * Sync Last.fm station playlists (recommendations and mix) daily for the user.
 	 * Also saves M3U playlists to the ListenBrainz folder and creates/updates playlists in Nextcloud.
 	 *
 	 * @param string $userId Nextcloud user ID
 	 * @param string|null $username Optional Last.fm username
-	 * @param bool $force Force sync even if synced within the last 7 days
+	 * @param bool $force Force sync even if playlists were already synced today
 	 * @param callable|null $logCallback Optional progress logger fn(string $msg)
 	 * @return array Result summary
 	 */
@@ -803,14 +803,15 @@ class LastfmService {
 	) : array {
 		$log = $logCallback ?? fn(string $msg) => $this->logger->info($msg);
 
-		// Check weekly interval unless force is specified
+		// Check daily interval unless force is specified
 		$lastSyncKey = 'lastfm.playlist.last_station_sync';
 		$lastSync = (int)$this->config->getUserValue($userId, 'music', $lastSyncKey, '0');
 		$now = \time();
+		$date = (new \DateTime())->format('Y-m-d');
+		$lastSyncDate = $lastSync > 0 ? (new \DateTime())->setTimestamp($lastSync)->format('Y-m-d') : '';
 
-		if (!$force && $lastSync > 0 && ($now - $lastSync < 7 * 86400)) {
-			$ageDays = \round(($now - $lastSync) / 86400, 1);
-			$msg = "Station playlists were already synced {$ageDays} days ago for user {$userId} (threshold: 7 days). Skipping.";
+		if (!$force && $lastSync > 0 && $lastSyncDate === $date) {
+			$msg = "Station playlists were already synced today ({$date}) for user {$userId}. Skipping.";
 			$log($msg);
 			return [
 				'success' => true,
@@ -838,6 +839,18 @@ class LastfmService {
 					}
 				}
 			} catch (\Throwable) {
+				try {
+					$scrobblers = \OC::$server->query('externalScrobblers');
+					if (\is_array($scrobblers)) {
+						foreach ($scrobblers as $scrobbler) {
+							if ($scrobbler instanceof Scrobbling\ExternalScrobbler && $scrobbler->getIdentifier() === 'lastfm') {
+								$username = $scrobbler->getUsername($userId);
+								break;
+							}
+						}
+					}
+				} catch (\Throwable) {
+				}
 			}
 		}
 
@@ -851,17 +864,19 @@ class LastfmService {
 			];
 		}
 
-		$date = (new \DateTime())->format('Y-m-d');
+		$encodedUser = \rawurlencode($username);
 		$stations = [
 			'recommended' => [
-				'title' => "Recommendations {$date}",
-				'url' => "https://www.last.fm/player/station/user/{$username}/recommended",
-				'config_key' => "lastfm.playlist.recommended.{$date}",
+				'base_name' => 'Recommendations',
+				'url' => "https://www.last.fm/player/station/user/{$encodedUser}/recommended",
+				'config_key_main' => 'lastfm.playlist.recommended',
+				'config_key_dated' => "lastfm.playlist.recommended.{$date}",
 			],
 			'mix' => [
-				'title' => "Mix {$date}",
-				'url' => "https://www.last.fm/player/station/user/{$username}/mix",
-				'config_key' => "lastfm.playlist.mix.{$date}",
+				'base_name' => 'Mix',
+				'url' => "https://www.last.fm/player/station/user/{$encodedUser}/mix",
+				'config_key_main' => 'lastfm.playlist.mix',
+				'config_key_dated' => "lastfm.playlist.mix.{$date}",
 			],
 		];
 
@@ -869,9 +884,8 @@ class LastfmService {
 		$syncedPlaylists = [];
 
 		foreach ($stations as $stationType => $stationInfo) {
-			$title = $stationInfo['title'];
+			$baseName = $stationInfo['base_name'];
 			$url = $stationInfo['url'];
-			$configKey = $stationInfo['config_key'];
 
 			$log("Fetching Last.fm station tracks from {$url}...");
 			$stationTracks = $this->fetchStationTracks($url);
@@ -882,7 +896,7 @@ class LastfmService {
 				continue;
 			}
 
-			$log("Found {$totalTracks} tracks in Last.fm station '{$title}'. Matching against local music library...");
+			$log("Found {$totalTracks} tracks in Last.fm station '{$baseName}'. Matching against local music library...");
 
 			$ncTrackIds = [];
 			$tracksForM3u = [];
@@ -919,52 +933,82 @@ class LastfmService {
 			}
 
 			$matchedCount = \count($ncTrackIds);
-			$log("Matched {$matchedCount} of {$totalTracks} tracks in local library for '{$title}'.");
+			$log("Matched {$matchedCount} of {$totalTracks} tracks in local library for '{$baseName}'.");
 
-			// 1. Save M3U file in user's ListenBrainz folder
-			$savedM3u = $this->savePlaylistToListenBrainzFolder($userId, $title, $tracksForM3u);
-			$m3uFilename = ((string)\preg_replace('/[^a-zA-Z0-9_\-,. ]/', '', $title)) . '.m3u';
+			// 1. Save M3U files in user's ListenBrainz folder (both current and dated snapshot)
+			$this->savePlaylistToListenBrainzFolder($userId, $baseName, $tracksForM3u);
+			$savedM3u = $this->savePlaylistToListenBrainzFolder($userId, "{$baseName} {$date}", $tracksForM3u);
 
-			// 2. Create or update Nextcloud music server playlist
-			$playlistName = $title . ' (Last.fm)';
-			$existingId = (int)$this->config->getUserValue($userId, 'music', $configKey, '0');
-			$ncPlaylist = null;
-
-			if ($existingId > 0) {
+			// 2. Create or update Nextcloud music server playlists
+			// 2a. Main persistent playlist: "Recommendations (Last.fm)" / "Mix (Last.fm)"
+			$mainPlaylistName = $baseName . ' (Last.fm)';
+			$mainId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_main'], '0');
+			$mainPlaylist = null;
+			if ($mainId > 0) {
 				try {
-					$ncPlaylist = $playlistBusinessLayer->find($existingId, $userId);
+					$mainPlaylist = $playlistBusinessLayer->find($mainId, $userId);
 				} catch (\OCP\AppFramework\Db\DoesNotExistException) {
-					$ncPlaylist = null;
+					$mainPlaylist = null;
 				}
 			}
-
-			if (!$ncPlaylist) {
-				$matching = $playlistBusinessLayer->findAllByName($playlistName, $userId);
+			if (!$mainPlaylist) {
+				$matching = $playlistBusinessLayer->findAllByName($mainPlaylistName, $userId);
 				if (!empty($matching)) {
-					$ncPlaylist = $matching[0];
-					$this->config->setUserValue($userId, 'music', $configKey, (string)$ncPlaylist->getId());
+					$mainPlaylist = $matching[0];
+					$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
 				}
 			}
-
-			if (!$ncPlaylist) {
-				$ncPlaylist = $playlistBusinessLayer->create($playlistName, $userId);
-				$this->config->setUserValue($userId, 'music', $configKey, (string)$ncPlaylist->getId());
-				$log("Created Nextcloud playlist '{$playlistName}' (ID {$ncPlaylist->getId()})");
+			if (!$mainPlaylist) {
+				$mainPlaylist = $playlistBusinessLayer->create($mainPlaylistName, $userId);
+				$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
+				$log("Created Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
 			} else {
-				if ($ncPlaylist->getName() !== $playlistName) {
-					$playlistBusinessLayer->rename($playlistName, $ncPlaylist->getId(), $userId);
+				if ($mainPlaylist->getName() !== $mainPlaylistName) {
+					$playlistBusinessLayer->rename($mainPlaylistName, $mainPlaylist->getId(), $userId);
 				}
-				$log("Updating Nextcloud playlist '{$playlistName}' (ID {$ncPlaylist->getId()})");
+				$log("Updating Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
 			}
+			$playlistBusinessLayer->setTracks($ncTrackIds, $mainPlaylist->getId(), $userId);
 
-			$playlistBusinessLayer->setTracks($ncTrackIds, $ncPlaylist->getId(), $userId);
+			// 2b. Dated snapshot playlist: "Recommendations YYYY-MM-DD (Last.fm)" / "Mix YYYY-MM-DD (Last.fm)"
+			$datedPlaylistName = "{$baseName} {$date} (Last.fm)";
+			$datedId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_dated'], '0');
+			$datedPlaylist = null;
+			if ($datedId > 0) {
+				try {
+					$datedPlaylist = $playlistBusinessLayer->find($datedId, $userId);
+				} catch (\OCP\AppFramework\Db\DoesNotExistException) {
+					$datedPlaylist = null;
+				}
+			}
+			if (!$datedPlaylist) {
+				$matching = $playlistBusinessLayer->findAllByName($datedPlaylistName, $userId);
+				if (!empty($matching)) {
+					$datedPlaylist = $matching[0];
+					$this->config->setUserValue($userId, 'music', $stationInfo['config_key_dated'], (string)$datedPlaylist->getId());
+				}
+			}
+			if (!$datedPlaylist) {
+				$datedPlaylist = $playlistBusinessLayer->create($datedPlaylistName, $userId);
+				$this->config->setUserValue($userId, 'music', $stationInfo['config_key_dated'], (string)$datedPlaylist->getId());
+				$log("Created Nextcloud playlist '{$datedPlaylistName}' (ID {$datedPlaylist->getId()})");
+			} else {
+				if ($datedPlaylist->getName() !== $datedPlaylistName) {
+					$playlistBusinessLayer->rename($datedPlaylistName, $datedPlaylist->getId(), $userId);
+				}
+				$log("Updating Nextcloud playlist '{$datedPlaylistName}' (ID {$datedPlaylist->getId()})");
+			}
+			$playlistBusinessLayer->setTracks($ncTrackIds, $datedPlaylist->getId(), $userId);
 
 			$syncedPlaylists[$stationType] = [
-				'playlist_id' => $ncPlaylist->getId(),
-				'name' => $playlistName,
+				'playlist_id' => $mainPlaylist->getId(),
+				'dated_playlist_id' => $datedPlaylist->getId(),
+				'name' => $mainPlaylistName,
+				'dated_name' => $datedPlaylistName,
 				'total_tracks' => $totalTracks,
 				'matched_tracks' => $matchedCount,
-				'm3u_file' => "ListenBrainz/{$m3uFilename}",
+				'm3u_file' => "ListenBrainz/{$baseName}.m3u",
+				'dated_m3u_file' => "ListenBrainz/{$baseName} {$date}.m3u",
 				'm3u_saved' => $savedM3u,
 			];
 		}

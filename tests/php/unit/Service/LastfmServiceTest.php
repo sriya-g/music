@@ -182,16 +182,15 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 		$this->assertStringContainsString("missing/Artist B - Song B.mp3", $writtenContent);
 	}
 
-	public function testSyncStationPlaylistsWeeklySkip() {
+	public function testSyncStationPlaylistsDailySkip() {
 		$userId = 'user1';
 		$now = \time();
-		$twoDaysAgo = $now - (2 * 86400);
 
 		$this->config->expects($this->any())
 			->method('getUserValue')
-			->will($this->returnCallback(function($u, $app, $key, $default = null) use ($twoDaysAgo) {
+			->will($this->returnCallback(function($u, $app, $key, $default = null) use ($now) {
 				if ($key === 'lastfm.playlist.last_station_sync') {
-					return (string)$twoDaysAgo;
+					return (string)$now;
 				}
 				if ($key === 'lastfm.username') {
 					return 'testuser';
@@ -202,7 +201,7 @@ class LastfmServiceTest extends \PHPUnit\Framework\TestCase {
 		$result = $this->service->syncStationPlaylists($userId, null, false);
 		$this->assertTrue($result['success']);
 		$this->assertTrue($result['skipped']);
-		$this->assertStringContainsString('threshold: 7 days', $result['message']);
+		$this->assertStringContainsString('already synced today', $result['message']);
 	}
 
 	public function testSyncStationPlaylistsMissingUsername() {

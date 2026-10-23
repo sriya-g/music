@@ -176,6 +176,13 @@ class ScrobblerController extends Controller {
 				return new JSONResponse(['error' => ['message' => $result['message'] ?? 'Sync failed']], 400);
 			}
 
+			// Also sync station playlists daily (Recommendations and Mix)
+			try {
+				$stationResult = $lastfmService->syncStationPlaylists($this->userId, $username, true);
+				$result['stations'] = $stationResult;
+			} catch (\Throwable) {
+			}
+
 			return new JSONResponse($result);
 		} catch (\Throwable $e) {
 			return new JSONResponse(['error' => ['message' => $e->getMessage()]], 500);

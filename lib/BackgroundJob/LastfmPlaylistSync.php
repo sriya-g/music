@@ -26,10 +26,14 @@ class LastfmPlaylistSync extends TimedJob {
 			$time = \OC::$server->query(ITimeFactory::class);
 		}
 		parent::__construct($time);
-		// Run weekly (7 * 86400 = 604800 seconds)
-		$this->setInterval(604800);
+		// Run daily (86400 seconds)
+		$this->setInterval(86400);
 	}
 
+	/**
+	 * @param mixed $arguments
+	 * @return void
+	 */
 	public function run($arguments) {
 		$app = \OC::$server->query(Application::class);
 		$logger = $app->get(Logger::class);

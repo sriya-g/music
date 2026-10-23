@@ -32,12 +32,12 @@ class LastfmPlaylistSync extends BaseCommand {
 	protected function doConfigure() : void {
 		$this
 			->setName('music:lastfm-playlist-sync')
-			->setDescription('Sync Last.fm recommendations and mix playlists for one or more users')
+			->setDescription('Sync Last.fm recommendation and mix playlists daily for one or more users')
 			->addOption(
 				'force',
 				'f',
 				InputOption::VALUE_NONE,
-				'Force sync even if playlists were already synced within the last 7 days'
+				'Force sync even if playlists were already synced today'
 			);
 	}
 
