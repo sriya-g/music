@@ -667,6 +667,7 @@ class LastfmService {
 		\curl_setopt($ch, \CURLOPT_URL, $stationUrl);
 		\curl_setopt($ch, \CURLOPT_CONNECTTIMEOUT, 15);
 		\curl_setopt($ch, \CURLOPT_TIMEOUT, 30);
+		\curl_setopt($ch, \CURLOPT_FOLLOWLOCATION, true);
 		\curl_setopt($ch, \CURLOPT_RETURNTRANSFER, true);
 		\curl_setopt($ch, \CURLOPT_USERAGENT, 'NextcloudMusicApp/1.0');
 		\curl_setopt($ch, \CURLOPT_HTTPHEADER, [
@@ -1013,22 +1014,36 @@ class LastfmService {
 			];
 		}
 
-		// Update last sync timestamp
-		$this->config->setUserValue($userId, 'music', $lastSyncKey, (string)$now);
-
-		// Clean up week-old station playlists
-		$this->cleanupOldStationPlaylists($userId, 7, false, $logCallback);
-
 		$syncedCount = \count($syncedPlaylists);
-		$msg = "Successfully synced {$syncedCount} Last.fm station playlist(s) for user {$userId}.";
+		if ($syncedCount > 0) {
+			// Update last sync timestamp only when playlists were successfully synced
+			$this->config->setUserValue($userId, 'music', $lastSyncKey, (string)$now);
+
+			// Clean up week-old station playlists
+			$this->cleanupOldStationPlaylists($userId, 7, false, $logCallback);
+
+			$msg = "Successfully synced {$syncedCount} Last.fm station playlist(s) for user {$userId}.";
+			$log($msg);
+
+			return [
+				'success' => true,
+				'skipped' => false,
+				'username' => $username,
+				'date' => $date,
+				'playlists' => $syncedPlaylists,
+				'message' => $msg,
+			];
+		}
+
+		$msg = "No Last.fm station playlists could be synced for user {$userId}.";
 		$log($msg);
 
 		return [
-			'success' => true,
+			'success' => false,
 			'skipped' => false,
 			'username' => $username,
 			'date' => $date,
-			'playlists' => $syncedPlaylists,
+			'playlists' => [],
 			'message' => $msg,
 		];
 	}

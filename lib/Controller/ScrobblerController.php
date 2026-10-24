@@ -180,7 +180,8 @@ class ScrobblerController extends Controller {
 			try {
 				$stationResult = $lastfmService->syncStationPlaylists($this->userId, $username, true);
 				$result['stations'] = $stationResult;
-			} catch (\Throwable) {
+			} catch (\Throwable $e) {
+				\OC::$server->getLogger()->warning('Last.fm station playlists sync in controller failed: ' . $e->getMessage(), ['app' => 'music', 'exception' => $e]);
 			}
 
 			return new JSONResponse($result);
