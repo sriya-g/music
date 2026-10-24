@@ -615,7 +615,7 @@ class LastfmService {
 				if ($existingPlaylistId > 0) {
 					try {
 						$playlist = $playlistBusinessLayer->find($existingPlaylistId, $userId);
-					} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+					} catch (\Throwable) {
 						$playlist = null;
 					}
 				}
@@ -787,6 +787,31 @@ class LastfmService {
 	}
 
 	/**
+	 * Delete a file from the user's ListenBrainz folder.
+	 *
+	 * @param string $userId
+	 * @param string $filename
+	 * @return bool
+	 */
+	public function deleteFileFromListenBrainzFolder(string $userId, string $filename) : bool {
+		try {
+			$userFolder = \OC::$server->getUserFolder($userId);
+			if ($userFolder->nodeExists('ListenBrainz')) {
+				$lbFolder = $userFolder->get('ListenBrainz');
+				if ($lbFolder instanceof Folder && $lbFolder->nodeExists($filename)) {
+					$file = $lbFolder->get($filename);
+					$file->delete();
+					$this->logger->info("Last.fm playlist sync: deleted file ListenBrainz/{$filename}");
+					return true;
+				}
+			}
+		} catch (\Throwable $e) {
+			$this->logger->warning("Last.fm playlist sync: failed to delete file ListenBrainz/{$filename}: " . $e->getMessage());
+		}
+		return false;
+	}
+
+	/**
 	 * Sync Last.fm station playlists (recommendations and mix) daily for the user.
 	 * Also saves M3U playlists to the ListenBrainz folder and creates/updates playlists in Nextcloud.
 	 *
@@ -872,12 +897,14 @@ class LastfmService {
 				'url' => "https://www.last.fm/player/station/user/{$encodedUser}/recommended",
 				'config_key_main' => 'lastfm.playlist.recommended',
 				'config_key_dated' => "lastfm.playlist.recommended.{$date}",
+				'keep_undated' => true,
 			],
 			'mix' => [
 				'base_name' => 'Mix',
 				'url' => "https://www.last.fm/player/station/user/{$encodedUser}/mix",
 				'config_key_main' => 'lastfm.playlist.mix',
 				'config_key_dated' => "lastfm.playlist.mix.{$date}",
+				'keep_undated' => false,
 			],
 		];
 
@@ -936,49 +963,75 @@ class LastfmService {
 			$matchedCount = \count($ncTrackIds);
 			$log("Matched {$matchedCount} of {$totalTracks} tracks in local library for '{$baseName}'.");
 
-			// 1. Save M3U files in user's ListenBrainz folder (both current and dated snapshot)
-			$this->savePlaylistToListenBrainzFolder($userId, $baseName, $tracksForM3u);
-			$savedM3u = $this->savePlaylistToListenBrainzFolder($userId, "{$baseName} {$date}", $tracksForM3u);
-
-			// 2. Create or update Nextcloud music server playlists
-			// 2a. Main persistent playlist: "Recommendations (Last.fm)" / "Mix (Last.fm)"
-			$mainPlaylistName = $baseName . ' (Last.fm)';
-			$mainId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_main'], '0');
 			$mainPlaylist = null;
-			if ($mainId > 0) {
-				try {
-					$mainPlaylist = $playlistBusinessLayer->find($mainId, $userId);
-				} catch (\OCP\AppFramework\Db\DoesNotExistException) {
-					$mainPlaylist = null;
-				}
-			}
-			if (!$mainPlaylist) {
-				$matching = $playlistBusinessLayer->findAllByName($mainPlaylistName, $userId);
-				if (!empty($matching)) {
-					$mainPlaylist = $matching[0];
-					$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
-				}
-			}
-			if (!$mainPlaylist) {
-				$mainPlaylist = $playlistBusinessLayer->create($mainPlaylistName, $userId);
-				$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
-				$log("Created Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
-			} else {
-				if ($mainPlaylist->getName() !== $mainPlaylistName) {
-					$playlistBusinessLayer->rename($mainPlaylistName, $mainPlaylist->getId(), $userId);
-				}
-				$log("Updating Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
-			}
-			$playlistBusinessLayer->setTracks($ncTrackIds, $mainPlaylist->getId(), $userId);
+			$mainPlaylistName = null;
+			$mainM3uFile = null;
 
-			// 2b. Dated snapshot playlist: "Recommendations YYYY-MM-DD (Last.fm)" / "Mix YYYY-MM-DD (Last.fm)"
+			if (!empty($stationInfo['keep_undated'])) {
+				// 1a. Save persistent M3U file: ListenBrainz/{$baseName}.m3u
+				$this->savePlaylistToListenBrainzFolder($userId, $baseName, $tracksForM3u);
+				$mainM3uFile = "ListenBrainz/{$baseName}.m3u";
+
+				// 2a. Main persistent playlist: "Recommendations (Last.fm)"
+				$mainPlaylistName = $baseName . ' (Last.fm)';
+				$mainId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_main'], '0');
+				if ($mainId > 0) {
+					try {
+						$mainPlaylist = $playlistBusinessLayer->find($mainId, $userId);
+					} catch (\Throwable) {
+						$mainPlaylist = null;
+					}
+				}
+				if (!$mainPlaylist) {
+					$matching = $playlistBusinessLayer->findAllByName($mainPlaylistName, $userId);
+					if (!empty($matching)) {
+						$mainPlaylist = $matching[0];
+						$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
+					}
+				}
+				if (!$mainPlaylist) {
+					$mainPlaylist = $playlistBusinessLayer->create($mainPlaylistName, $userId);
+					$this->config->setUserValue($userId, 'music', $stationInfo['config_key_main'], (string)$mainPlaylist->getId());
+					$log("Created Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
+				} else {
+					if ($mainPlaylist->getName() !== $mainPlaylistName) {
+						$playlistBusinessLayer->rename($mainPlaylistName, $mainPlaylist->getId(), $userId);
+					}
+					$log("Updating Nextcloud playlist '{$mainPlaylistName}' (ID {$mainPlaylist->getId()})");
+				}
+				$playlistBusinessLayer->setTracks($ncTrackIds, $mainPlaylist->getId(), $userId);
+			} else {
+				// Remove undated M3U file and undated playlist if present (e.g. for Mix)
+				$this->deleteFileFromListenBrainzFolder($userId, "{$baseName}.m3u");
+				$undatedPlaylistName = $baseName . ' (Last.fm)';
+				$oldMainId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_main'], '0');
+				if ($oldMainId > 0) {
+					try {
+						$playlistBusinessLayer->delete($oldMainId, $userId);
+						$log("Removed undated playlist '{$undatedPlaylistName}' (ID {$oldMainId})");
+					} catch (\Throwable) {
+					}
+					$this->config->deleteUserValue($userId, 'music', $stationInfo['config_key_main']);
+				}
+				$matching = $playlistBusinessLayer->findAllByName($undatedPlaylistName, $userId);
+				foreach ($matching as $matchPl) {
+					try {
+						$playlistBusinessLayer->delete($matchPl->getId(), $userId);
+						$log("Removed undated playlist '{$undatedPlaylistName}' (ID {$matchPl->getId()})");
+					} catch (\Throwable) {
+					}
+				}
+			}
+
+			// 1b & 2b. Dated snapshot playlist: "Recommendations YYYY-MM-DD (Last.fm)" / "Mix YYYY-MM-DD (Last.fm)"
+			$savedM3u = $this->savePlaylistToListenBrainzFolder($userId, "{$baseName} {$date}", $tracksForM3u);
 			$datedPlaylistName = "{$baseName} {$date} (Last.fm)";
 			$datedId = (int)$this->config->getUserValue($userId, 'music', $stationInfo['config_key_dated'], '0');
 			$datedPlaylist = null;
 			if ($datedId > 0) {
 				try {
 					$datedPlaylist = $playlistBusinessLayer->find($datedId, $userId);
-				} catch (\OCP\AppFramework\Db\DoesNotExistException) {
+				} catch (\Throwable) {
 					$datedPlaylist = null;
 				}
 			}
@@ -1002,13 +1055,13 @@ class LastfmService {
 			$playlistBusinessLayer->setTracks($ncTrackIds, $datedPlaylist->getId(), $userId);
 
 			$syncedPlaylists[$stationType] = [
-				'playlist_id' => $mainPlaylist->getId(),
+				'playlist_id' => $mainPlaylist ? $mainPlaylist->getId() : null,
 				'dated_playlist_id' => $datedPlaylist->getId(),
 				'name' => $mainPlaylistName,
 				'dated_name' => $datedPlaylistName,
 				'total_tracks' => $totalTracks,
 				'matched_tracks' => $matchedCount,
-				'm3u_file' => "ListenBrainz/{$baseName}.m3u",
+				'm3u_file' => $mainM3uFile,
 				'dated_m3u_file' => "ListenBrainz/{$baseName} {$date}.m3u",
 				'm3u_saved' => $savedM3u,
 			];
@@ -1081,6 +1134,25 @@ class LastfmService {
 			$playlistName = $playlist->getName() ?? '';
 			$playlistId = $playlist->getId();
 
+			// Also delete any leftover undated "Mix (Last.fm)" playlists
+			if ($playlistName === 'Mix (Last.fm)') {
+				if (!$dryRun) {
+					try {
+						$playlistBusinessLayer->delete($playlistId, $userId);
+						$log("Deleted undated Last.fm playlist '{$playlistName}' (ID {$playlistId})");
+						$deletedPlaylists[] = [
+							'id' => $playlistId,
+							'name' => $playlistName,
+							'tracks' => $playlist->getTrackCount(),
+							'age_days' => 0,
+						];
+					} catch (\Throwable $e) {
+						$log("Failed to delete playlist '{$playlistName}' (ID {$playlistId}): " . $e->getMessage());
+					}
+				}
+				continue;
+			}
+
 			// Only clean up Last.fm station playlists (Recommendations / Mix with a date)
 			$isStationPlaylist = (
 				\strpos($playlistName, '(Last.fm)') !== false &&
@@ -1141,7 +1213,7 @@ class LastfmService {
 						} else {
 							try {
 								$playlistBusinessLayer->find($plId, $userId);
-							} catch (\OCP\AppFramework\Db\DoesNotExistException) {
+							} catch (\Throwable) {
 								$this->config->deleteUserValue($userId, 'music', $key);
 							}
 						}
@@ -1170,7 +1242,7 @@ class LastfmService {
 		if ($playlistId > 0) {
 			try {
 				$playlist = $playlistBusinessLayer->find($playlistId, $userId);
-			} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+			} catch (\Throwable) {
 				$playlist = null;
 			}
 		}

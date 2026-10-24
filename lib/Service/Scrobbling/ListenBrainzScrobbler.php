@@ -668,7 +668,7 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 			if ($playlistId > 0) {
 				try {
 					$ncPlaylist = $playlistBusinessLayer->find($playlistId, $userId);
-				} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+				} catch (\Throwable $e) {
 					$ncPlaylist = null;
 				}
 			}
@@ -817,7 +817,7 @@ class ListenBrainzScrobbler extends ExternalScrobbler {
 					} else {
 						try {
 							$playlistBusinessLayer->find($plId, $userId);
-						} catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+						} catch (\Throwable $e) {
 							$this->config->deleteUserValue($userId, 'music', $key);
 						}
 					}
